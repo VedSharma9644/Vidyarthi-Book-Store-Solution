@@ -1,0 +1,93 @@
+﻿@model SmtpSetting
+@{
+    ViewData["Title"] = "Add Email Config";
+}
+
+<div class="container-fluid">
+    <div class="header">
+        <h1 class="header-title"><em>Email Settings</em></h1>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary">
+                    <a asp-action="Index" class="btn btn-light btn-sm">Back</a>
+                </div>
+                <div class="card-body">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8 py-3 border border-2">
+                            <form id="submit-form" asp-action="SaveEmailConfig" method="post">
+                                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                                <div class="mb-3">
+                                    <label asp-for="EmailProviderName" class="form-label"></label>
+                                    <input asp-for="EmailProviderName" class="form-control" />
+                                    <span asp-validation-for="EmailProviderName" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="FromName" class="form-label"></label>
+                                    <input asp-for="FromName" class="form-control" />
+                                    <span asp-validation-for="FromName" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="FromAddress" class="form-label"></label>
+                                    <input asp-for="FromAddress" class="form-control" />
+                                    <span asp-validation-for="FromAddress" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="SmtpServer" class="form-label"></label>
+                                    <input asp-for="SmtpServer" class="form-control" />
+                                    <span asp-validation-for="SmtpServer" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="SmtpPort" class="form-label"></label>
+                                    <input asp-for="SmtpPort" class="form-control" type="number" />
+                                    <span asp-validation-for="SmtpPort" class="text-danger"></span>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input asp-for="UseSmtpAuthentication" class="form-check-input" />
+                                    <label asp-for="UseSmtpAuthentication" class="form-check-label"></label>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="SmtpUsername" class="form-label"></label>
+                                    <input asp-for="SmtpUsername" class="form-control" />
+                                    <span asp-validation-for="SmtpUsername" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="SmtpPassword" class="form-label"></label>
+                                    <input asp-for="SmtpPassword" type="password" class="form-control" />
+                                    <span asp-validation-for="SmtpPassword" class="text-danger"></span>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input asp-for="EnableSsl" class="form-check-input" />
+                                    <label asp-for="EnableSsl" class="form-check-label"></label>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input asp-for="IsActive" class="form-check-input" />
+                                    <label asp-for="IsActive" class="form-check-label"></label>
+                                </div>
+
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-warning w-100">Submit</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}

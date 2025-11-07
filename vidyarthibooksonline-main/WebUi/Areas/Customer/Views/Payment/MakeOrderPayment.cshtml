@@ -1,0 +1,124 @@
+﻿@using Domain.DTOs.PaymentGateway
+@model PaymentDto
+
+@{
+    ViewData["Title"] = "Make Order Payment";
+    var orderAmount = Model.OrderAmount;
+    var orderReceipt = Model.OrderReceipt;
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Make Order Payment",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Payment", IsActive = true }
+        }
+            };
+}
+
+<!-- Header Section -->
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row justify-content-center w-100">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header text-center">
+                        <h5 class="card-title">Total amount to be paid :  @orderAmount.ToString("c", new CultureInfo("en-IN"))</h5>
+                    </div>
+                    <div class="card-body">
+
+                        <div class="text-center mt-3">
+                            <button id="payButton" class="btn btn-primary w-50">Pay Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+   
+</section>
+
+
+@section Scripts {
+    <script src="https://checkout.razorpay.com/v1/checkout.js?config=@Model.ApiClientKey"></script>
+    <script>
+            document.getElementById('payButton').onclick = function (e) {
+            e.preventDefault();
+
+            var amount = '@orderAmount';
+            var receipt = '@orderReceipt';
+
+            if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+                alert("Please enter a valid amount.");
+                return;
+            }
+
+            var amountInPaise = parseFloat(amount) * 100; // Razorpay expects amount in paise (smallest currency unit)
+
+            fetch('/Customer/Payment/CreateOrder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ amount: amountInPaise,receipt:receipt })
+            })
+                .then(response => response.json())
+                .then(order => {
+                    if (order.error) {
+                        alert(order.message);
+                        return;
+                    }
+
+                    var options = {
+                        "key": "@Model.ApiClientKey", // Razorpay Key ID from backend
+                        "amount": order.amount, // Amount in paise from backend
+                        "currency": "INR",
+                        "name": "Vidyarthi Books",
+                        "description": "Test Transaction",
+                        "image": "https://vidyarthibooksonline.com/images/logo.png",
+                        "order_id": order.orderId, // Razorpay order ID
+                        "handler": function (response) {
+                            // Handle successful payment response
+                            fetch('/Customer/Payment/PaymentSuccess', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    razorpayPaymentId: response.razorpay_payment_id,
+                                    razorpayOrderId: response.razorpay_order_id,
+                                    razorpaySignature: response.razorpay_signature
+                                })
+                            })
+                                .then(() => {
+
+                                 window.location.href = `/order-completed.html?orderId=${response.razorpay_order_id}&paymentId=${response.razorpay_payment_id}`;
+
+                                });
+                        },
+                        "theme": {
+                            "color": "#3399cc"
+                        },
+                        "display": {
+                            "UPI": true
+                        },
+                        "method": {
+                            "netbanking": true,
+                            "card": true,
+                            "wallet": true,
+                            "upi": true
+                        }
+
+                    };
+
+                    var rzp1 = new Razorpay(options);
+                    rzp1.open();
+                })
+                .catch(error => {
+                    console.error("Error creating order:", error);
+                    alert("There was an error creating the order. Please try again.");
+                });
+        };
+    </script>
+}

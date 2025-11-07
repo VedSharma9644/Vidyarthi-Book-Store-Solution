@@ -1,0 +1,31 @@
+﻿@{
+    ViewData["Title"] = "Legal Notice";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Legal Notice",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Legal Notice", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>1. Website Ownership</h3>
+    <p>This website, <strong>www.vidyarthibooksonline.com</strong>, is owned and operated by Vidyarthi Books Private Limited, registered under the Companies Act, India.</p>
+
+    <h3>2. Intellectual Property</h3>
+    <p>All content, images, trademarks, and designs are the intellectual property of Vidyarthi Books and/or respective authors and publishers. Unauthorized use or reproduction is prohibited.</p>
+
+    <h3>3. Legal Jurisdiction</h3>
+    <p>Any dispute arising out of use of this website or purchases shall be subject to the jurisdiction of courts located in Hydrabad, India.</p>
+
+    <h3>4. Third-Party Links</h3>
+    <p>This site may contain links to other websites. We are not responsible for the content or practices of these external sites.</p>
+
+    <h3>5. Limitation of Liability</h3>
+    <p>We do not guarantee uninterrupted access or error-free operation of the site. We shall not be liable for any damages caused by website outages, cyber attacks, or user actions.</p>
+    </div>
+</section>

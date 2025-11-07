@@ -1,0 +1,22 @@
+﻿@model TicketDTOs
+<div id="errorContainer">
+	@if (TempData.ContainsKey("error"))
+	{
+		<div class="alert alert-danger">
+			@TempData["error"]
+		</div>
+	}
+</div>
+<form method="post" asp-action="ReplyOnTickets">
+	<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+	<input asp-for="Ticket!.Id" value="@Model.Ticket!.Id" type="hidden" />
+	<input asp-for="Ticket!.AppUserId" value="@Model.Ticket.AppUserId" type="hidden" />
+	<div class="mb-3">
+		<label>Message</label>
+		<textarea asp-for="TicketMessage!.Message" class="form-control" rows="4" placeholder="Message"></textarea>
+		<span class="text-danger" style="position:absolute;font-size:13px; line-height:14px">@(ViewBag.MessageError != null ? ViewBag.MessageError : "")</span>		
+	</div>
+	<div class="text-left">
+		<button type="submit" class="btn btn-primary">Send Message</button>
+	</div>
+</form>

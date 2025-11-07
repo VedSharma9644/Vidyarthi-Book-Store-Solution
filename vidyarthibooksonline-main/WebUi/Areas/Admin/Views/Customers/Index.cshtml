@@ -1,0 +1,63 @@
+﻿@model List<AppUser>
+@{
+    ViewData["Title"] = "customer";
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">
+            Cusotmers
+        </h1>
+
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info">
+                </div>
+                <div class="card-body">
+                    <table id="datatables-multi" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>FullName</th>
+                                <th>Email</th>
+                                <th>Address</th>
+                                <th>City</th>
+                               
+                                <th>Date Created</th>
+                               
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                var i = 1;
+                                @foreach (var obj in Model)
+                                {
+                                    <tr>
+                                        <td>@i</td>
+                                        <td>@($"{obj.FirstName} {obj.LastName}")</td>
+                                        <td>
+                                            @obj.Email
+                                        </td> 
+                                        <td>
+                                            @obj.Address
+                                        </td> <td>
+                                            @obj.City
+                                        </td>
+                                        <td>@obj.CreatedAt.ToString("dd-MM-yyyy hh:mm tt", new CultureInfo("en-IN"))</td>
+                                    </tr>
+                                    i++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}

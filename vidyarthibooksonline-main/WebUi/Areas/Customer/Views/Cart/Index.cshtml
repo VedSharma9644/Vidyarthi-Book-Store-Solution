@@ -1,0 +1,365 @@
+﻿@{
+    ViewData["Title"] = "Shopping Cart";
+    var headerModel = new PageHeaderDto
+    {
+        Title = "Your Shopping Cart",
+        Breadcrumbs = new List<Breadcrumb>
+    {
+    new Breadcrumb { Text = "Cart", IsActive = true }
+    }
+    };
+ }
+
+    <!-- Header Section -->
+    <partial name="_PageHeader" model="headerModel" />
+
+    <section class="cart-section py-5">
+        <div class="container">
+            <div class="row">
+                <!-- Cart Items -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Your Items</h5>
+                        </div>
+                        <div class="card-body" id="cartItemsContainer">
+                            <!-- Cart items will be loaded here dynamically -->
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading your cart...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Continue Shopping Button -->
+                    <div class="mt-4 d-flex justify-content-between">
+                    <a href="/school-zone.html" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>Continue Shopping
+                        </a>
+
+                    <div class="d-flex justify-content-end mb-3">
+                        <button id="clearCartBtn" class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash-alt me-1"></i> Clear Cart
+                        </button>
+                    </div>
+
+                    </div>
+                </div>
+
+                <!-- Order Summary -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm sticky-top" style="top: 20px;">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Order Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Subtotal (<span id="itemCount">0</span> items)</span>
+                                <span>₹<span id="subtotal">0.00</span></span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between mb-2">
+                            <span style="font-size:14px">Shipping (Vidyarthibooks Online Shipping - Standard delivery (Incl. GST))</span>
+                            <span>₹<span id="shipping">0.00</span></span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between fw-bold fs-5 mb-4">
+                                <span>Total</span>
+                                <span>₹<span id="total">0.00</span></span>
+                            </div>
+                        <a id="checkoutBtn" href="/cart-checkout.html" class="btn btn-primary w-100 py-2">
+                            Proceed to Checkout <i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+
+                            <!-- Coupon Code -->
+                           @*  <div class="mt-3">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control form-control-sm" placeholder="Coupon Code">
+                                    <button class="btn btn-outline-secondary btn-sm" type="button">Apply</button>
+                                </div>
+                            </div> *@
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @section Scripts {
+        <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadCart();
+        });
+
+        function loadCart() {
+            fetch(`/api/cart/getcart`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load cart');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const items = data?.items || [];
+                    const subtotal = data?.subTotal || 0;
+                    const shipping = data?.shipping || 0;
+
+                    renderCartItems(items);
+                    updateOrderSummary(subtotal,shipping);
+
+                    // Only increment shipping count if new items are added
+                    const currentCount = parseInt(localStorage.getItem('lastCartItemCount')) || 0;
+                    const newCount = items.length;
+
+                    // Update the checkout button with shipping query param
+                    const checkoutBtn = document.getElementById('checkoutBtn');
+                    if (checkoutBtn) {
+                        checkoutBtn.href = `/cart-checkout.html?shipping=${shipping}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('cartItemsContainer').innerHTML = `
+                        <div class="alert alert-danger">Failed to load cart. Please try again later.</div>
+                    `;
+                    updateOrderSummary(0,0);
+                });
+        }
+
+        function renderCartItems(items) {
+            const container = document.getElementById('cartItemsContainer');
+
+            if (!items || items.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                        <h5>Your cart is empty</h5>
+                        <p>Start shopping to add items to your cart</p>
+                        <a href="/books" class="btn btn-primary mt-3">Browse Books</a>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            items.forEach(item => {
+                const itemTotal = (item.price * item.quantity).toFixed(2);
+                html += `
+                    <div class="cart-item row align-items-center py-3 border-bottom" data-item-id="${item.id}">
+                        <div class="col-5">
+                            <h6 class="mb-1">${item.title}</h6>
+                            <small class="text-black">Product ID: ${item.productId}</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="input-group input-group-sm" style="max-width: 120px;">
+                                <input type="text" class="form-control text-center quantity" value="${item.quantity}" readonly>
+                            </div>
+                        </div>
+                        <div class="col-2 text-end">
+                            <span class="fw-bold">₹${itemTotal}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            document.querySelectorAll('.remove-item').forEach(button => {
+                button.addEventListener('click', removeItem);
+            });
+
+            document.querySelectorAll('.quantity').forEach(input => {
+                input.addEventListener('change', updateQuantity);
+            });
+        }
+
+        function updateOrderSummary(subtotal,shipping) {
+            subtotal = Number(subtotal) || 0;
+            shipping = Number(shipping) || 0;
+           
+            const total = subtotal + shipping;
+
+            document.getElementById('itemCount').textContent = document.querySelectorAll('.cart-item').length;
+            document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+            document.getElementById('shipping').textContent = shipping.toFixed(2);
+            document.getElementById('total').textContent = total.toFixed(2);
+
+                // Update the checkout button href
+                const checkoutBtn = document.getElementById('checkoutBtn');
+                if (checkoutBtn) {
+                    checkoutBtn.href = `/cart-checkout.html`;
+                }
+        }
+
+        function incrementQuantity(e) {
+            const input = e.target.closest('.input-group').querySelector('.quantity');
+            input.value = parseInt(input.value) + 1;
+            updateCartItem(input);
+        }
+
+        function decrementQuantity(e) {
+            const input = e.target.closest('.input-group').querySelector('.quantity');
+            if (parseInt(input.value) > 1) {
+                input.value = parseInt(input.value) - 1;
+                updateCartItem(input);
+            }
+        }
+
+        function updateQuantity(e) {
+            const value = parseInt(e.target.value);
+            if (!isNaN(value) && value > 0) {
+                updateCartItem(e.target);
+            } else {
+                e.target.value = 1;
+            }
+        }
+
+        function updateCartItem(inputElement) {
+            const cartItem = inputElement.closest('.cart-item');
+            const itemId = parseInt(cartItem.dataset.itemId);
+            const quantity = parseInt(inputElement.value);
+
+            fetch('/api/cart/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    itemId: itemId,
+                    quantity: quantity
+                })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to update quantity');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    updateCartBadge();
+                    loadCart();
+                   
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to update quantity. Please try again.');
+                });
+        }
+
+        function removeItem(e) {
+            if (!confirm('Are you sure you want to remove this item from your cart?')) {
+                return;
+            }
+
+            const cartItem = e.target.closest('.cart-item');
+            const itemId = cartItem.dataset.itemId;
+
+            fetch(`/api/cart/${itemId}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to remove item');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    updateCartBadge();
+                    loadCart();
+                    
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to remove item. Please try again.');
+                });
+        }
+
+        function updateCartBadge() {
+            const cartBadge = document.getElementById('cartBadge');
+
+            fetch('/api/cart/count')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to get cart count');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        const currentCount = parseInt(cartBadge.getAttribute('data-cart-count')) || 0;
+                        const newCount = data.count;
+
+                        cartBadge.textContent = newCount;
+                        cartBadge.setAttribute('data-cart-count', newCount);
+
+                        if (newCount > 0) {
+                            cartBadge.style.display = 'flex';
+                            if (newCount > currentCount) {
+                                cartBadge.classList.add('cart-badge-pop');
+                                setTimeout(() => {
+                                    cartBadge.classList.remove('cart-badge-pop');
+                                }, 300);
+                            }
+                        } else {
+                            cartBadge.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching cart count:', error);
+                });
+        }
+
+        // Clear cart and reset shipping
+        document.getElementById('clearCartBtn').addEventListener('click', function () {
+            if (!confirm('Are you sure you want to remove all items from your cart?')) return;
+
+            fetch('/api/cart/clear', {
+                method: 'POST'
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to clear cart');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                   
+                    updateCartBadge();
+                    loadCart();
+                    
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to clear cart. Please try again.');
+                });
+        });
+
+        </script>
+    }
+
+<style>
+    .quantity {
+        max-width: 40px;
+    }
+
+    .input-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .input-group-sm .form-control {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .remove-item {
+        font-size: 1rem;
+        border: none;
+        background-color: transparent;
+        color: red
+    }
+</style>

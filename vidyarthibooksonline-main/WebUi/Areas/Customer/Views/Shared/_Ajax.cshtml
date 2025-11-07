@@ -1,0 +1,28 @@
+﻿<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+<script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+
+<script src="~/ajax-helper/websiteAjax.js"></script>
+<script>
+    $(document).ready(function () {
+        // Function to handle form submission
+         function handleFormSubmission(selector) {
+            $(document).on('submit', selector, function (event) {
+                event.preventDefault(); // Prevent the default form submission
+                var form = $(this);
+                var url = form.attr('action');
+                var method = form.attr('method');
+
+                var isFileUpload = form.attr('enctype') === 'multipart/form-data';
+                var data = isFileUpload ? new FormData(this) : form.serialize(); // Use FormData for file uploads
+                var button = form.find('button[type="submit"]');
+                var returnUrl = form.data('return-url'); // Get the return URL if needed
+
+                ajaxRequest(url, method, data, returnUrl, button, isFileUpload); // Pass isFileUpload as true if needed
+            });
+        }
+
+        // Apply to all forms dynamically that match the selector passed to handleFormSubmission
+        handleFormSubmission('form');  // This will apply to all forms
+    });
+</script>
+

@@ -1,0 +1,137 @@
+﻿@{
+    ViewData["Title"] = "Genearal Book";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "General Book",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "General Books", IsActive = true }
+        }
+            };
+}
+<!-- Header Section -->
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="pt-5 bg-light p-2">
+    <div class="container">
+        <!-- Filter & Sort Row -->
+        <div class="row mb-4 ">
+            <div class="col-md-3 mb-3">
+                <select class="form-select" id="category-filter">
+                    <option value="">Filter by Category</option>
+                    <option value="Books">Books</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Cricket Kits">Cricket Kits</option>
+                </select>
+            </div>
+            <div class="col-md-3 mb-3">
+                <select class="form-select" id="price-filter">
+                    <option value="">Filter by Price</option>
+                    <option value="under-50">Under $50</option>
+                    <option value="50-100">$50 - $100</option>
+                    <option value="100-plus">$100+</option>
+                </select>
+            </div>
+            <div class="col-md-3 mb-3">
+                <select class="form-select" id="rating-filter">
+                    <option value="">Filter by Rating</option>
+                    <option value="4">4 Stars & Up</option>
+                    <option value="3">3 Stars & Up</option>
+                </select>
+            </div>
+            <div class="col-md-3 mb-3">
+                <select class="form-select" id="sort-filter">
+                    <option value="">Sort by</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="newest">Newest</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Product List -->
+        <div class="text-center my-4" id="loading-spinner" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <div class="row" id="product-wrapper">
+            <!-- Products will be loaded here dynamically -->
+        </div>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-content-between align-items-center mt-4">
+            <div class="text-muted" id="pagination-info">Loading products...</div>
+            <nav>
+                <ul class="pagination mb-0 gap-3">
+                    <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                    <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                    <li class="page-item"><a class="page-link" href="#">2</a></li>
+                    <li class="page-item"><a class="page-link" href="#">3</a></li>
+                    <li class="page-item"><a class="page-link" href="#">Next</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            loadBooks();
+
+            document.querySelectorAll("#category-filter, #price-filter, #rating-filter, #sort-filter")
+                .forEach(el => el.addEventListener("change", loadBooks));
+        });
+
+        function showSpinner() {
+            document.getElementById("loading-spinner").style.display = "block";
+        }
+
+        function hideSpinner() {
+            document.getElementById("loading-spinner").style.display = "none";
+        }
+
+        function loadBooks() {
+            showSpinner();
+
+            fetch("/api/books/get-all-generalbooks")
+                .then(response => response.json())
+                .then(books => {
+                    const wrapper = document.getElementById("product-wrapper");
+                    wrapper.innerHTML = "";
+
+                    if (books.length === 0) {
+                        wrapper.innerHTML = "<p class='text-center'>No books found.</p>";
+                        document.getElementById("pagination-info").textContent = "No results.";
+                        hideSpinner();
+                        return;
+                    }
+
+                    books.forEach(book => {
+                        wrapper.innerHTML += `
+                            <div class="col-md-3 mb-3 col-6">
+                                <div class="card position-relative p-4 border rounded-3">
+                                    <div class="position-absolute">
+                                        <p class="bg-primary py-1 px-3 fs-6 text-white rounded-2">10% off</p>
+                                    </div>
+                                    <img src="${book.coverImageUrl || '/images/default-book.png'}" class="img-fluid shadow-sm" alt="${book.title}">
+                                    <h6 class="mt-4 mb-0 fw-bold"><a href="#">${book.title}</a></h6>
+                                    <span class="price text-primary fw-bold mb-2 fs-5">₹${book.price}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    document.getElementById("pagination-info").textContent = `Showing ${books.length} results`;
+                    hideSpinner();
+                })
+                .catch(error => {
+                    console.error("Error loading books:", error);
+                    document.getElementById("product-wrapper").innerHTML = "<p>Error loading books.</p>";
+                    hideSpinner();
+                });
+        }
+    </script>
+}

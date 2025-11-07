@@ -1,0 +1,305 @@
+﻿@model RegisterDTOs
+@{
+    ViewData["Title"] = "Register";
+}
+
+<div class="container-fluid vh-100">
+    <div class="row h-100 m-0">
+        <!-- Left Image Section -->
+        <div class="col-lg-6 d-none d-lg-flex  align-items-center justify-content-center p-0">
+            <img src="/img/logo.png" alt="Register Image" width="400" style="object-fit: cover;">
+        </div>
+
+        <!-- Right Form Section -->
+        <div class="col-lg-6 d-flex align-items-center justify-content-center shadow-lg p-0">
+            <div class="w-100 px-lg-5" style="max-width: 75%;">
+                <div class="text-left mb-4">
+                    <h1 class="fw-bold"><em>Register</em></h1>
+                    <hr />
+                </div>
+                <form id="submit-form" method="post" asp-action="RegisterUser">
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Query["returnUrl"]" />
+                    <div class="text-danger" asp-validation-summary="ModelOnly"></div>
+                    <div class="mb-2">
+                        <label for="email" class="form-label">Email</label>
+                        <input asp-for="Email" type="text" class="form-control" id="email" placeholder="enter email " required />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    
+                    <div class="mb-2">
+                        <label asp-for="MobileNumber" class="form-label"></label>
+                        <div class="input-group">
+                            <input asp-for="MobileNumber" class="form-control"
+                                   placeholder="Enter mobile number" />
+                            <button type="button" class="btn btn-outline-secondary"
+                                    id="send-otp-btn">
+                                Send OTP
+                            </button>
+                        </div>
+                        <span asp-validation-for="MobileNumber" class="text-danger"></span>
+
+                        <!-- OTP input: hidden initially -->
+                        <div id="otp-wrapper" class="mt-2 d-none">
+                            <input asp-for="MobileOtp" class="form-control mt-1"
+                                   placeholder="Enter OTP received on mobile" />
+                            <span asp-validation-for="MobileOtp" class="text-danger"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input asp-for="Password" type="password" class="form-control" id="password" placeholder="enter password" required />
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Confirm Password</label>
+                        <input asp-for="ConfirmPassword" type="password" class="form-control" id="confirmPassword" placeholder="enter confirm password" required />
+                        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit"  class="btn btn-primary w-100 py-2">Sign Up</button>
+                    </div>
+                </form>
+                <!-- Separator with OR -->
+                <div class="d-flex align-items-center my-3">
+                    <hr class="flex-grow-1" />
+                    <span class="mx-3 text-muted">OR</span>
+                    <hr class="flex-grow-1" />
+                </div>
+                <!-- New Button for Mobile OTP Registration -->
+                <div class="text-center mt-3">
+                    <button id="btnMobileOtp" class="btn btn-outline-secondary w-100 py-2">
+                        Register with Mobile OTP
+                    </button>
+                </div>
+                <div class="text-center mt-3">
+                    <p class="mb-0">Already have an account? <a class="text-primary" asp-action="Login">Sign In</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile OTP Modal -->
+<div class="modal fade" id="mobileOtpModal" tabindex="-1" aria-labelledby="mobileOtpModalLabel" aria-hidden="true">
+    <div class="modal-dialog  rounded-4">
+        <div class="modal-content rounded-4 shadow">
+            <form id="mobileOtpForm" onsubmit="return false;">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mobileOtpModalLabel">Register with Mobile OTP</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Mobile Input -->
+                    <div id="mobileInputGroup">
+                        <label for="mobileNumber" class="form-label">Mobile Number</label>
+                        <input type="tel" class="form-control rounded-3" id="mobileNumber" placeholder="enter mobile number" pattern="[0-9]{10}" required>
+                        <div class="invalid-feedback">Please enter a valid 10-digit mobile number.</div>
+                    </div>
+
+                    <!-- OTP Input -->
+                    <div id="otpInputGroup" style="display:none;">
+                        <label for="otpCode" class="form-label">Enter OTP</label>
+                        <input type="text" class="form-control rounded-3" id="otpCode" placeholder="6-digit OTP" maxlength="6" pattern="[0-9]{6}">
+                        <div class="invalid-feedback">Please enter the 6-digit OTP.</div>
+                    </div>
+                    <!-- Success message -->
+                    <div id="otpMessage" class="alert alert-success mt-2" style="display:none;"></div>
+
+                    <!-- Error message -->
+                    <div id="otpErrorMessage" class="alert alert-danger mt-2" style="display:none;"></div>
+                </div>
+
+                <div class="modal-footer justify-content-between">
+                    <button type="button" id="sendOtpBtn" class="btn btn-primary">Send OTP</button>
+                    <button type="button" id="verifyOtpBtn" class="btn btn-success" style="display:none;">Verify & Register</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+    <script>
+        // Bootstrap modal reference
+         var mobileOtpModal = new bootstrap.Modal(document.getElementById('mobileOtpModal'));
+
+         // Show modal on button click
+         document.getElementById("btnMobileOtp").addEventListener("click", function () {
+             resetModal();
+             mobileOtpModal.show();
+         });
+
+         // Reset modal UI
+         function resetModal() {
+             document.getElementById('mobileOtpForm').reset();
+             document.getElementById('mobileInputGroup').style.display = 'block';
+             document.getElementById('otpInputGroup').style.display = 'none';
+             document.getElementById('sendOtpBtn').style.display = 'inline-block';
+             document.getElementById('verifyOtpBtn').style.display = 'none';
+             document.getElementById('otpMessage').style.display = 'none';
+             document.getElementById('otpErrorMessage').style.display = 'none';
+             clearValidation();
+         }
+
+         function clearValidation() {
+             document.getElementById('mobileNumber').classList.remove('is-invalid');
+             document.getElementById('otpCode').classList.remove('is-invalid');
+         }
+
+         // Send OTP button click
+         document.getElementById("sendOtpBtn").addEventListener("click", function () {
+             clearValidation();
+               const mobileInput = document.getElementById("mobileNumber");
+            const mobile = mobileInput.value.trim();
+
+            // Basic validation for 10-digit number
+            if (!/^\d{10}$/.test(mobile)) {
+                mobileInput.classList.add("is-invalid");
+                return;
+            } else {
+                mobileInput.classList.remove("is-invalid");
+            }
+            //show loading indicator
+           const sendBtn = document.getElementById("sendOtpBtn");
+           toggleButtonLoading(sendBtn, true, "Sending...");
+
+            // Send OTP request
+            fetch(`/send-otp-via-2factor?mobile=${mobile}`)
+                .then(response => {
+                    if (!response.ok) throw new Error("Failed to send OTP");
+                    toggleButtonLoading(sendBtn, false);
+                    return response.json();
+                })
+                .then(() => {
+                    // Hide mobile input and send button
+                    document.getElementById("mobileInputGroup").style.display = "none";
+                    document.getElementById("sendOtpBtn").style.display = "none";
+
+                    // Show OTP input and verify button
+                    document.getElementById("otpInputGroup").style.display = "block";
+                    document.getElementById("verifyOtpBtn").style.display = "inline-block";
+                })
+                .catch(() => {
+                    toggleButtonLoading(sendBtn, false);
+                    alert("Failed to send OTP. Please try again.");
+                });
+        });
+
+         // Verify OTP and register
+         document.getElementById("verifyOtpBtn").addEventListener("click", function () {
+             clearValidation();
+             var mobile = document.getElementById('mobileNumber').value.trim();
+             var otp = document.getElementById('otpCode').value.trim();
+
+             if (!/^\d{6}$/.test(otp)) {
+                 document.getElementById('otpCode').classList.add('is-invalid');
+                 return;
+             }
+             //show append loading indicator
+             const verifyBtn = document.getElementById("verifyOtpBtn");
+             toggleButtonLoading(verifyBtn, true, "Verifying...");
+             // Call your OTP verification and registration API
+             fetch('/verify-and-register', {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val() // for anti-forgery token if needed
+                 },
+                 body: JSON.stringify({ Mobile: mobile, Otp: otp })
+             })
+             .then(res => {
+                 if (!res.ok) throw new Error("Failed to verify OTP");
+                  toggleButtonLoading(verifyBtn, false);
+                 return res.json();
+             })
+             .then(data => {
+                 if (data.success) {
+                     document.getElementById('otpMessage').textContent = "Registration successful!";
+                     document.getElementById('otpErrorMessage').style.display = 'none';
+
+                     setTimeout(() => {
+                         mobileOtpModal.hide();
+                         // Optionally, redirect to login or dashboard
+                         window.location.href = data.redirectUrl || '/login';
+                     }, 1500);
+                 } else {
+                      toggleButtonLoading(verifyBtn, false);
+                     document.getElementById('otpErrorMessage').textContent = data.message || "Invalid OTP";
+                     document.getElementById('otpErrorMessage').style.display = 'block';
+                 }
+             })
+             .catch(err => {
+                  toggleButtonLoading(verifyBtn, false);
+                 document.getElementById('otpErrorMessage').textContent = "Error verifying OTP: " + err.message;
+                 document.getElementById('otpErrorMessage').style.display = 'block';
+             });
+         });
+
+          //loading indicator function
+        function toggleButtonLoading(button, isLoading, loadingText) {
+            if (isLoading) {
+                button.disabled = true;
+                button.dataset.originalText = button.innerHTML;
+                button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${loadingText}`;
+            } else {
+                button.disabled = false;
+                button.innerHTML = button.dataset.originalText;
+            }
+        }
+    </script>
+    <script>
+        document.getElementById("send-otp-btn").addEventListener("click", async function () {
+            const mobileInput = document.querySelector('input[name="MobileNumber"]');
+            const mobile = mobileInput.value.trim();
+
+            if (!/^\d{10}$/.test(mobile)) {
+                alert("Please enter a valid 10-digit mobile number.");
+                mobileInput.focus();
+                return;
+            }
+
+            this.disabled = true;
+            this.textContent = "Sending...";
+
+            try {
+                const response = await fetch(`/send-otp-via-2factor?mobile=${mobile}`);
+                if (response.ok) {
+                    document.getElementById("otp-wrapper").classList.remove("d-none");
+                    this.textContent = "OTP Sent";
+                } else {
+                    const data = await response.json();
+                    alert(data.message || "Failed to send OTP.");
+                    this.textContent = "Send OTP";
+                    this.disabled = false;
+                }
+            } catch (err) {
+                alert("Error sending OTP.");
+                this.textContent = "Send OTP";
+                this.disabled = false;
+            }
+        });
+    </script>
+}
+
+<style>
+    /* Rounded corners on modal and form container */
+    #mobileOtpModal .modal-content {
+        border-radius: 15px;
+    }
+
+    .form-container {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+
+    /* Smaller modal width */
+    #mobileOtpModal .modal-dialog {
+        max-width: 380px;
+    }
+</style>

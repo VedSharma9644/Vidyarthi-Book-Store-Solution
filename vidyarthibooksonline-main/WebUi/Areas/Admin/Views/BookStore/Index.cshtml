@@ -1,0 +1,72 @@
+﻿@model List<BookDto>
+@using System.Globalization
+@{
+    ViewData["Title"] = "Books";
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">Manage Books</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary">
+                    <a asp-action="Upsert" class="btn btn-dark btn-sm float-end">Add Book</a>
+                </div>
+                <div class="card-body">
+                    <table id="datatables-multi" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>ISBN</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>BookType</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                var i = 1;
+                                foreach (var obj in Model)
+                                {
+                                    <tr>
+                                        <td>@i</td>
+                                        <td>@obj.Title</td>
+                                        <td>@obj.Author</td>
+                                        <td>@obj.ISBN</td>
+                                        <td>₹@obj.Price</td>
+                                        <td>@obj.StockQuantity</td>
+                                        <td>@obj.BookType</td>
+                                        <td>
+
+                                            <form class="delete" asp-action="Delete" asp-route-id="@obj.Id">
+
+                                                <a asp-action="Upsert" asp-route-id="@obj.Id" class="btn btn-sm btn-primary me-1">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </a>
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            </form>
+
+                                        </td>
+                                    </tr>
+                                    i++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}

@@ -1,0 +1,161 @@
+﻿@{
+    ViewData["Title"] = "School Zone";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "School Zone",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "School Zone", IsActive = true }
+        }
+            };
+}
+
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light">
+    <div class="container py-5">
+        <!-- Search Filter -->
+        <div class="row mb-4">
+            <div class="col-md-6 offset-md-3">
+                <input type="text" id="school-search" class="form-control" placeholder="Enter schools name, code, city...">
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="text-center my-4" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <!-- School Cards -->
+        <div class="row" id="school-list">
+            <!-- School cards will be injected here -->
+        </div>
+    </div>
+</section>
+
+<!-- School Code Modal -->
+<div class="modal fade" id="schoolCodeModal" tabindex="-1" aria-labelledby="schoolCodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Enter School Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalSchoolName" class="fw-bold"></p>
+                <input type="hidden" id="modalSchoolId" />
+                <input type="text" id="inputSchoolCode" class="form-control" placeholder="Enter School Code" />
+                <div class="text-danger mt-2" id="codeError" style="display:none;">Invalid code. Please try again.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="submitSchoolCode()">Submit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        async function fetchSchools(searchTerm = '') {
+            const schoolList = document.getElementById('school-list');
+            const loading = document.getElementById('loading');
+
+            loading.style.display = 'block';
+            schoolList.innerHTML = '';
+
+            try {
+                const url = searchTerm.length > 0
+                    ? `/api/school/search?search=${encodeURIComponent(searchTerm)}`
+                    : `/api/school/search`;
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to fetch");
+
+                const data = await response.json();
+                if (!Array.isArray(data)) throw new Error("Invalid data format");
+
+                if (data.length === 0) {
+                    schoolList.innerHTML = `<div class="col-12 text-center text-black">No schools found.</div>`;
+                } else {
+                           data.forEach(school => {
+                            const card = `
+                                <div class="col-md-4 mb-4">
+                                    <a href="javascript:void(0);" class="text-decoration-none text-dark" onclick="openCodeModal(${school.id}, '${school.name}')">
+                                        <div class="card shadow-sm h-100 text-center p-3">
+                                            <img src="${school.schoolLogo}" alt="${school.name}" class="img-fluid mb-3" style="max-height: 120px; object-fit: contain;">
+                                            <h5 class="fw-bold">${school.name}</h5>
+                                            <p class="mb-1">${school.branchName}</p>
+                                            <p class="text-black">${school.board}</p>
+                                        </div>
+                                    </a>
+                                </div>`;
+                            schoolList.insertAdjacentHTML('beforeend', card);
+                        });
+                }
+            } catch (error) {
+                schoolList.innerHTML = `<div class="col-12 text-center text-danger">An error occurred while loading schools.</div>`;
+                console.error(error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        //validate school code and open model
+        function openCodeModal(schoolId, schoolName) {
+            document.getElementById('modalSchoolId').value = schoolId;
+            document.getElementById('modalSchoolName').innerText = schoolName;
+            document.getElementById('inputSchoolCode').value = '';
+            document.getElementById('codeError').style.display = 'none';
+
+            const modal = new bootstrap.Modal(document.getElementById('schoolCodeModal'));
+            modal.show();
+        }
+
+        async function submitSchoolCode() {
+            const schoolId = document.getElementById('modalSchoolId').value;
+            const schoolCode = document.getElementById('inputSchoolCode').value.trim();
+            const errorDiv = document.getElementById('codeError');
+
+            if (!schoolCode) {
+                errorDiv.innerText = "Please enter the school code.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/school/validate-code?id=${schoolId}&code=${encodeURIComponent(schoolCode)}`);
+                if (!response.ok) throw new Error("Server error");
+
+                const result = await response.json();
+
+                if (result.isValid) {
+                     window.location.href = `/school-search-result.html?id=${schoolId}`;
+                } else {
+                    errorDiv.innerText = "Invalid code. Please try again.";
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                console.error(err);
+                errorDiv.innerText = "An error occurred. Please try again later.";
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        //search schools
+        document.getElementById('school-search').addEventListener('input', function () {
+            const searchTerm = this.value.trim();
+            fetchSchools(searchTerm);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSchools();
+        });
+
+
+
+    </script>
+
+}

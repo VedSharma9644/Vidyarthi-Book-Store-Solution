@@ -1,0 +1,73 @@
+﻿@model List<Order>
+@{
+    ViewData["Title"] = "Customer Orders"; <!-- Fixed title -->
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">
+            Customer Orders <!-- Fixed typo -->
+        </h1>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info">
+                    <h5 class="card-title mb-0 text-white">Order List</h5> <!-- Added header title -->
+                </div>
+                <div class="card-body">
+                    <table id="datatables-multi" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Order Number</th> <!-- Added Order Number -->
+                                <th>Customer Name</th>
+                                <th>Order Total</th>
+                                <th>Status</th>
+                                <th>Payment Status</th>
+                                <th>Date Created</th>
+                                <th>Actions</th> <!-- Added Actions column -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                var i = 1;
+                                @foreach (var order in Model)
+                                {
+                                    <tr>
+                                        <td>@i</td>
+                                        <td>@order.OrderNumber</td>
+                                        <td>@order.ShippingName</td>
+                                        <td>₹@order.FinalAmount.ToString("N2")</td> <!-- Formatted as currency -->
+                                        <td>
+                                            <span class="badge bg-@(order.OrderStatus == "Completed" ? "success" : "warning")">
+                                                @order.OrderStatus
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-@(order.PaymentStatus == "Paid" ? "success" : "danger")">
+                                                @order.PaymentStatus
+                                            </span>
+                                        </td>
+                                        <td>@order.OrderDate.ToString("dd-MM-yyyy hh:mm tt", new CultureInfo("en-IN"))</td>
+                                        <td>
+                                            <a href="/get-order-details?orderId=@order.Id" class="btn btn-sm btn-primary">View</a>
+                                        </td>
+                                    </tr>
+                                    i++;
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center">No orders found</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

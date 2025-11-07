@@ -1,0 +1,32 @@
+﻿@model PageHeaderDto
+
+<!-- Page Header -->
+
+<header class="bg-primary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center py-2">
+                <h3>@Model.Title</h3>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb justify-content-center">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        @if (Model.Breadcrumbs != null)
+                        {
+                            foreach (var crumb in Model.Breadcrumbs)
+                            {
+                                if (crumb.IsActive)
+                                {
+                                    <li class="breadcrumb-item active" aria-current="page">@crumb.Text</li>
+                                }
+                                else
+                                {
+                                    <li class="breadcrumb-item"><a href="@crumb.Url">@crumb.Text</a></li>
+                                }
+                            }
+                        }
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>

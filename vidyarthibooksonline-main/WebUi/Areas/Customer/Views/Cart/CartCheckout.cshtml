@@ -1,0 +1,124 @@
+﻿@model OrderDto
+@{
+    ViewData["Title"] = "Cart Checkout";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Cart Checkout",
+                Breadcrumbs = new List<Breadcrumb>
+            {
+                new Breadcrumb { Text = "Cart", Url = "/cart" },
+                new Breadcrumb { Text = "Checkout", IsActive = true }
+            }
+          };
+}
+
+<!-- Header -->
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="checkout-section py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <!-- Billing Details -->
+            <div class="col-lg-7 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Billing Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="submit-form" method="post" asp-action="PlaceOrder">
+                            <div class="text-danger" asp-validation-summary="ModelOnly"></div>
+                            <input type="hidden" asp-for="OrderTotal" />
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="firstName" class="form-label">Full Name</label>
+                                    <input type="text" class="form-control compact-input" id="firstName" asp-for="ShippingName" required />
+                                    <span asp-validation-for="ShippingName" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" class="form-control compact-input" id="phone" asp-for="ShippingPhone" required placeholder="Enter phone number" />
+                                    <span asp-validation-for="ShippingPhone" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="alternatephone" class="form-label">Alternate Phone Number</label>
+                                    <input type="tel" class="form-control compact-input" id="alternatephone" asp-for="AlternatePhone" placeholder="Enter alternate phone number" required />
+                                    <span asp-validation-for="AlternatePhone" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="text" class="form-control compact-input" id="email" asp-for="Email" placeholder="Enter email" required />
+                                    <span asp-validation-for="Email" class="text-danger"></span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="address" class="form-label">Address</label>
+                                <textarea class="form-control compact-input" id="address" asp-for="ShippingAddress" placeholder="Enter address" rows="3" required></textarea>
+                                <span asp-validation-for="ShippingAddress" class="text-danger"></span>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="city" class="form-label">City</label>
+                                    <input type="text" class="form-control compact-input" id="city" asp-for="ShippingCity" placeholder="Enter city" required />
+                                    <span asp-validation-for="ShippingCity" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="city" class="form-label">State</label>
+                                    <input type="text" class="form-control compact-input" id="city" asp-for="ShippingState" placeholder="Enter state" required />
+                                    <span asp-validation-for="ShippingState" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="pincode" class="form-label">Pincode</label>
+                                    <input type="text" class="form-control compact-input" id="pincode" asp-for="ShippingPostalCode" placeholder="Enter pincode" required />
+                                    <span asp-validation-for="ShippingPostalCode" class="text-danger"></span>
+                                </div>
+                            </div>
+
+                            <!-- Payment Method -->
+                            <div class="mb-4">
+                                <label class="form-label">Payment Method</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio"  id="payu" value="Razorpay" asp-for="PaymentMethod" />
+                                    <label class="form-check-label" for="payu">Pay using Card/UPI (Razorpay Secure Gateway)</label>
+                                </div>
+                                <span asp-validation-for="PaymentMethod" class="text-danger"></span>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-2">Place Order</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <!-- Order Summary -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm sticky-top" style="top: 20px;">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Order Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group mb-3">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>SubTotal</span>
+                                <strong>₹@ViewBag.SubTotal</strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Shipping fees</span>
+                                <strong>₹@ViewBag.ShippingFee</strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Order Total</span>
+                                <strong>₹@Model.OrderTotal</strong>
+                            </li>
+                        </ul>
+                        <a href="/shopping-cart.html" class="btn btn-outline-secondary w-100 mb-2">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Cart
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+@section Scripts {
+    <partial name="_Ajax" />
+}

@@ -1,0 +1,55 @@
+﻿<nav class="navbar navbar-expand navbar-theme shadow-lg">
+	<a class="sidebar-toggle d-flex me-2">
+		<i class="hamburger align-self-center"></i>
+	</a>
+
+	<div class="navbar-collapse collapse">
+		<ul class="navbar-nav ms-auto">
+			
+			<li class="nav-item dropdown ms-lg-2">
+				<a class="nav-link dropdown-toggle position-relative" href="#" id="alertsDropdown" data-bs-toggle="dropdown">
+					<i class="align-middle fas fa-bell"></i>
+					<span class="indicator"></span>
+				</a>
+				<div class="dropdown-menu dropdown-menu-lg dropdown-menu-end py-0" aria-labelledby="alertsDropdown">
+					<div class="dropdown-menu-header">
+						No New Notifications
+					</div>
+
+					<div class="dropdown-menu-footer">
+						<a href="#" class="text-muted">Show all notifications</a>
+					</div>
+				</div>
+			</li>
+			<li class="nav-item dropdown ms-lg-2">
+				<a class="nav-link dropdown-toggle position-relative" href="#" id="userDropdown" data-bs-toggle="dropdown">
+					
+					<i class="align-middle fas fa-user-circle"></i>
+				</a>
+				<div class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+
+
+					<a class="dropdown-item" href="/admin-orders">
+						<i class="align-middle me-2 fas fa-fw fa-user"></i> Customers
+					</a>
+					<a class="dropdown-item" href="/admin-orders">
+						<i class="align-middle me-2 fas fa-fw fa-user"></i> Orders
+					</a>
+					<a class="dropdown-item" href="/ad/email-config">
+						<i class="align-middle me-2 fas fa-fw fa-cog"></i> Email Config
+					</a>
+					<a class="dropdown-item" href="/change-password">
+						<i class="align-middle me-2 fas fa-fw fa-key"></i> Change Password
+					</a>
+					@if (User.Identity!.IsAuthenticated)
+					{
+						<a href="#" class=" dropdown-item logout-link">
+							<i class="align-middle me-2 fas fa-fw fa-power-off text-danger"></i> <span class="align-middle">Logout</span>
+						</a>
+						
+					}
+				</div>
+			</li>
+		</ul>
+	</div>
+</nav>

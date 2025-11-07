@@ -1,0 +1,136 @@
+﻿@model Order
+@{
+    ViewData["Title"] = "Order Details";
+    
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">
+            Order details #@Model.OrderNumber <!-- Fixed typo -->
+        </h1>
+    </div>
+    <div class="row mb-2">
+        <div class="col-lg-12">
+            <div class="card p-3">
+                <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+
+                    <!-- Left: Update Status Form -->
+                    <form id="updateStatusForm" method="post" asp-controller="ManageOrders" asp-action="UpdateOrderStatus" class="d-flex align-items-end gap-2 flex-wrap">
+                        <input type="hidden" name="orderId" value="@Model.Id" />
+
+                        <div>
+                            <label class="form-label">Change Order Status</label>
+                            <select class="form-control" name="newStatus">
+                                <option value="@Model.OrderStatus" selected>@Model.OrderStatus</option>
+                                <option value="Processing">Processing</option>
+                                <option value="Shipped">Shipped</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <button type="submit" class="btn btn-success">Update Status</button>
+                        </div>
+                    </form>
+                    <!-----------Middle Part-------------->
+                    @if (Model.OrderStatus != SD.OrderStatus.Shipped)
+                    {
+                        <form class="submit-form" asp-action="CreateShiprocketOrder" asp-controller="ManageOrders" asp-route-orderId="@Model.Id">
+                            <button type="submit" class="btn btn-sm btn-primary">Create Shiprockt Order</button>
+                        </form>
+                    }
+                   
+
+                    <!-- Right: Generate Invoice -->
+                    <div>
+                        <label class="form-label d-block invisible">Generate</label> <!-- Keeps alignment -->
+                        <a href="/orders/generate-invoice?orderId=@Model.Id" class="btn btn-outline-primary">
+                            Generate Invoice
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Order Summary -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">Order Summary</div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> @Model.OrderStatus</p>
+                    <p>
+                        <strong>Payment:</strong>
+                        <span class="badge bg-@(Model.PaymentStatus == "Paid" ? "success" : "danger")">
+                            @Model.PaymentStatus
+                        </span>
+                    </p>
+                    <p><strong>Order Date:</strong> @Model.OrderDate.ToString("dd-MM-yyyy hh:mm tt", new CultureInfo("en-IN"))</p>
+                    <p><strong>Total Amount:</strong> ₹@Model.FinalAmount.ToString("N2")</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shipping Details -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">Shipping Details</div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> @Model.ShippingName</p>
+                    <p><strong>Phone:</strong> @Model.ShippingPhone</p>
+                    <p><strong>Address:</strong> @Model.ShippingAddress, @Model.ShippingCity, @Model.ShippingState - @Model.ShippingPostalCode</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Items -->
+    <div class="card mt-2">
+        <div class="card-header bg-info text-white">Order Items</div>
+        <div class="card-body p-0">
+            <table class="table table-bordered table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th>Qty</th>
+                        <th>Price (₹)</th>
+                        <th>Total (₹)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.OrderItems?.Any() == true)
+                    {
+                        int i = 1;
+                       
+                        foreach (var item in Model.OrderItems)
+                        {
+                            <tr>
+                                <td>@i</td>
+                                <td>@item.Book.Title</td>
+                                <td>@item.Quantity</td>
+                                <td>@item.UnitPrice.ToString("c", new CultureInfo("en-IN"))</td>
+                                <td>@( (item.Quantity * item.UnitPrice).ToString("c", new CultureInfo("en-IN")) )</td>
+                            </tr>
+                            i++;
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center">No items in this order.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}
