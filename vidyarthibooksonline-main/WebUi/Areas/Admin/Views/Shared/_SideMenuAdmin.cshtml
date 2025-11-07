@@ -1,0 +1,120 @@
+﻿<nav id="sidebar" class="sidebar">
+    <a class="sidebar-brand" href="#" style="background:white">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 12H10V5H4V12Z" fill="#4e73df" stroke="#2e59d9" stroke-width="0.5" />
+            <path d="M4 19H10V14H4V19Z" fill="#4e73df" stroke="#2e59d9" stroke-width="0.5" />
+            <path d="M14 19H20V10H14V19Z" fill="#4e73df" stroke="#2e59d9" stroke-width="0.5" />
+            <path d="M14 8H20V5H14V8Z" fill="#4e73df" stroke="#2e59d9" stroke-width="0.5" />
+        </svg>
+        <span class="text-black">ADMIN</span>
+    </a>
+    <div class="sidebar-content">
+        <ul class="sidebar-nav">
+            <li class="sidebar-item">
+                <a href="/admin-dashboard" class="sidebar-link">
+                    <i class="align-middle me-2 fas fa-fw fa-tachometer-alt"></i><span class="align-middle">Dashboard</span>
+                </a>
+            </li>
+
+            <!-- Profile Section -->
+            <li class="sidebar-item">
+                <a data-bs-target="#pages" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-user-cog"></i> <span class="align-middle">Profile</span>
+                </a>
+                <ul id="pages" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a asp-action="Index" asp-controller="Profile" class="sidebar-link"><i class="fas fa-lock me-2"></i>Change Password</a></li>
+                </ul>
+            </li>
+
+            <!-- Settings Section -->
+            <li class="sidebar-item">
+                <a data-bs-target="#settings" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-cogs"></i> <span class="align-middle">Settings</span>
+                </a>
+                <ul id="settings" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a asp-action="Index" asp-controller="EmailConfiguration" class="sidebar-link"><i class="fas fa-envelope me-2"></i>Email Configuration</a></li>
+                </ul>
+            </li>
+
+            <!-- Manage Books -->
+            <li class="sidebar-item">
+                <a data-bs-target="#books" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-book"></i> <span class="align-middle">Books Management</span>
+                </a>
+                <ul id="books" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a asp-action="Index" asp-controller="ManageCategory" class="sidebar-link"><i class="fas fa-tags me-2"></i>Category</a></li>
+                    <li class="sidebar-item"><a asp-action="Index" asp-controller="BookStore" class="sidebar-link"><i class="fas fa-book-open me-2"></i>Books</a></li>
+                </ul>
+            </li>
+
+            <!-- Order management -->
+            <li class="sidebar-item">
+                <a data-bs-target="#orders" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-shopping-cart"></i> <span class="align-middle">Order Management</span>
+                </a>
+                <ul id="orders" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a asp-action="Index" asp-controller="ManageOrders" class="sidebar-link"><i class="fas fa-clipboard-list me-2"></i>Orders</a></li>
+                </ul>
+            </li>
+
+            <!-- Schools Management -->
+            <li class="sidebar-item">
+                <a data-bs-target="#schools" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-school"></i> <span class="align-middle">Schools</span>
+                </a>
+                <ul id="schools" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a class="sidebar-link" asp-action="Index" asp-controller="ManageSchool"><i class="fas fa-university me-2"></i>Manage Schools</a></li>
+                    <li class="sidebar-item"><a class="sidebar-link" asp-action="Index" asp-controller="ManageGrade"><i class="fas fa-graduation-cap me-2"></i>Manage Grade</a></li>
+                </ul>
+            </li>
+
+            <!-- Customers -->
+            <li class="sidebar-item">
+                <a data-bs-target="#customers" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-users"></i> <span class="align-middle">Customers</span>
+                </a>
+                <ul id="customers" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a class="sidebar-link" asp-action="Index" asp-controller="Customers"><i class="fas fa-user-friends me-2"></i>All Customers</a></li>
+                </ul>
+            </li>
+
+            <!-- Coupons -->
+            <li class="sidebar-item">
+                <a asp-action="Index" asp-controller="ManageCoupon" class="sidebar-link">
+                    <i class="align-middle me-2 fas fa-fw fa-tag"></i> <span class="align-middle">Coupons</span>
+                </a>
+            </li>
+
+            <!-- Customers -->
+            <li class="sidebar-item">
+                <a data-bs-target="#slider" data-bs-toggle="collapse" class="sidebar-link collapsed">
+                    <i class="align-middle me-2 fas fa-fw fa-users"></i> <span class="align-middle">CMS Management</span>
+                </a>
+                <ul id="slider" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item"><a class="sidebar-link" asp-action="Index" asp-controller="Sliders"><i class="fas fa-user-friends me-2"></i>Manage Slider</a></li>
+                </ul>
+            </li>
+
+            <!-- Support -->
+            <li class="sidebar-item">
+                <a asp-action="Index" asp-controller="Supports" class="sidebar-link">
+                    <i class="align-middle me-2 fas fa-fw fa-headset"></i> <span class="align-middle">Support Tickets</span>
+                </a>
+            </li>
+
+            <!-- Logout Section -->
+            <li class="sidebar-header">
+                Account
+            </li>
+            <li class="sidebar-item">
+                @if (User.Identity!.IsAuthenticated)
+                {
+                    <a href="#" class="sidebar-link collapsed logout-link">
+                        <i class="align-middle me-2 fas fa-fw fa-sign-out-alt text-danger"></i> <span class="align-middle">Logout</span>
+                    </a>
+                    
+                }
+            </li>
+        </ul>
+    </div>
+</nav>

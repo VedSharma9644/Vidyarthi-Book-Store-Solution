@@ -1,0 +1,247 @@
+﻿@{
+    ViewData["Title"] = "My Account";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "My Account",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Account", IsActive = true }
+        }
+            };
+}
+<!-- Header Section -->
+<partial name="_PageHeader" model="headerModel" />
+<section>
+    <div class="container py-5">
+        <div class="row">
+            <!-- Left Menu -->
+            <div class="col-md-3 mt-3">
+                <div class="card p-4">
+                    <h6 class="text-primary fw-bold">ACCOUNT DASHBOARD</h6>
+                    <hr class="pt-0 mt-0">
+
+                    <!-- Desktop View (Hidden on Mobile) -->
+                    <ul class="nav flex-column nav-pills custom-nav-pills d-none d-md-block" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="dashboard-tab" data-bs-toggle="pill" href="#dashboard" role="tab">Account Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="orders-tab" data-bs-toggle="pill" href="#orders" role="tab">My Orders</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="wishlist-tab" data-bs-toggle="pill" href="#wishlist" role="tab">My Wish List</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="address-tab" data-bs-toggle="pill" href="#address" role="tab">Address Book</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="info-tab" data-bs-toggle="pill" href="#info" role="tab">Account Information</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="returns-tab" data-bs-toggle="pill" href="#returns" role="tab">My Returns</a>
+                        </li>
+                    </ul>
+
+                    <!-- Mobile View (Hidden on Desktop) -->
+                    <!-- Custom Dropdown for Mobile -->
+                    <div class="d-block d-md-none position-relative">
+                        <button class="btn  w-100 text-start" onclick="toggleDropdown()">
+                            <span id="dropdownSelected">Account Dashboard</span>
+                            <span class="float-end">&#9662;</span> <!-- Down Arrow -->
+                        </button>
+                        <div id="customDropdown" class="list-group" style="display: none;">
+                            <a class="list-group-item list-group-item-action" href="#dashboard" onclick="selectOption('Account Dashboard', '#dashboard')">Account Dashboard</a>
+                            <a class="list-group-item list-group-item-action" href="#orders" onclick="selectOption('My Orders', '#orders')">My Orders</a>
+                            <a class="list-group-item list-group-item-action" href="#wishlist" onclick="selectOption('My Wish List', '#wishlist')">My Wish List</a>
+                            <a class="list-group-item list-group-item-action" href="#address" onclick="selectOption('Address Book', '#address')">Address Book</a>
+                            <a class="list-group-item list-group-item-action" href="#info" onclick="selectOption('Account Information', '#info')">Account Information</a>
+                            <a class="list-group-item list-group-item-action" href="#returns" onclick="selectOption('My Returns', '#returns')">My Returns</a>
+                        </div>
+                    </div>
+
+                    <script>
+                        function toggleDropdown() {
+                            var dropdown = document.getElementById('customDropdown');
+                            dropdown.style.display = (dropdown.style.display === 'none' || dropdown.style.display === '') ? 'block' : 'none';
+                        }
+
+                        function selectOption(name, target) {
+                            document.getElementById('dropdownSelected').innerText = name;
+                            document.getElementById('customDropdown').style.display = 'none';
+
+                            var tabTrigger = new bootstrap.Tab(document.querySelector('[href="' + target + '"]'));
+                            tabTrigger.show();
+                        }
+                    </script>
+
+                </div>
+
+                <script>
+
+                </script>
+
+            </div>
+
+            <!-- Right Content -->
+            <div class="col-md-9  mt-3">
+                <div class="card p-4 tab-content" id="v-pills-tabContent">
+                    <!-- Dashboard Tab -->
+                    <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                        <h4>My Account</h4>
+
+                        <h4 class="text-dark pt-2">Account Information</h4>
+                        <hr class="pt-0 mt-0">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Contact Information</h6>
+                                <p>salar khan<br>salark2001@gmail.com</p>
+                                <a href="#info" onclick="selectOption('Account Information', '#info')" class="text-primary">Edit | Change Password</a>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Newsletters</h6>
+                                <p>You aren't subscribed to our newsletter.</p>
+                                <a href="#" class="text-primary">Edit</a>
+                            </div>
+                        </div>
+                        <h4 class="text-dark pt-3">Address Book <small><a href="#address" onclick="selectOption('Address Book', '#address')" class="text-danger"><small>Manage Addresses</small></a></small></h4>
+                        <hr class="pt-0 mt-0">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Default Billing Address</h6>
+                                <p>You have not set a default billing address.</p>
+                                <a href="#address" onclick="selectOption('Address Book', '#address')" class="text-primary">Edit Address</a>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Default Shipping Address</h6>
+                                <p>You have not set a default shipping address.</p>
+                                <a href="#address" onclick="selectOption('Address Book', '#address')" class="text-primary">Edit Address</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other Tabs Content -->
+                    <div class="tab-pane fade" id="orders" role="tabpanel">
+                        <h4>My Orders</h4>
+                        <p>You have placed no orders.</p>
+                    </div>
+
+                    <div class="tab-pane fade" id="wishlist" role="tabpanel">
+                        <h4>My Wish List</h4>
+                        <p>
+                            You have no items in your wish list.
+                        </p>
+                    </div>
+
+                    <div class="tab-pane fade" id="address" role="tabpanel">
+                        <h4 class="mb-4">Address Book</h4>
+                        <form>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="firstName" class="form-label">First Name</label>
+                                    <input type="text" class="form-control" id="firstName" placeholder="Enter First Name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="lastName" class="form-label">Last Name</label>
+                                    <input type="text" class="form-control" id="lastName" placeholder="Enter Last Name">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="gstin" class="form-label">GSTIN</label>
+                                    <input type="text" class="form-control" id="gstin" placeholder="Enter GSTIN">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="phoneNumber" class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" id="phoneNumber" placeholder="Enter Phone Number">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="altNumber" class="form-label">Alternate Number</label>
+                                    <input type="text" class="form-control" id="altNumber" placeholder="Enter Alternate Number">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="streetAddress" class="form-label">Street Address</label>
+                                    <input type="text" class="form-control" id="streetAddress" placeholder="Enter Street Address">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="country" class="form-label">Country</label>
+                                    <input type="text" class="form-control" id="country" placeholder="Enter Country">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="state" class="form-label">State/Province</label>
+                                    <input type="text" class="form-control" id="state" placeholder="Enter State/Province">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="city" class="form-label">City</label>
+                                    <input type="text" class="form-control" id="city" placeholder="Enter City">
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label for="zip" class="form-label">Zip/Postal Code</label>
+                                    <input type="text" class="form-control" id="zip" placeholder="Enter Zip/Postal Code">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Save Address</button>
+                        </form>
+                    </div>
+
+
+                    <div class="tab-pane fade" id="info" role="tabpanel">
+                        <h4 class="mb-4">Account Information</h4>
+                        <form>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="firstNameInfo" class="form-label fw-bold">First Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="firstNameInfo" placeholder="Enter First Name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="lastNameInfo" class="form-label fw-bold">Last Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="lastNameInfo" placeholder="Enter Last Name">
+                                </div>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="changeEmail">
+                                <label class="form-check-label" for="changeEmail">Change Email</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="changePassword">
+                                <label class="form-check-label" for="changePassword">Change Password</label>
+                            </div>
+
+                            <div class="form-check mb-4">
+                                <input class="form-check-input" type="checkbox" id="remoteShopping">
+                                <label class="form-check-label" for="remoteShopping">
+                                    Allow remote shopping assistance
+                                    <span class="ms-1" data-bs-toggle="tooltip" title="Get help from our shopping assistant online.">
+                                        <i class="bi bi-question-circle"></i>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-danger px-4 py-2">Save</button>
+                        </form>
+                    </div>
+
+
+                    <div class="tab-pane fade" id="returns" role="tabpanel">
+                        <h4>My Returns</h4>
+                        <p>You have no returns.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+

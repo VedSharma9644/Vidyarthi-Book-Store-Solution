@@ -1,0 +1,55 @@
+﻿@model GradeDto
+@{
+    ViewData["Title"] = "Upsert Grade";
+}
+
+<div class="container-fluid">
+    <div class="header">
+        <h1 class="header-title">Manage Grade</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Upsert Grade</li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="row">
+        <div class="col-12 col-xl-12">
+            <div class="card">
+                <div class="card-header bg-primary">
+                    <a asp-action="Index" class="btn btn-light btn-sm">Back</a>
+                </div>
+                <div class="card-body">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-5 border border-2 py-2">
+                            <form id="submit-form" asp-action="SaveGrade" method="post">
+                                <input type="hidden" asp-for="Id" />
+
+                                <div class="mb-3">
+                                    <label asp-for="Name" class="form-label"></label>
+                                    <input asp-for="Name" class="form-control" />
+                                    <span asp-validation-for="Name" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="SchoolId" class="form-label">Select School</label>
+                                    <select asp-for="SchoolId" class="form-control" asp-items="@(new SelectList(Model.GetSchools ?? new List<School>(), "Id", "Name"))">
+                                        <option value="">-- Select School --</option>
+                                    </select>
+                                    <span asp-validation-for="SchoolId" class="text-danger"></span>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Submit</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}

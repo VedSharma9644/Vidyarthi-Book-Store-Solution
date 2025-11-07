@@ -1,0 +1,40 @@
+﻿@{
+    ViewData["Title"] = "FAQ";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "FAQ",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "FAQ", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>Q1. How do I place an order?</h3>
+    <p>Browse books, add to cart, and proceed to checkout. Enter your shipping and payment details to complete the order.</p>
+
+    <h3>Q2. What payment methods are accepted?</h3>
+    <p>We accept UPI, debit/credit cards, net banking, and mobile wallets through secured payment gateways.</p>
+
+    <h3>Q3. How long does shipping take?</h3>
+    <p>We ship most orders within 1–2 days. Delivery time ranges from 3 to 7 working days.</p>
+
+    <h3>Q4. Can I cancel my order?</h3>
+    <p>You can cancel your order within 12 hours or before dispatch by contacting us.</p>
+
+    <h3>Q5. How do I track my order?</h3>
+    <p>We’ll email or SMS you the tracking ID once your order is dispatched.</p>
+
+    <h3>Q6. Do you ship outside India?</h3>
+    <p>Currently, we only ship within India. International shipping will be added soon.</p>
+
+    <h3>Q7. Are the books original?</h3>
+    <p>Yes, we deal only in 100% original books from trusted publishers and distributors.</p>
+
+    <h3>Q8. Do you support bulk or institutional orders?</h3>
+    <p>Yes! Please write to <b>sales@vidyarthibooksonline.com</b> for special pricing and assistance.</p>
+    </div>
+</section>

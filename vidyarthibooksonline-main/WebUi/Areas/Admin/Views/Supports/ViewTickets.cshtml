@@ -1,0 +1,54 @@
+﻿@model TicketDTOs
+@{
+	ViewData["Title"] = "Support Ticket";
+}
+
+<div class="container-fluid">
+	<div class="header d-flex justify-content-between align-items-center">
+		<h1 class="header-title">
+			Ticket details
+		</h1>
+		<a href="/admin/tickets-list" class="btn btn-sm btn-primary fw-bold">Back to tickets</a>
+	</div>
+	<div class="row">
+		<div class="col-12">
+			<div class="card">
+				<div class="card-body">
+					<div class="row justify-content-center">
+						@if (Model.Ticket!.TicketMessage!.Count() > 0)
+						{
+							<div class="col-md-10 p-3">
+								<h4 class="border-bottom fw-bold">@Model.Ticket.Tital</h4>
+								@foreach (var item in Model.Ticket.TicketMessage!)
+								{
+									<div class="mb-2">
+										<h4 class="mb-0">@item.AppUser!.UserName</h4>
+										<span style="font-size:13px">
+											<i class="fa fa-calendar-days"></i>
+											@item.RegisterDateTime.ToString("dd-MM-yyyy hh:mm tt", new CultureInfo("en-IN"))
+										</span>
+									</div>
+									<p>@item.Message</p>
+								}
+							</div>
+						}
+					</div>
+					<div class="row justify-content-center">
+						<div class="col-md-10">
+							@if (Model.Ticket.IsTicketOpen == true)
+							{
+								<partial name="_AddTicketMessage" model="Model" />
+							}
+							else
+							{
+								<div class="form-group text-center p-3">
+									<h4 class="text-danger">Ticket has been closed</h4>
+								</div>
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

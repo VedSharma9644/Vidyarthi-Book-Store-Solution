@@ -1,0 +1,42 @@
+﻿@{
+    ViewData["Title"] = "Privacy Policy";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Privacy Policy",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Privacy Policy", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>1. Information We Collect</h3>
+    <ul>
+        <li>Name, email, phone number, address</li>
+        <li>Payment details (handled via third-party gateways)</li>
+        <li>Browser/device data and cookies</li>
+    </ul>
+
+    <h3>2. How We Use Your Data</h3>
+    <ul>
+        <li>To process and deliver your orders</li>
+        <li>To improve our website and offerings</li>
+        <li>To communicate order updates and promotions</li>
+    </ul>
+
+    <h3>3. Sharing of Information</h3>
+    <p>We do not sell your data. We share it only with trusted payment and logistics partners as needed.</p>
+
+    <h3>4. Data Security</h3>
+    <p>We implement SSL and other security best practices. However, no method of transmission is 100% secure.</p>
+
+    <h3>5. Cookies</h3>
+    <p>Cookies are used to personalize your experience and track website usage. You can disable them via browser settings.</p>
+
+    <h3>6. Your Rights</h3>
+    <p>You can access, update, or delete your personal data by contacting us at privacy@vidyarthibooksonline.com.</p>
+    </div>
+</section>

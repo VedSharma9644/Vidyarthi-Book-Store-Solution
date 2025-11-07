@@ -1,0 +1,70 @@
+﻿@model List<SchoolDto>
+@{
+    ViewData["Title"] = "Manage Schools";
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">
+            Manage Schools
+        </h1>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info">
+                    <a class="btn btn-primary btn-sm" asp-action="Upsert">Add New</a>
+                </div>
+                <div class="card-body">
+                    <table id="datatables-multi" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>School Name</th>
+                                <th>Branch</th>
+                                <th>Code</th>
+                                <th>Email</th>
+                                <th>City</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                var i = 1;
+                                @foreach (var obj in Model)
+                                {
+                                    <tr>
+                                        <td>@i</td>
+                                        <td>@obj.Name</td>
+                                        <td>@obj.BranchName</td>
+                                        <td>@obj.Code</td>
+                                        <td>@obj.Email</td>
+                                        <td>@obj.City</td>
+                                        <td>
+                                            
+                                            <form class="delete"  asp-action="Delete" asp-route-id="@obj.Id">
+                                                @Html.AntiForgeryToken()
+                                                <a href="/upsert-school?id=@obj.Id" class="btn btn-sm btn-primary me-1">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </a>
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            </form>
+                                           
+                                        </td>
+                                    </tr>
+                                    i++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}

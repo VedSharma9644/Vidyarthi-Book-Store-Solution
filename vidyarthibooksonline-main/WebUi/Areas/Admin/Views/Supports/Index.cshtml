@@ -1,0 +1,103 @@
+﻿@model IEnumerable<Ticket>
+@{
+    ViewData["Title"] = "Support Requests";
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">
+            Support Tickets
+        </h1>
+       
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info">
+                    
+                </div>
+                <div class="card-body">
+                    <table id="datatables-multi" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Sr No</th>
+                                <th>Username</th>
+                                <th>Subject</th>
+                                <th>Date Time</th>
+                                <th>Ticket</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                var i = 1;
+                                @foreach (var obj in Model.Reverse())
+                                {
+                                    <tr>
+                                        <td>@i</td>
+                                        <td>
+                                            @obj.AppUser!.UserName
+                                        </td>
+                                        <td>
+                                            @obj.Tital
+                                        </td>
+                                        <td>@obj.CreatedAt.ToString("dd-MM-yyyy hh:mm tt", new CultureInfo("en-IN"))</td>
+                                        <td>
+                                            @if (obj.IsTicketOpen == true)
+                                            {
+                                                <span class="badge bg-primary">Open</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Closed</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @{
+                                                var ticketMessageStatus = obj.TicketMessage!.LastOrDefault();
+                                            }
+                                            @if (ticketMessageStatus!.Status == true)
+                                            {
+                                                <span class="badge bg-success">Pending</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Answered</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="d-flex">
+                                                <div class="btn-group dropend" role="group">
+                                                    <button type="button" class="btn btn-primary btn-sm rouded rounded-2 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        Action
+                                                    </button>
+                                                    <ul class="dropdown-menu" style="border-radius:10px">
+                                                        <li><a class="dropdown-item text-black" href="/admin/views-tickets?id=@obj.Id">View ticket</a></li>
+                                                        <li>
+                                                            <form method="post" asp-action="CloseTicket" asp-route-id="@obj.Id">
+                                                                <button type="submit" class="dropdown-item text-warning" >Close ticket</button>
+                                                            </form>
+                                                        </li>
+                                                        <li>
+                                                            <form method="post" asp-action="DeleteTicket" asp-route-id="@obj.Id">
+                                                                <button type="submit" class="dropdown-item text-danger" >Delete ticket</button>
+                                                            </form>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                               
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    i++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

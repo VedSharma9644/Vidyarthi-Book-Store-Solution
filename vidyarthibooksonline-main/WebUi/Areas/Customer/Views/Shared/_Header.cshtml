@@ -1,0 +1,189 @@
+﻿
+<header id="header" class="site-header">
+    <div class="top-info border-bottom d-none d-md-block ">
+        <div class="container-fluid">
+            <div class="row g-0">
+                <div class="col-md-6">
+                    <p class="fs-6 my-2 text-center">Need any help? Call us <a href="#">+91 9440070097</a></p>
+                </div>
+                <div class="col-md-6">
+                    <p class="fs-6 my-2 text-center">
+                        Missing, Replacement or Return are. Allowed within 7 business days of
+                        delivery.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <nav id="header-nav" class="navbar navbar-expand-lg py-3">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="images/logo.png" width="100" class="logo">
+            </a>
+            <button class="navbar-toggler d-flex d-lg-none order-3 p-2" type="button" data-bs-toggle="offcanvas"
+                    data-bs-target="#bdNavbar" aria-controls="bdNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fas fa-bars fs-4"></i>
+            </button>
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="bdNavbar" aria-labelledby="bdNavbarOffcanvasLabel">
+                <div class="offcanvas-header px-4 pb-0">
+                    <a class="navbar-brand" href="index.html">
+                        <img src="images/logo.png" width="70" class="logo">
+                    </a>
+                    <button type="button" class="btn-close btn-close-black" data-bs-dismiss="offcanvas" aria-label="Close"
+                    data-bs-target="#bdNavbar"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <ul id="navbar"
+                    class="navbar-nav text-uppercase justify-content-start justify-content-lg-center align-items-start align-items-lg-center flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link me-4 active" href="/">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link me-4" href="/about-us.html">About</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link me-4" href="/shop.html">Shop</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link me-4" href="/general-book.html">General Books</a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link me-4 dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                            aria-expanded="false">NCERT</a>
+                            <ul class="dropdown-menu animate slide border">
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 1</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 2</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 3</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 4</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 5</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 6</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 7</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 8</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 9</a>
+                                </li>
+                                <li>
+                                    <a href="#" class="dropdown-item fw-light">Class 10</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link me-4 dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button"
+                            aria-expanded="false">Account</a>
+                            <ul class="dropdown-menu animate slide border">
+                                @if (!User.Identity!.IsAuthenticated)
+                                {
+                                    <li>
+                                        <a href="/login" class="dropdown-item fw-light">Login</a>
+                                    </li>
+                                    <li>
+                                        <a href="/register" class="dropdown-item fw-light">Register</a>
+                                    </li>
+                                }
+                                else
+                                {
+                                    @* <li>
+                                        <a href="/my-account.html" class="dropdown-item fw-light">My Account</a>
+                                    </li>
+                                    <li>
+                                        <a href="/my-account.html" class="dropdown-item fw-light">Orders</a>
+                                    </li> *@
+                                    <li>
+                                        <a href="#" class="dropdown-item fw-light logout-link">Logout</a>
+                                    </li>
+                                }
+                               
+                                
+                            </ul>
+                        </li>
+                        <li class="nav-item position-relative me-4">
+                            <a class="nav-link" href="/shopping-cart.html">
+                                <i class="fa fa-shopping-cart fs-5" aria-hidden="true" style="color:cadetblue"></i>
+                                <!-- Add ID and data attribute to the badge -->
+                                <span id="cartBadge"
+                                      class="position-absolute top-0 start-100 translate-middle bg-danger text-white d-flex justify-content-center align-items-center rounded-circle"
+                                      style="width: 20px; height: 20px; font-size: 0.75rem;"
+                                      data-cart-count="0">
+                                    <span class="visually-hidden">items in cart</span>
+                                </span>
+                            </a>
+                        </li>
+
+
+                        <li class="nav-item bg-danger rounded rounded-3 p-2">
+                            <a class="nav-link me-4 text-white" href="/school-zone.html"> School Zone</a>
+                        </li>
+                       
+                        
+                    </ul>
+                  
+                </div>
+            </div>
+        </div>
+    </nav>
+</header>
+<script>
+    // Update cart badge on every page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCartBadge();
+    });
+
+    // Also update when authentication state changes (login/logout)
+    document.addEventListener('authChanged', updateCartBadge);
+
+    // Update cart badge function
+    function updateCartBadge() {
+        const cartBadge = document.getElementById('cartBadge');
+        if (!cartBadge) return; // Exit if badge doesn't exist on current page
+
+        fetch('/api/cart/count')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to get cart count');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    const currentCount = parseInt(cartBadge.getAttribute('data-cart-count')) || 0;
+                    const newCount = data.count;
+
+                    cartBadge.textContent = newCount;
+                    cartBadge.setAttribute('data-cart-count', newCount);
+
+                    // Show/hide badge based on count
+                    if (newCount > 0) {
+                        cartBadge.style.display = 'flex';
+                        // Add animation if count increased
+                        if (newCount > currentCount) {
+                            cartBadge.classList.add('cart-badge-pop');
+                            setTimeout(() => {
+                                cartBadge.classList.remove('cart-badge-pop');
+                            }, 300);
+                        }
+                    } else {
+                        cartBadge.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching cart count:', error);
+            });
+    }
+</script>

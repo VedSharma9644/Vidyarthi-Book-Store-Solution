@@ -1,0 +1,38 @@
+﻿@{
+    ViewData["Title"] = "Refund Policy";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Refund Policy",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Refund Policy", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>1. Eligibility for Refunds</h3>
+    <p>Refunds are applicable in the following cases:</p>
+    <ul>
+        <li>You received a damaged or defective product.</li>
+        <li>Product is missing from the package.</li>
+        <li>Incorrect product delivered.</li>
+        <li>Cancelled orders before shipment.</li>
+    </ul>
+
+    <h3>2. Refund Process</h3>
+    <p>To initiate a refund, please email <strong>refunds@vidyarthibooksonline.com</strong> within 7 days of delivery, along with your Order ID and photo proof (if applicable). Once approved, refunds will be processed within 5–7 business days.</p>
+
+    <h3>3. Mode of Refund</h3>
+    <p>Refunds are issued to the original payment method used — UPI, cards, or net banking. For COD, we will request bank details.</p>
+
+    <h3>4. Non-Refundable Cases</h3>
+    <ul>
+        <li>Change of mind or incorrect order placed by customer.</li>
+        <li>Used, torn, or customer-damaged products.</li>
+        <li>Return initiated after 7-day return window.</li>
+    </ul>
+    </div>
+</section>

@@ -1,0 +1,36 @@
+﻿@{
+    ViewData["Title"] = "Cancellation Policy";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Cancellation Policy",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Cancellation Policy", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+
+<section class="bg-light my-4">
+    <div class="container">
+
+    
+    <h3>1. Order Cancellation</h3>
+    <p>You may cancel your order within 12 hours of placing it or before it has been shipped. To cancel, contact our team at <strong>support@vidyarthibooksonline.com</strong> with your Order ID.</p>
+
+    <h3>2. Auto Cancellation</h3>
+    <p>Orders may be auto-cancelled if:</p>
+    <ul>
+        <li>Payment is not received within a stipulated time.</li>
+        <li>Invalid or incomplete address details are provided.</li>
+        <li>Product is out of stock or unavailable.</li>
+    </ul>
+
+    <h3>3. Refund on Cancellation</h3>
+    <p>Full refunds will be issued for all eligible cancellations, processed back to the original payment method within 5–7 business days.</p>
+
+    <h3>4. Post-Shipping Cancellation</h3>
+    <p>If the product has already been shipped, the order cannot be cancelled. You may choose to reject delivery, and the refund will be initiated once we receive the item back in original condition.</p>
+    </div>
+</section>

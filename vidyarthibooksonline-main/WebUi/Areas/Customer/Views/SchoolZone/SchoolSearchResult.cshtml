@@ -1,0 +1,77 @@
+﻿@model SchoolDetailsDto
+@{
+    ViewData["Title"] = "School Search Result";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Search Result",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Search Result", IsActive = true }
+        }
+            };
+}
+<!-- Header Section -->
+<partial name="_PageHeader" model="headerModel" />
+<section class="bg-light py-2">
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <a href="/school-zone.html" style="padding:5px">
+                    <i class="fa fa-arrow-left me-1"></i> Back
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    @if(Model.LogoSchool != null)
+                    {
+                        <img src="@Model.LogoSchool" style="width: 170px;" class="mb-5" alt="">
+                    }
+                    else
+                    {
+                        <img src="/img/no-image-icon.png" style="width: 170px;" class="mb-5" alt="">
+                    }
+                    <hr />
+                </div>
+
+                <div class="row">
+                    @foreach(var data in Model.GetAllGrade)
+                    {
+                        <div class="col-md-3 mb-3">
+                            <div class="card p-4 ">
+                                <div class="language-box">
+                                    <h4><strong>@data.Name</strong></h4>
+                                    <div class="border border-1">
+                                        @if (data.Categories != null && data.Categories.Any())
+                                        {
+                                            <div class="bg-primary">Select language</div>
+                                            @foreach (var category in data.Categories)
+                                            {
+                                                <a href="/school-langage-books.html?categoryId=@category.Id">
+                                                    <div class="language-option">
+                                                        <span>&raquo;</span> @category.Name
+                                                    </div>
+                                                </a>
+                                               
+                                            }
+                                           
+                                        }
+                                        else
+                                        {
+                                            <p class="text-center">No categories found.</p>
+                                        }
+                                       
+                                    </div>
+                                   
+                                </div>
+
+                            </div>
+                        </div>
+                    }
+                    
+                </div>
+            </div>
+        </div>
+       
+    </div>
+</section>
+

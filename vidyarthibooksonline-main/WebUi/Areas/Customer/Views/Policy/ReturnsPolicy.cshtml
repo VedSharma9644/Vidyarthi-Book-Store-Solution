@@ -1,0 +1,41 @@
+﻿@{
+    ViewData["Title"] = "Return Policy";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Return Policy",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Return Policy", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>1. Eligibility for Returns</h3>
+    <p>Returns are accepted within 7 days of delivery if:</p>
+    <ul>
+        <li>The book is damaged or defective.</li>
+        <li>You received the wrong item.</li>
+        <li>The package was tampered with or missing items.</li>
+    </ul>
+
+    <h3>2. Non-Returnable Items</h3>
+    <p>The following items are not eligible for return:</p>
+    <ul>
+        <li>E-books or downloadable content</li>
+        <li>Clearance or sale items</li>
+        <li>Items without original packaging</li>
+    </ul>
+
+    <h3>3. Return Process</h3>
+    <p>Email us at returns@vidyarthibooksonline.com with your order ID and product issue photos. Once approved, we’ll arrange a pickup or provide return instructions.</p>
+
+    <h3>4. Refund Policy</h3>
+    <p>Refunds will be processed to the original payment method within 5-7 working days after inspection.</p>
+
+    <h3>5. Exchange</h3>
+    <p>If you want to exchange a damaged item for the same product, indicate this during your return request.</p>
+    </div>
+</section>

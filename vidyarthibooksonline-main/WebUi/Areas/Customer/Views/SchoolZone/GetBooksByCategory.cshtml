@@ -1,0 +1,238 @@
+﻿
+@model List<BookDto>
+@{
+    ViewData["Title"] = "Books by Language";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Books",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Search Result", IsActive = true }
+        }
+            };
+
+    var groupedBooks = Model.GroupBy(b => b.BookType).ToList();
+}
+
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light py-2">
+    <div class="container">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <a href="/school-zone.html" style="padding:5px">
+                    <i class="fa fa-arrow-left me-1"></i> Back
+                    
+                </a>
+                
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <p>@Model.FirstOrDefault()?.SchoolName-@Model.FirstOrDefault()?.SchoolBranch</p>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-8">
+                        <form id="add-to-cart-form">
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th></th>
+                                            <th>Book Type</th>
+                                            <th>Qty</th>
+                                            <th>Unit Price (MRP)</th>
+                                            <th>Total Price</th>
+                                        </tr>
+                                    </thead>
+
+                                    @foreach (var group in groupedBooks)
+                                    {
+                                        <thead class="text-white">
+                                            <tr>
+                                                <th colspan="5" style="background-color:darkblue;color:white">@group.Key*</th>
+                                            </tr>
+                                        </thead>
+                                        @foreach (var book in group)
+                                        {
+
+                                            var qty = 1; // default quantity
+                                            var totalPrice = book.Price * qty;
+
+                                            <tr>
+                                                <td style="width: 40px;">
+                                                    <input type="checkbox" class="book-checkbox" value="@book.Id" checked disabled />
+                                                </td>
+                                                <td>@book.Title</td>
+                                                <td>
+                                                    <input type="number" class="book-qty" value="1" min="1" style="width: 60px;" readonly />
+                                                </td>
+                                                <td>@book.Price.ToString("c", new CultureInfo("en-IN"))</td>
+                                                <td>@totalPrice.ToString("c", new CultureInfo("en-IN"))</td>
+                                            </tr>
+                                        }
+                                    }
+
+                                    <tfoot>
+                                        <tr class="table-secondary">
+                                            <th colspan="4" class="text-end">Total Sale Price</th>
+                                            <th>
+                                                @Model.Sum(b => b.Price).ToString("c", new CultureInfo("en-IN"))
+                                            </th>
+                                        </tr>
+                                        
+                                    </tfoot>
+                                </table>
+                            </div>
+                           
+                        </form>
+                        <div class="d-flex justify-content-end">
+                            <a href="javascript:void(0);" class="border border-1 p-2 rounded rounded-3 bg-warning" onclick="submitCart(false)">Add To Cart</a>
+                            <a href="javascript:void(0);" class="border border-1 p-2 rounded rounded-3 bg-warning ms-3" onclick="submitCart(true)">Buy Now</a>
+                        </div>
+                    </div>
+
+                   <div class="col-lg-4">
+    <div class="border-start ps-3">
+        <h5 class="text-primary">Add Delivery Details</h5>
+        <div class="card p-2 mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fa fa-user-circle fs-3 me-3" style="color:blue"></i>
+                <div>
+                                        <p style="color:blue">
+                                            <strong style="color:darkblue;font-size:20px;">Customer Support</strong><br />
+                                            9440070097<br />
+                                            Mon-Sat: 9AM To 9PM
+                    </p>
+                  
+                </div>
+            </div>
+        </div>
+        <div class="card p-2 mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fa fa-envelope fs-3 me-3" style="color:blue"></i>
+                <div style="color:blue">
+                     Also reach us info@vidyarthibookbank.com for <br />
+                     any concern related to your orders.
+                </div>
+            </div>
+        </div>
+        <hr />
+        <div class="card p-2 mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fa fa-refresh fs-3 me-3" style="color:blue"></i>
+                <div>
+                    <strong style="color:blue">Replacement/Exchange in <br /> 7 business days</strong>
+                </div>
+            </div>
+        </div>
+        <div class="card p-2 mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fa fa-lock fs-3  me-3" style="color:blue"></i>
+                <div style="color:blue">
+                    <strong>Buy the products</strong><br />
+                    100% safe and secure<br />
+                    <small>As per instructions from Govt of India, 
+                    GST is applicable with effect from 1st July 2017. <br />
+                    Displayed the price is inclusive of GST</small><br />
+                   
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+@section Scripts{
+    <script>
+            function submitCart(redirectToCheckout) {
+            var selectedBookIds = [];
+            var quantities = [];
+
+            $('.book-checkbox:checked').each(function () {
+                var bookId = $(this).val();
+                var qtyInput = $(this).closest('tr').find('.book-qty').val();
+
+                selectedBookIds.push(parseInt(bookId));
+                quantities.push(parseInt(qtyInput));
+            });
+
+            if (selectedBookIds.length === 0) {
+                alert("Please select at least one book.");
+                return;
+            }
+
+                    $.ajax({
+                        url: '/add-to-cart-multiple',
+                        method: 'POST',
+                        data: {
+                            selectedBookIds: selectedBookIds,
+                            quantities: quantities,
+                            redirectToCheckout: redirectToCheckout
+                        },
+                        traditional: true,
+                        success: function(response) {
+                            if (response.success) {
+                                updateCartBadge();
+                                window.location.href = response.redirectUrl;
+                            } else {
+                                alert(response.message || "Failed to add books to cart.");
+                                if (response.redirectUrl) {
+                                    window.location.href = response.redirectUrl;
+                                }
+                            }
+                        },
+                        error: function(xhr) {
+                            if (xhr.status === 401) {
+                                // Redirect to login page with return URL
+                                var returnUrl = window.location.pathname + window.location.search;
+                                window.location.href = '/login?returnUrl=' + encodeURIComponent(returnUrl);
+                            } else {
+                                alert("An error occurred while adding books to cart.");
+                            }
+                        }
+                    });
+        }
+        // Function to update just the cart badge
+        function updateCartBadge() {
+            const cartBadge = document.getElementById('cartBadge');
+
+            fetch('/api/cart/count')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to get cart count');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        const currentCount = parseInt(cartBadge.getAttribute('data-cart-count')) || 0;
+                        const newCount = data.count;
+
+                        cartBadge.textContent = newCount;
+                        cartBadge.setAttribute('data-cart-count', newCount);
+
+                        // Show/hide badge based on count
+                        if (newCount > 0) {
+                            cartBadge.style.display = 'flex';
+                            // Add animation if count increased
+                            if (newCount > currentCount) {
+                                cartBadge.classList.add('cart-badge-pop');
+                                setTimeout(() => {
+                                    cartBadge.classList.remove('cart-badge-pop');
+                                }, 300);
+                            }
+                        } else {
+                            cartBadge.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching cart count:', error);
+                });
+        }
+    </script>
+}

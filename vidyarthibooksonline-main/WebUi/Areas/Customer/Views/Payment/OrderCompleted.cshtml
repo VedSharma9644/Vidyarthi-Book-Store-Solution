@@ -1,0 +1,52 @@
+﻿@{
+    ViewData["Title"] = "Order Success";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Order Success",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Cart Checkout", Url = "/cart-checkout" },
+            new Breadcrumb { Text = "Order Success", IsActive = true }
+        }
+            };
+}
+
+<!-- Header -->
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="py-5 bg-light">
+    <div class="container text-center">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="card shadow-sm p-4">
+                    <div class="card-body">
+                        <i class="fas fa-check-circle text-success display-4 mb-3"></i>
+                        <h3 class="text-success">Thank you! Your order has been placed successfully.</h3>
+                        <p class="lead mt-3">We’ve sent a confirmation email with your order details. You can track your order in your <a href="#">order history</a>.</p>
+
+                        <div class="my-4">
+                            <h5 class="mb-3">Order Summary</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Order Number:</span>
+                                    <strong>@ViewBag.OrderId</strong> <!-- Replace with actual order ID -->
+                                </li>
+                                
+                            </ul>
+                        </div>
+
+                        <div class="mt-4">
+                            <a href="/shop.html" class="btn btn-primary me-2">
+                                <i class="fas fa-shopping-bag me-1"></i> Continue Shopping
+                            </a>
+                            <a href="#" class="btn btn-outline-secondary">
+                                <i class="fas fa-list me-1"></i> View My Orders
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+       
+    </div>
+</section>

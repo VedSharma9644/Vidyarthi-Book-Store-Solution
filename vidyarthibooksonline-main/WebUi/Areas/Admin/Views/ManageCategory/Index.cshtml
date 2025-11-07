@@ -1,0 +1,63 @@
+﻿@model List<CategoryDto>
+@{
+    ViewData["Title"] = "Manage Language";
+}
+
+<div class="container-fluid">
+    <div class="header d-flex justify-content-between align-items-center">
+        <h1 class="header-title">
+            Manage Languages
+        </h1>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                   <a class="btn btn-dark btn-sm float-end" asp-action="Upsert">Add New</a>
+                </div>
+                <div class="card-body">
+                    <table id="datatables-multi" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Category Name</th>
+                                <th>Description</th>
+                                <th>Grade</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var obj in Model)
+                            {
+                            <tr>
+                                <td>@obj.Id</td>
+                                <td>@obj.Name</td>
+                                <td>@obj.Description</td>
+                                <td>@(obj.Grades?.FirstOrDefault(g => g.Id == obj.GradeId)?.Name ?? "N/A")</td>
+                                    <td>
+
+                                        <form class="delete" asp-action="Delete" asp-route-id="@obj.Id">
+
+                                            <a asp-action="Upsert" asp-route-id="@obj.Id" class="btn btn-sm btn-primary me-1">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </a>
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-trash"></i> Delete
+                                            </button>
+                                        </form>
+
+                                    </td>
+                            </tr>
+                         
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <partial name="_AjaxCallPartial" />
+}

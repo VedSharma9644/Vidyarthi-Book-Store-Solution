@@ -1,0 +1,84 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="MproFX Academy">
+    <meta name="author" content="MproFX">
+    <title>Admin</title>
+    <!-- Core Css -->
+    <partial name="_CssHost" />
+</head>
+<body>
+    <!-- Preloader -->
+   
+    <div class="wrapper">
+        <!---Side Menu---->
+        <partial name="_SideMenuAdmin" />
+        <div class="main">
+            <!---TopNav--->
+            <partial name="_TopNavAdmin" />
+            <!-----body------->
+            <main class="content">
+                @RenderBody()
+                <partial name="_Notifications" />
+            </main>
+            <!----footer----->
+            <footer class="footer">
+                <div class="container-fluid">
+                    <div class="row text-muted">
+                        <div class="col-8 text-start">
+                            <ul class="list-inline">
+
+                                <li class="list-inline-item">
+                                    <a class="text-black text-decoration-none" href="#">&copy; 2025</a>
+                                </li>
+                              
+                            </ul>
+                        </div>
+                        <div class="col-4 text-end">
+                            <p class="mb-0 text-black">
+                               v-1.0.2
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+            <!---End Body----->
+        </div>
+    </div>
+    <!-----custom js----->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var currentUrl = window.location.pathname;
+            var sidebarItems = document.querySelectorAll('.sidebar-item');
+            for (var i = 0; i < sidebarItems.length; i++) {
+                var sidebarItem = sidebarItems[i];
+                var sidebarLink = sidebarItem.querySelector('.sidebar-link');
+                var linkHref = sidebarLink.getAttribute('href');
+                if (currentUrl === linkHref) {
+                    sidebarItem.classList.add('active');
+                }
+            }
+        });
+    </script>
+    <!---Core js---->
+    <partial name="_JsHost" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.7.0/tinymce.min.js"></script>
+    <!--------Data table-------->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Datatables with Multiselect
+            var datatablesMulti = $("#datatables-multi").DataTable({
+                responsive: true,
+                select: {
+                    style: "multi"
+                }
+            });
+        });
+    </script>
+    <script src="~/ajax-helper/logout.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

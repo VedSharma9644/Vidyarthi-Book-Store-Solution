@@ -1,0 +1,43 @@
+﻿@{
+    ViewData["Title"] = "Terms and Conditions";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Terms and Conditions",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Terms and Conditions", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>1. Introduction</h3>
+    <p>Welcome to Vidyarthi Books Online. By accessing or using our website, you agree to be bound by the terms and conditions outlined below. These terms apply to all visitors, users, and others who access the site.</p>
+
+    <h3>2. Eligibility</h3>
+    <p>You must be at least 18 years old or have the consent of a parent or guardian to make purchases on this website.</p>
+
+    <h3>3. Use of Website</h3>
+    <ul>
+        <li>You may not misuse the website or its content.</li>
+        <li>Unauthorised access or attempts to interfere with site functionality are strictly prohibited.</li>
+    </ul>
+
+    <h3>4. Product Descriptions</h3>
+    <p>We strive to describe products accurately. However, we do not guarantee that product descriptions or other content are complete, reliable, or error-free.</p>
+
+    <h3>5. Pricing & Payment</h3>
+    <p>All prices are in INR and include applicable taxes. We reserve the right to change pricing at any time without prior notice. Payments are accepted via UPI, cards, wallets, and net banking through secured gateways.</p>
+
+    <h3>6. Limitation of Liability</h3>
+    <p>We are not responsible for any loss, injury, or damage resulting from use or misuse of our products or delays in delivery.</p>
+
+    <h3>7. Termination</h3>
+    <p>We may terminate or suspend your access immediately, without prior notice, for any breach of terms.</p>
+
+    <h3>8. Governing Law</h3>
+    <p>These terms shall be governed and construed in accordance with the laws of India.</p>
+    </div>
+</section>

@@ -1,0 +1,40 @@
+﻿@{
+    ViewData["Title"] = "Grievance Redressal";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Grievance Redressal",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Grievance Redressal", IsActive = true }
+        }
+            };
+}
+<partial name="_PageHeader" model="headerModel" />
+
+<section class="bg-light my-4">
+    <div class="container">
+    <h3>1. Purpose</h3>
+    <p>We value your feedback and aim to resolve any grievances promptly. This policy outlines the process for raising and resolving issues regarding your experience on Vidyarthi Books Online.</p>
+
+    <h3>2. How to Raise a Complaint</h3>
+    <p>Email us at <strong>grievance@vidyarthibooksonline.com</strong> with the following details:</p>
+    <ul>
+        <li>Full name and contact details</li>
+        <li>Order ID (if applicable)</li>
+        <li>Nature of grievance</li>
+        <li>Relevant documents/screenshots (if any)</li>
+    </ul>
+
+    <h3>3. Grievance Officer</h3>
+    <p>
+            <strong>Mr. POLU SAI CHANDER</strong><br />
+        Grievance Officer, Vidyarthi Books Online<br />
+        Email: grievance@vidyarthibooksonline.com<br />
+        Response Time: Within 3 working days<br />
+        Resolution Time: Up to 7 working days
+    </p>
+
+    <h3>4. Escalation</h3>
+    <p>If your issue is not resolved satisfactorily, it will be escalated to our management team for review.</p>
+    </div>
+</section>

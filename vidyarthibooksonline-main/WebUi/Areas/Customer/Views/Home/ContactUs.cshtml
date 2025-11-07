@@ -1,0 +1,15 @@
+﻿@{
+    ViewData["Title"] = "Contact Us";
+    var headerModel = new PageHeaderDto
+            {
+                Title = "Contact us",
+                Breadcrumbs = new List<Breadcrumb>
+        {
+            new Breadcrumb { Text = "Contact", IsActive = true }
+        }
+            };
+}
+<!-- Header Section -->
+<partial name="_PageHeader" model="headerModel" />
+
+
