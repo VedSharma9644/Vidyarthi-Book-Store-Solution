@@ -95,6 +95,12 @@ android/.gradle/
 android/local.properties
 android/app/debug.keystore
 android/app/release.keystore
+**/android/app/build/
+**/android/build/
+**/android/.gradle/
+**/android/local.properties
+**/android/app/debug.keystore
+**/android/app/release.keystore
 *.apk
 *.aab
 *.ap_
