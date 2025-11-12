@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.36:5000', // Updated for physical Android device - use your laptop's IP address
+  BASE_URL: 'https://vidyarthi-backend-594708558503.us-central1.run.app', // Production backend on Google Cloud Run
   ENDPOINTS: {
     // Authentication
     AUTH: {
@@ -42,6 +42,17 @@ export const API_CONFIG = {
       GET_ALL: '/api/categories',
       GET_BY_ID: '/api/categories',
     },
+          // Payment
+          PAYMENT: {
+            CREATE_ORDER: '/api/payment/create-order',
+            VERIFY_PAYMENT: '/api/payment/verify-payment',
+          },
+          // Orders
+          ORDERS: {
+            CREATE: '/api/orders/create',
+            GET_ALL: '/api/orders',
+            GET_BY_ID: '/api/orders',
+          },
     // Health
     HEALTH: '/health',
   },
@@ -56,7 +67,7 @@ export const getApiUrl = (endpoint) => {
 // For device testing, you might need to use your computer's IP address
 // Example: 'http://192.168.1.100:5000'
 export const getDeviceApiUrl = (endpoint) => {
-  // Use laptop's IP address for physical device testing
-  const DEVICE_BASE_URL = 'http://192.168.1.36:5000'; // Your laptop's IP
+  // Use production backend URL (same as BASE_URL)
+  const DEVICE_BASE_URL = 'https://vidyarthi-backend-594708558503.us-central1.run.app';
   return `${DEVICE_BASE_URL}${endpoint}`;
 };

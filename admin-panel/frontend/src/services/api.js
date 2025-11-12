@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// Use production backend URL by default, or environment variable if set
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://admin-panel-backend-594708558503.us-central1.run.app';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

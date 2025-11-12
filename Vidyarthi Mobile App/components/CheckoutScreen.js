@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,18 +7,93 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// Import Razorpay with error handling
+let RazorpayCheckout = null;
+let razorpayImportError = null;
+try {
+  const RazorpayModule = require('react-native-razorpay');
+  RazorpayCheckout = RazorpayModule.default || RazorpayModule;
+  console.log('Razorpay module import attempt:', {
+    moduleExists: !!RazorpayModule,
+    defaultExists: !!RazorpayModule?.default,
+    checkoutExists: !!RazorpayCheckout,
+    hasOpenMethod: !!(RazorpayCheckout?.open),
+  });
+} catch (error) {
+  razorpayImportError = error;
+  console.error('Failed to import Razorpay module:', error);
+}
+
+// Check if Razorpay is available
+const isRazorpayAvailable = () => {
+  try {
+    if (!RazorpayCheckout) {
+      console.error('RazorpayCheckout is null - native module not linked');
+      return false;
+    }
+    if (typeof RazorpayCheckout.open !== 'function') {
+      console.error('RazorpayCheckout.open is not a function');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Razorpay module not available:', error);
+    return false;
+  }
+};
 import { styles, colors } from '../css/styles';
 import ApiService from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
 
 const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
+  const { user } = useAuth();
   const [cartItems, setCartItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showRazorpayWebView, setShowRazorpayWebView] = useState(false);
+  const [razorpayOrderData, setRazorpayOrderData] = useState(null);
+  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'India',
+  });
+  const webViewRef = useRef(null);
 
   // Delivery charge per package (in INR) - same as CartScreen
   const DELIVERY_CHARGE = 300;
+
+  // Load user's shipping address on mount
+  useEffect(() => {
+    if (user) {
+      // Load from user's saved address or use defaults
+      const userAddress = user.address || {};
+      setShippingAddress({
+        name: user.firstName && user.lastName 
+          ? `${user.firstName} ${user.lastName}`.trim()
+          : user.firstName || user.userName || '',
+        phone: user.phoneNumber || '',
+        address: userAddress.address || '',
+        city: userAddress.city || '',
+        state: userAddress.state || '',
+        postalCode: userAddress.postalCode || '',
+        country: userAddress.country || 'India',
+      });
+    }
+  }, [user]);
 
   // Load cart data from API
   useEffect(() => {
@@ -81,30 +156,88 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
     return calculateSubtotal() + calculateTax() + calculateDelivery();
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
       Alert.alert('Empty Cart', 'Your cart is empty. Please add items before placing an order.');
       return;
     }
 
-    Alert.alert(
-      'Order Placed!',
-      `Your order total is ₹${calculateTotal().toFixed(2)}. Thank you for your purchase!`,
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            if (onPlaceOrder) {
-              onPlaceOrder();
-            }
-          },
-        },
-      ]
-    );
+    try {
+      const totalAmount = calculateTotal();
+      const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      console.log('Creating payment order:', { totalAmount, receipt });
+
+      // Create Razorpay order
+      const orderResult = await ApiService.createPaymentOrder(totalAmount, receipt);
+
+      console.log('Payment order result:', orderResult);
+
+      if (!orderResult.success || !orderResult.data) {
+        console.error('Failed to create payment order:', orderResult.message);
+        Alert.alert('Error', orderResult.message || 'Failed to create payment order');
+        return;
+      }
+
+      const orderData = orderResult.data;
+
+      // Validate order data
+      if (!orderData.keyId || !orderData.orderId || !orderData.amount) {
+        console.error('Invalid order data:', orderData);
+        Alert.alert('Error', 'Invalid payment order data. Please try again.');
+        return;
+      }
+
+      // Log order details for debugging
+      console.log('Opening Razorpay WebView checkout:', {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        order_id: orderData.orderId,
+        currency: orderData.currency || 'INR',
+      });
+
+      // Use WebView-based Razorpay checkout (works without native modules)
+      setRazorpayOrderData(orderData);
+      setShowRazorpayWebView(true);
+    } catch (error) {
+      console.error('Error initiating payment:', error);
+      Alert.alert('Error', 'Failed to initiate payment. Please try again.');
+    }
   };
 
   const handleEditShipping = () => {
-    Alert.alert('Edit Shipping', 'Edit shipping address functionality will be implemented');
+    setShowShippingModal(true);
+  };
+
+  const handleSaveShippingAddress = () => {
+    // Validate required fields
+    if (!shippingAddress.name.trim()) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+    if (!shippingAddress.phone.trim()) {
+      Alert.alert('Error', 'Please enter your phone number');
+      return;
+    }
+    if (!shippingAddress.address.trim()) {
+      Alert.alert('Error', 'Please enter your address');
+      return;
+    }
+    if (!shippingAddress.city.trim()) {
+      Alert.alert('Error', 'Please enter your city');
+      return;
+    }
+    if (!shippingAddress.state.trim()) {
+      Alert.alert('Error', 'Please enter your state');
+      return;
+    }
+    if (!shippingAddress.postalCode.trim()) {
+      Alert.alert('Error', 'Please enter your postal code');
+      return;
+    }
+
+    setShowShippingModal(false);
+    Alert.alert('Success', 'Shipping address updated');
   };
 
   const handleEditPayment = () => {
@@ -249,8 +382,14 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                   <Text style={styles.infoCardIconText}>📍</Text>
                 </View>
                 <View style={styles.infoCardDetails}>
-                  <Text style={styles.infoCardTitle}>Sophia Carter</Text>
-                  <Text style={styles.infoCardSubtitle}>123 Elm Street, Anytown, USA</Text>
+                  <Text style={styles.infoCardTitle}>
+                    {shippingAddress.name || 'Add Shipping Address'}
+                  </Text>
+                  <Text style={styles.infoCardSubtitle} numberOfLines={2}>
+                    {shippingAddress.address && shippingAddress.city && shippingAddress.state
+                      ? `${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`
+                      : 'Tap to add shipping address'}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.chevronIcon}>›</Text>
@@ -287,6 +426,415 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Razorpay WebView Modal */}
+      <Modal
+        visible={showRazorpayWebView}
+        animationType="slide"
+        onRequestClose={() => setShowRazorpayWebView(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowRazorpayWebView(false);
+                setRazorpayOrderData(null);
+              }}
+              style={{ padding: 8 }}
+            >
+              <Text style={{ fontSize: 24 }}>←</Text>
+            </TouchableOpacity>
+            <Text style={{ flex: 1, fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginRight: 40 }}>
+              Payment
+            </Text>
+          </View>
+          {razorpayOrderData && (
+            <WebView
+              ref={webViewRef}
+              source={{
+                html: `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+                    <style>
+                      body {
+                        margin: 0;
+                        padding: 20px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        background: #f5f5f5;
+                      }
+                      .container {
+                        text-align: center;
+                      }
+                      .loading {
+                        color: #666;
+                        font-size: 16px;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="container">
+                      <div class="loading">Loading payment gateway...</div>
+                    </div>
+                    <script>
+                      var options = {
+                        "key": "${razorpayOrderData.keyId}",
+                        "amount": ${razorpayOrderData.amount},
+                        "currency": "${razorpayOrderData.currency || 'INR'}",
+                        "order_id": "${razorpayOrderData.orderId}",
+                        "name": "Vidyarthi Books",
+                        "description": "Order Payment",
+                        "image": "https://vidyarthibooksonline.com/images/logo.png",
+                        "handler": function (response) {
+                          window.ReactNativeWebView.postMessage(JSON.stringify({
+                            type: 'payment_success',
+                            data: {
+                              razorpay_payment_id: response.razorpay_payment_id,
+                              razorpay_order_id: response.razorpay_order_id,
+                              razorpay_signature: response.razorpay_signature
+                            }
+                          }));
+                        },
+                        "prefill": {
+                          "email": "",
+                          "contact": ""
+                        },
+                        "theme": {
+                          "color": "#3399cc"
+                        },
+                        "modal": {
+                          "ondismiss": function() {
+                            window.ReactNativeWebView.postMessage(JSON.stringify({
+                              type: 'payment_cancelled'
+                            }));
+                          }
+                        }
+                      };
+                      var rzp = new Razorpay(options);
+                      rzp.open();
+                    </script>
+                  </body>
+                  </html>
+                `,
+              }}
+              onMessage={async (event) => {
+                try {
+                  const message = JSON.parse(event.nativeEvent.data);
+                  
+                  if (message.type === 'payment_success') {
+                    setShowRazorpayWebView(false);
+                    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = message.data;
+                    
+                    // Verify payment
+                    const verifyResult = await ApiService.verifyPayment(
+                      razorpay_order_id,
+                      razorpay_payment_id,
+                      razorpay_signature
+                    );
+
+                    if (verifyResult.success) {
+                      // Create order in database
+                      const userId = user?.id || await AsyncStorage.getItem('userId');
+                      console.log('📦 Creating order - User ID:', userId);
+                      if (!userId) {
+                        Alert.alert('Error', 'User not found. Please login again.');
+                        return;
+                      }
+
+                      console.log('📦 Calling createOrder API with:', {
+                        userId,
+                        razorpayOrderId: razorpay_order_id,
+                        razorpayPaymentId: razorpay_payment_id,
+                      });
+
+                      const orderResult = await ApiService.createOrder(
+                        {
+                          razorpayOrderId: razorpay_order_id,
+                          razorpayPaymentId: razorpay_payment_id,
+                          razorpaySignature: razorpay_signature,
+                        },
+                        shippingAddress // Pass the shipping address
+                      );
+
+                      console.log('📦 Order creation result:', {
+                        success: orderResult.success,
+                        hasData: !!orderResult.data,
+                        orderNumber: orderResult.data?.orderNumber,
+                        orderId: orderResult.data?.id,
+                        message: orderResult.message,
+                      });
+
+                      if (orderResult.success) {
+                        Alert.alert(
+                          'Payment Successful!',
+                          `Your order has been placed successfully!\n\nOrder Number: ${orderResult.data?.orderNumber || razorpay_order_id}`,
+                          [
+                            {
+                              text: 'OK',
+                              onPress: () => {
+                                if (onPlaceOrder) {
+                                  onPlaceOrder();
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      } else {
+                        // Payment verified but order creation failed
+                        Alert.alert(
+                          'Payment Verified',
+                          'Your payment was successful, but there was an issue saving your order. Please contact support with Order ID: ' + razorpay_order_id,
+                          [
+                            {
+                              text: 'OK',
+                              onPress: () => {
+                                if (onPlaceOrder) {
+                                  onPlaceOrder();
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      }
+                    } else {
+                      Alert.alert('Payment Verification Failed', verifyResult.message || 'Please contact support.');
+                    }
+                  } else if (message.type === 'payment_cancelled') {
+                    setShowRazorpayWebView(false);
+                    console.log('Payment cancelled by user');
+                  }
+                } catch (error) {
+                  console.error('Error processing payment message:', error);
+                }
+              }}
+              style={{ flex: 1 }}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Shipping Address Edit Modal */}
+      <Modal
+        visible={showShippingModal}
+        animationType="slide"
+        onRequestClose={() => setShowShippingModal(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            {/* Header */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: '#e0e0e0',
+              backgroundColor: '#fff',
+            }}>
+              <TouchableOpacity
+                onPress={() => setShowShippingModal(false)}
+                style={{ padding: 8 }}
+              >
+                <Text style={{ fontSize: 24 }}>←</Text>
+              </TouchableOpacity>
+              <Text style={{
+                flex: 1,
+                fontSize: 18,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                marginRight: 40,
+              }}>
+                Shipping Address
+              </Text>
+            </View>
+
+            {/* Form */}
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+              <View style={{ gap: 16 }}>
+                {/* Name */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    Full Name <Text style={{ color: '#e74c3c' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                    }}
+                    placeholder="Enter your full name"
+                    value={shippingAddress.name}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, name: text })}
+                  />
+                </View>
+
+                {/* Phone */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    Phone Number <Text style={{ color: '#e74c3c' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                    }}
+                    placeholder="Enter your phone number"
+                    value={shippingAddress.phone}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, phone: text })}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                {/* Address */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    Address <Text style={{ color: '#e74c3c' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                      minHeight: 80,
+                      textAlignVertical: 'top',
+                    }}
+                    placeholder="Enter your complete address"
+                    value={shippingAddress.address}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, address: text })}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                {/* City */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    City <Text style={{ color: '#e74c3c' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                    }}
+                    placeholder="Enter your city"
+                    value={shippingAddress.city}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, city: text })}
+                  />
+                </View>
+
+                {/* State */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    State <Text style={{ color: '#e74c3c' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                    }}
+                    placeholder="Enter your state"
+                    value={shippingAddress.state}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, state: text })}
+                  />
+                </View>
+
+                {/* Postal Code */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    Postal Code <Text style={{ color: '#e74c3c' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                    }}
+                    placeholder="Enter your postal code"
+                    value={shippingAddress.postalCode}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, postalCode: text })}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* Country */}
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
+                    Country
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e0e0e0',
+                      borderRadius: 8,
+                      padding: 12,
+                      fontSize: 16,
+                    }}
+                    placeholder="Enter your country"
+                    value={shippingAddress.country}
+                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, country: text })}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Save Button */}
+            <View style={{
+              padding: 16,
+              borderTopWidth: 1,
+              borderTopColor: '#e0e0e0',
+              backgroundColor: '#fff',
+            }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#06412c',
+                  borderRadius: 8,
+                  padding: 16,
+                  alignItems: 'center',
+                }}
+                onPress={handleSaveShippingAddress}
+              >
+                <Text style={{
+                  color: '#f8fcfa',
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                }}>
+                  Save Address
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };

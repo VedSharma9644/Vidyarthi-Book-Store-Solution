@@ -317,6 +317,93 @@ class ApiService {
     }
   }
 
+  // Payment APIs
+  async createPaymentOrder(amount, receipt) {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, {
+        amount,
+        receipt,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create payment order API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to create payment order',
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to create payment order. Please try again.',
+        };
+      }
+    }
+  }
+
+  async verifyPayment(orderId, paymentId, signature) {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.VERIFY_PAYMENT, {
+        orderId,
+        paymentId,
+        signature,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Verify payment API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to verify payment',
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to verify payment. Please try again.',
+        };
+      }
+    }
+  }
+
+  // Orders APIs
+  async createOrder(paymentData, shippingAddress = null) {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, {
+        paymentData,
+        shippingAddress,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create order API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to create order',
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to create order. Please try again.',
+        };
+      }
+    }
+  }
+
   // Schools APIs
   async searchSchools(searchTerm = '', limit = 20) {
     try {

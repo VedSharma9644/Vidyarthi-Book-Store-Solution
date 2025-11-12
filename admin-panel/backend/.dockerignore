@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+README.md
+DEPLOYMENT.md
+*.md
+.DS_Store
+.vscode
+.idea
+test-*.js
+test-*.ps1
+serviceAccountKey.json
+

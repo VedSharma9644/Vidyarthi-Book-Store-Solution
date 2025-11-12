@@ -13,9 +13,12 @@ const gradeRoutes = require('./routes/grade.routes');
 const categoryRoutes = require('./routes/category.routes');
 const bookRoutes = require('./routes/book.routes');
 const cartRoutes = require('./routes/cart.routes');
+const paymentRoutes = require('./routes/payment.routes');
+const orderRoutes = require('./routes/order.routes');
 
 // Initialize Express app
 const app = express();
+// Cloud Run and App Engine use PORT environment variable (default 8080)
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -48,18 +51,21 @@ app.use('/api/grades', gradeRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Error handling
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server - bind to 0.0.0.0 to accept connections from network
+// Start server - Cloud Run requires binding to 0.0.0.0 and using PORT env var
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-    console.log(`📱 Auth API: http://localhost:${PORT}/api/auth/test`);
-    console.log(`🌐 Network access: http://192.168.1.36:${PORT}/health`);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`📱 Auth API: http://localhost:${PORT}/api/auth/test`);
+    }
 });
 
 module.exports = app;
