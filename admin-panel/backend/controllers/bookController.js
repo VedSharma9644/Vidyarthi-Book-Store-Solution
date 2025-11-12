@@ -4,7 +4,10 @@ const Book = require('../models/Book');
 // Get all books
 const getAllBooks = async (req, res) => {
   try {
-    const booksSnapshot = await db.collection('books').get();
+    // Only fetch active books (not soft-deleted)
+    const booksSnapshot = await db.collection('books')
+      .where('isActive', '==', true)
+      .get();
     const books = [];
 
     booksSnapshot.forEach((doc) => {
@@ -72,9 +75,37 @@ const createBook = async (req, res) => {
       publicationDate: req.body.PublicationDate || req.body.publicationDate || new Date(),
       isFeatured: req.body.IsFeatured !== undefined ? req.body.IsFeatured : (req.body.isFeatured !== undefined ? req.body.isFeatured : false),
       categoryId: req.body.CategoryId || req.body.categoryId,
+      gradeId: req.body.GradeId || req.body.gradeId || '',
+      schoolId: req.body.SchoolId || req.body.schoolId || '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+
+    // If gradeId or schoolId are not provided, try to get them from the category
+    if (bookData.categoryId && (!bookData.gradeId || !bookData.schoolId)) {
+      try {
+        const categoryDoc = await db.collection('categories').doc(bookData.categoryId).get();
+        if (categoryDoc.exists) {
+          const categoryData = categoryDoc.data();
+          if (!bookData.gradeId && categoryData.gradeId) {
+            bookData.gradeId = categoryData.gradeId;
+          }
+          
+          // Get schoolId from grade if not provided
+          if (!bookData.schoolId && bookData.gradeId) {
+            const gradeDoc = await db.collection('grades').doc(bookData.gradeId).get();
+            if (gradeDoc.exists) {
+              const gradeData = gradeDoc.data();
+              if (gradeData.schoolId) {
+                bookData.schoolId = gradeData.schoolId;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Warning: Could not fetch grade/school from category:', error.message);
+      }
+    }
 
     const book = new Book(bookData);
 
@@ -149,8 +180,36 @@ const updateBook = async (req, res) => {
       publicationDate: req.body.PublicationDate !== undefined ? req.body.PublicationDate : (req.body.publicationDate !== undefined ? req.body.publicationDate : existingBook.publicationDate),
       isFeatured: req.body.IsFeatured !== undefined ? req.body.IsFeatured : (req.body.isFeatured !== undefined ? req.body.isFeatured : existingBook.isFeatured),
       categoryId: req.body.CategoryId !== undefined ? req.body.CategoryId : (req.body.categoryId !== undefined ? req.body.categoryId : existingBook.categoryId),
+      gradeId: req.body.GradeId !== undefined ? req.body.GradeId : (req.body.gradeId !== undefined ? req.body.gradeId : existingBook.gradeId || ''),
+      schoolId: req.body.SchoolId !== undefined ? req.body.SchoolId : (req.body.schoolId !== undefined ? req.body.schoolId : existingBook.schoolId || ''),
       updatedAt: new Date(),
     };
+
+    // If categoryId changed or gradeId/schoolId are missing, try to get them from category
+    if (updatedData.categoryId && (!updatedData.gradeId || !updatedData.schoolId)) {
+      try {
+        const categoryDoc = await db.collection('categories').doc(updatedData.categoryId).get();
+        if (categoryDoc.exists) {
+          const categoryData = categoryDoc.data();
+          if (!updatedData.gradeId && categoryData.gradeId) {
+            updatedData.gradeId = categoryData.gradeId;
+          }
+          
+          // Get schoolId from grade if not provided
+          if (!updatedData.schoolId && updatedData.gradeId) {
+            const gradeDoc = await db.collection('grades').doc(updatedData.gradeId).get();
+            if (gradeDoc.exists) {
+              const gradeData = gradeDoc.data();
+              if (gradeData.schoolId) {
+                updatedData.schoolId = gradeData.schoolId;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Warning: Could not fetch grade/school from category:', error.message);
+      }
+    }
 
     // Preserve createdAt
     updatedData.createdAt = existingBook.createdAt;
@@ -214,11 +273,36 @@ const deleteBook = async (req, res) => {
       });
     }
 
-    // Soft delete - set isActive to false
-    await db.collection('books').doc(id).update({
-      isActive: false,
-      updatedAt: new Date(),
-    });
+    const bookData = bookDoc.data();
+
+    // Permanently delete the book document from Firestore
+    await db.collection('books').doc(id).delete();
+
+    // Optionally delete the cover image from Firebase Storage if it exists
+    if (bookData.coverImageUrl) {
+      try {
+        const { admin } = require('../config/database');
+        const bucket = admin.storage().bucket('vidyarthi-mobile-app.firebasestorage.app');
+        
+        // Extract the file path from the URL
+        // URL format: https://storage.googleapis.com/bucket-name/path/to/file
+        const urlParts = bookData.coverImageUrl.split('/');
+        const fileName = urlParts.slice(4).join('/'); // Skip https://storage.googleapis.com/bucket-name/
+        
+        if (fileName) {
+          const file = bucket.file(fileName);
+          const [exists] = await file.exists();
+          
+          if (exists) {
+            await file.delete();
+            console.log(`Deleted cover image: ${fileName}`);
+          }
+        }
+      } catch (storageError) {
+        // Log error but don't fail the deletion if image deletion fails
+        console.warn('Warning: Could not delete cover image from storage:', storageError.message);
+      }
+    }
 
     res.json({
       success: true,

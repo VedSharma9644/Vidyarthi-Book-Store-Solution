@@ -1,30 +1,76 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
+import { categoriesAPI, gradesAPI } from '../services/api';
 import './Categories.css';
 
 const Categories = () => {
-  // Mock data - replace with API call later
-  const [categories, setCategories] = useState([
-    { id: 3, name: 'PARAMITA CBSE CLASS 1', description: 'PARAMITA  CBSE CLASS 1  ', grade: 'CLASS 1' },
-    { id: 4, name: 'PARAMITA CBSE CLASS 2', description: 'PARAMITA CBSE CLASS 2', grade: 'CLASS 2' },
-    { id: 5, name: 'PARAMITA CBSE CLASS 3', description: 'PARAMITA CBSE CLASS 3', grade: 'CLASS 3' },
-    { id: 6, name: 'PARAMITA CBSE CLASS 4', description: 'PARAMITA CBSE CLASS 4', grade: 'CLASS 4' },
-    { id: 7, name: 'PARAMITA CBSE CLASS 5', description: 'PARAMITA CBSE CLASS 5', grade: 'CLASS 5' },
-    { id: 8, name: 'PARAMITA CBSE CLASS 6', description: 'PARAMITA CBSE CLASS 6', grade: 'CLASS 6' },
-    { id: 9, name: 'PARAMITA CBSE CLASS 7', description: 'PARAMITA CBSE CLASS 7', grade: 'CLASS 7' },
-    { id: 10, name: 'PARAMITA CBSE CLASS 8', description: 'PARAMITA CBSE CLASS 8', grade: 'CLASS 8' },
-    { id: 11, name: 'PARAMITA IIT CLASS 6', description: 'PARAMITA IIT CLASS 6', grade: 'CLASS 6' },
-    { id: 12, name: 'PARAMITA IIT CLASS 7', description: 'PARAMITA IIT CLASS 7', grade: 'CLASS 7' },
-  ]);
-
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filterText, setFilterText] = useState('');
   const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoading(true);
+        const response = await categoriesAPI.getAll();
+        if (response.data.success) {
+          const categoriesData = response.data.data || [];
+          
+          // Fetch all grades to map grade names
+          const gradesResponse = await gradesAPI.getAll();
+          const gradesMap = new Map();
+          if (gradesResponse.data.success) {
+            gradesResponse.data.data.forEach(grade => {
+              gradesMap.set(grade.id, grade.name);
+            });
+          }
+          
+          // Transform categories to include grade name for display
+          const transformedCategories = categoriesData.map((category) => {
+            const gradeName = category.gradeId ? (gradesMap.get(category.gradeId) || 'Unknown Grade') : 'No Grade';
+            
+            return {
+              id: category.id,
+              name: category.name,
+              description: category.description || '',
+              grade: gradeName,
+              gradeId: category.gradeId,
+            };
+          });
+          
+          setCategories(transformedCategories);
+        } else {
+          console.error('Failed to load categories:', response.data.message);
+          alert('Failed to load categories. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        alert('Failed to load categories. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
-      // TODO: Call API to delete
-      setCategories(categories.filter(cat => cat.id !== id));
+      try {
+        const response = await categoriesAPI.delete(id);
+        if (response.data.success) {
+          // Remove from local state
+          setCategories(categories.filter(cat => cat.id !== id));
+          alert('Category deleted successfully');
+        } else {
+          alert(response.data.message || 'Failed to delete category');
+        }
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        alert('Failed to delete category. Please try again.');
+      }
     }
   };
 
@@ -151,21 +197,30 @@ const Categories = () => {
               </Link>
             </div>
             <div className="card-body">
-              <DataTable
-                columns={columns}
-                data={filteredItems}
-                pagination
-                paginationResetDefaultPage={resetPaginationToggle}
-                subHeader
-                subHeaderComponent={subHeaderComponentMemo}
-                persistTableHead
-                highlightOnHover
-                striped
-                customStyles={customStyles}
-                paginationPerPage={10}
-                paginationRowsPerPageOptions={[10, 25, 50, 100]}
-                noDataComponent="No categories found"
-              />
+              {loading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2">Loading categories...</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  data={filteredItems}
+                  pagination
+                  paginationResetDefaultPage={resetPaginationToggle}
+                  subHeader
+                  subHeaderComponent={subHeaderComponentMemo}
+                  persistTableHead
+                  highlightOnHover
+                  striped
+                  customStyles={customStyles}
+                  paginationPerPage={10}
+                  paginationRowsPerPageOptions={[10, 25, 50, 100]}
+                  noDataComponent="No categories found"
+                />
+              )}
             </div>
           </div>
         </div>

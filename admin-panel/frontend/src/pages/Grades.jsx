@@ -1,21 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import DataTable from 'react-data-table-component';
+import { schoolsAPI, gradesAPI } from '../services/api';
 import './Grades.css';
 
 const Grades = () => {
-  // Mock data - replace with API call later
-  const [grades, setGrades] = useState([
-    { id: 3, name: 'CLASS 1', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 4, name: 'CLASS 2', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 5, name: 'CLASS 3', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 6, name: 'CLASS 4', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 7, name: 'CLASS 5', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 8, name: 'CLASS 6', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 9, name: 'CLASS 7', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 10, name: 'CLASS 8', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 11, name: 'CLASS 9', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-    { id: 12, name: 'CLASS 10', school: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE - KARIMNAGAR-PADMANAGAR-CBSE', schoolId: 1 },
-  ]);
+  const [grades, setGrades] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [filterText, setFilterText] = useState('');
   const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
@@ -29,40 +19,86 @@ const Grades = () => {
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Mock schools data - replace with API call later
-  const mockSchools = [
-    { id: 1, name: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { id: 41, name: ' PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { id: 44, name: 'PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { id: 46, name: 'PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { id: 48, name: 'PARAMITA HIGH SCHOOL-MANKAMMA THOTA- IIT CAMPUS' },
-    { id: 52, name: 'SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-  ];
+  const [loadingSchools, setLoadingSchools] = useState(false);
 
   useEffect(() => {
-    // Load schools
-    const loadSchools = async () => {
+    const initializeData = async () => {
+      // First load schools, then load grades (grades need schools for display)
       try {
-        // TODO: Fetch schools from API
-        // const response = await fetch('/api/schools');
-        // const data = await response.json();
-        // setSchools(data);
-        
-        // Using mock data for now
-        setSchools(mockSchools);
+        setLoadingSchools(true);
+        const schoolsResponse = await schoolsAPI.getAll();
+        if (schoolsResponse.data.success) {
+          const schoolsData = schoolsResponse.data.data || [];
+          setSchools(schoolsData);
+          
+          // Now load grades with school data available
+          setLoading(true);
+          const gradesResponse = await gradesAPI.getAll();
+          if (gradesResponse.data.success) {
+            const gradesData = gradesResponse.data.data || [];
+            
+            // Create a map of schools for quick lookup
+            const schoolsMap = new Map();
+            schoolsData.forEach(school => {
+              schoolsMap.set(school.id, school);
+            });
+            
+            // Transform grades to include school name for display
+            const transformedGrades = gradesData.map((grade) => {
+              let schoolName = 'Unknown School';
+              if (grade.schoolId) {
+                const school = schoolsMap.get(grade.schoolId);
+                if (school) {
+                  schoolName = school.branchName 
+                    ? `${school.name} - ${school.branchName}`
+                    : school.name;
+                }
+              }
+              
+              return {
+                id: grade.id,
+                name: grade.name,
+                school: schoolName,
+                schoolId: grade.schoolId,
+              };
+            });
+            
+            setGrades(transformedGrades);
+          } else {
+            console.error('Failed to load grades:', gradesResponse.data.message);
+            alert('Failed to load grades. Please try again.');
+          }
+        } else {
+          console.error('Failed to load schools:', schoolsResponse.data.message);
+          alert('Failed to load schools. Please try again.');
+        }
       } catch (error) {
-        console.error('Error loading schools:', error);
+        console.error('Error loading data:', error);
+        alert('Failed to load data. Please try again.');
+      } finally {
+        setLoadingSchools(false);
+        setLoading(false);
       }
     };
 
-    loadSchools();
+    initializeData();
   }, []);
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this grade?')) {
-      // TODO: Call API to delete
-      setGrades(grades.filter(grade => grade.id !== id));
+      try {
+        const response = await gradesAPI.delete(id);
+        if (response.data.success) {
+          // Remove from local state
+          setGrades(grades.filter(grade => grade.id !== id));
+          alert('Grade deleted successfully');
+        } else {
+          alert(response.data.message || 'Failed to delete grade');
+        }
+      } catch (error) {
+        console.error('Error deleting grade:', error);
+        alert('Failed to delete grade. Please try again.');
+      }
     }
   };
 
@@ -139,46 +175,65 @@ const Grades = () => {
     setIsSubmitting(true);
     
     try {
-      // TODO: Call API to save grade
-      // const response = await fetch('/Admin/ManageGrade/SaveGrade', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     Id: parseInt(formData.Id),
-      //     Name: formData.Name,
-      //     SchoolId: parseInt(formData.SchoolId),
-      //   }),
-      // });
-      
-      // if (response.ok) {
-      //   const updatedGrade = await response.json();
-      //   if (formData.Id === '0') {
-      //     setGrades([...grades, updatedGrade]);
-      //   } else {
-      //     setGrades(grades.map(g => g.id === parseInt(formData.Id) ? updatedGrade : g));
-      //   }
-      //   handleCloseModal();
-      // }
-      
-      // Mock success for now
-      const newGrade = {
-        id: formData.Id === '0' ? grades.length + 1 : parseInt(formData.Id),
-        name: formData.Name,
-        school: schools.find(s => s.id === parseInt(formData.SchoolId))?.name || '',
-        schoolId: parseInt(formData.SchoolId),
+      const gradeData = {
+        name: formData.Name.trim(),
+        schoolId: formData.SchoolId,
+        displayOrder: 0,
+        isActive: true,
       };
-      
+
+      let response;
       if (formData.Id === '0') {
-        setGrades([...grades, newGrade]);
+        // Create new grade
+        response = await gradesAPI.create(gradeData);
       } else {
-        setGrades(grades.map(g => g.id === parseInt(formData.Id) ? newGrade : g));
+        // Update existing grade
+        response = await gradesAPI.update(formData.Id, gradeData);
       }
-      
-      handleCloseModal();
+
+      if (response.data.success) {
+        // Reload grades to get updated data with school names
+        const gradesResponse = await gradesAPI.getAll();
+        if (gradesResponse.data.success) {
+          const gradesData = gradesResponse.data.data || [];
+          
+          // Create a map of schools for quick lookup
+          const schoolsMap = new Map();
+          schools.forEach(school => {
+            schoolsMap.set(school.id, school);
+          });
+          
+          // Transform grades to include school name for display
+          const transformedGrades = gradesData.map((grade) => {
+            let schoolName = 'Unknown School';
+            if (grade.schoolId) {
+              const school = schoolsMap.get(grade.schoolId);
+              if (school) {
+                schoolName = school.branchName 
+                  ? `${school.name} - ${school.branchName}`
+                  : school.name;
+              }
+            }
+            
+            return {
+              id: grade.id,
+              name: grade.name,
+              school: schoolName,
+              schoolId: grade.schoolId,
+            };
+          });
+          
+          setGrades(transformedGrades);
+        }
+        
+        alert(formData.Id === '0' ? 'Grade created successfully' : 'Grade updated successfully');
+        handleCloseModal();
+      } else {
+        alert(response.data.message || 'Failed to save grade');
+      }
     } catch (error) {
       console.error('Error saving grade:', error);
+      alert('Failed to save grade. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -298,21 +353,30 @@ const Grades = () => {
               </button>
             </div>
             <div className="card-body">
-              <DataTable
-                columns={columns}
-                data={filteredItems}
-                pagination
-                paginationResetDefaultPage={resetPaginationToggle}
-                subHeader
-                subHeaderComponent={subHeaderComponentMemo}
-                persistTableHead
-                highlightOnHover
-                striped
-                customStyles={customStyles}
-                paginationPerPage={10}
-                paginationRowsPerPageOptions={[10, 25, 50, 100]}
-                noDataComponent="No grades found"
-              />
+              {loading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2">Loading grades...</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  data={filteredItems}
+                  pagination
+                  paginationResetDefaultPage={resetPaginationToggle}
+                  subHeader
+                  subHeaderComponent={subHeaderComponentMemo}
+                  persistTableHead
+                  highlightOnHover
+                  striped
+                  customStyles={customStyles}
+                  paginationPerPage={10}
+                  paginationRowsPerPageOptions={[10, 25, 50, 100]}
+                  noDataComponent="No grades found"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -351,7 +415,7 @@ const Grades = () => {
 
                           <div className="mb-3">
                             <label className="form-label" htmlFor="Name">
-                              Name
+                              Grade Name <span className="text-danger">*</span>
                             </label>
                             <input
                               className={`form-control ${errors.Name ? 'is-invalid' : ''}`}
@@ -371,7 +435,7 @@ const Grades = () => {
 
                           <div className="mb-3">
                             <label className="form-label" htmlFor="SchoolId">
-                              Select School
+                              Select School <span className="text-danger">*</span>
                             </label>
                             <select
                               className={`form-control ${errors.SchoolId ? 'is-invalid' : ''}`}
@@ -381,14 +445,21 @@ const Grades = () => {
                               name="SchoolId"
                               value={formData.SchoolId}
                               onChange={handleChange}
+                              disabled={loadingSchools}
+                              required
                             >
-                              <option value="">-- Select School --</option>
+                              <option value="">
+                                {loadingSchools ? 'Loading schools...' : '-- Select School --'}
+                              </option>
                               {schools.map((school) => (
                                 <option key={school.id} value={school.id}>
-                                  {school.name}
+                                  {school.name} {school.branchName ? `- ${school.branchName}` : ''}
                                 </option>
                               ))}
                             </select>
+                            {loadingSchools && (
+                              <small className="text-muted">Loading schools...</small>
+                            )}
                             {errors.SchoolId && (
                               <span className="text-danger">{errors.SchoolId}</span>
                             )}

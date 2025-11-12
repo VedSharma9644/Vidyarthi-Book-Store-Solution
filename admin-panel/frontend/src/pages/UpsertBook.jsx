@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { schoolsAPI, categoriesAPI, booksAPI, gradesAPI, uploadAPI } from '../services/api';
 import './UpsertBook.css';
 
 const UpsertBook = () => {
@@ -20,6 +21,8 @@ const UpsertBook = () => {
     StockQuantity: '0',
     BookType: '',
     otherBookType: '',
+    SchoolId: '',
+    GradeId: '',
     CategoryId: '',
   });
 
@@ -27,62 +30,12 @@ const UpsertBook = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [coverImageFile, setCoverImageFile] = useState(null);
   const [showOtherBookType, setShowOtherBookType] = useState(false);
-
-  // Category options - in production, fetch from API
-  const categoryOptions = [
-    { value: '3', label: 'PARAMITA CBSE CLASS 1' },
-    { value: '4', label: 'PARAMITA CBSE CLASS 2' },
-    { value: '5', label: 'PARAMITA CBSE CLASS 3' },
-    { value: '6', label: 'PARAMITA CBSE CLASS 4' },
-    { value: '7', label: 'PARAMITA CBSE CLASS 5' },
-    { value: '8', label: 'PARAMITA CBSE CLASS 6' },
-    { value: '9', label: 'PARAMITA CBSE CLASS 7' },
-    { value: '10', label: 'PARAMITA CBSE CLASS 8' },
-    { value: '11', label: 'PARAMITA IIT CLASS 6' },
-    { value: '12', label: 'PARAMITA IIT CLASS 7' },
-    { value: '13', label: 'PARAMITA IIT CLASS 8' },
-    { value: '14', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 6-ALUGUNUR' },
-    { value: '15', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 7-ALUGUNUR' },
-    { value: '16', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 8-ALUGUNUR' },
-    { value: '17', label: 'PARAMITA CBSE CLASS 9' },
-    { value: '18', label: 'PARAMITA CBSE CLASS 9- LANGUAGE HINDI' },
-    { value: '19', label: 'PARAMITA CBSE CLASS 10' },
-    { value: '20', label: 'GRADE 10 CBSE LANGUAGE HINDI' },
-    { value: '21', label: 'PARAMITA STATE BOARD CLASS  NURSERY' },
-    { value: '22', label: 'PARAMITA STATE BOARD CLASS LKG' },
-    { value: '23', label: 'PARAMITA STATE BOARD CLASS UKG' },
-    { value: '24', label: 'PARAMITA STATE BOARD CLASS 1' },
-    { value: '25', label: 'PARAMITA STATE BOARD CLASS 2' },
-    { value: '26', label: 'PARAMITA STATE BOARD CLASS 3' },
-    { value: '27', label: 'PARAMITA STATE BOARD CLASS 4' },
-    { value: '28', label: 'PARAMITA STATE BOARD CLASS 5' },
-    { value: '29', label: 'PARAMITA STATE BOARD CLASS 6' },
-    { value: '30', label: 'PARAMITA STATE BOARD CLASS 7' },
-    { value: '31', label: 'PARAMITA STATE BOARD CLASS 8' },
-    { value: '35', label: 'PARAMITA STATE BOARD CLASS 6- IIT CAMPUS' },
-    { value: '36', label: 'PARAMITA STATE BOARD CLASS 7- IIT CAMPUS' },
-    { value: '37', label: 'PARAMITA STATE BOARD CLASS 8- IIT CAMPUS' },
-    { value: '38', label: 'PARAMITA IIT CLASS-9 --  Bi  P C' },
-    { value: '39', label: 'PARAMITA IIT CLASS-10 -- Bi P C' },
-    { value: '40', label: 'PARAMITA IIT CLASS-9 -- M  P C' },
-    { value: '41', label: 'PARAMITA IIT CLASS-10 -- M P C' },
-    { value: '53', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR  CLASS -- NURSERY' },
-    { value: '54', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- LKG-PP1' },
-    { value: '55', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- UKG-PP2' },
-    { value: '56', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- 1' },
-    { value: '57', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- 2' },
-    { value: '58', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- 3' },
-    { value: '59', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- 4' },
-    { value: '60', label: 'SIDDARTHA SCHOOLS -KARIMNAGAR CLASS -- 5' },
-    { value: '61', label: 'PARAMITA IIT CLASS-9 -- Bi P C HINDI LANGUAGE' },
-    { value: '62', label: 'PARAMITA IIT CLASS-10 -- Bi P C HINDI LANGUAGE' },
-    { value: '63', label: 'PARAMITA IIT CLASS-9 -- M P C HINDI LANGUAGE' },
-    { value: '64', label: 'PARAMITA IIT CLASS-10 -- M P C HINDI LANGUAGE' },
-    { value: '65', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 9-ALUGUNUR' },
-    { value: '66', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 10-ALUGUNUR' },
-    { value: '67', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 9 HINDI LANGUAGE -ALUGUNUR' },
-    { value: '68', label: 'PARAMITA WORLD SCHOOL- CBSE CLASS 10 HINDI LANGUAGE -ALUGUNUR' },
-  ];
+  const [schools, setSchools] = useState([]);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const [grades, setGrades] = useState([]);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   const bookTypeOptions = [
     { value: 'TEXTBOOK', label: 'TEXTBOOK' },
@@ -92,20 +45,126 @@ const UpsertBook = () => {
     { value: 'OTHER', label: 'OTHER' },
   ];
 
+  // Load grades when school is selected
+  const loadGradesForSchool = async (schoolId) => {
+    try {
+      setLoadingGrades(true);
+      const response = await gradesAPI.getAll(schoolId);
+      if (response.data.success) {
+        setGrades(response.data.data || []);
+      } else {
+        setGrades([]);
+      }
+    } catch (error) {
+      console.error('Error loading grades:', error);
+      setGrades([]);
+    } finally {
+      setLoadingGrades(false);
+    }
+  };
+
+  // Load categories when grade is selected
+  const loadCategoriesForGrade = async (gradeId) => {
+    try {
+      setLoadingCategories(true);
+      const response = await categoriesAPI.getAll();
+      if (response.data.success) {
+        // Filter categories by gradeId
+        const allCategories = response.data.data || [];
+        const filteredCategories = allCategories.filter(cat => cat.gradeId === gradeId);
+        setCategories(filteredCategories);
+      } else {
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
   useEffect(() => {
+    // Load schools on component mount
+    const loadSchools = async () => {
+      try {
+        setLoadingSchools(true);
+        const response = await schoolsAPI.getAll();
+        if (response.data.success) {
+          setSchools(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error loading schools:', error);
+        alert('Failed to load schools. Please try again.');
+      } finally {
+        setLoadingSchools(false);
+      }
+    };
+
+    loadSchools();
+
     // If editing, fetch book data
     if (bookId) {
-      // TODO: Fetch book data from API
       const fetchBook = async () => {
         try {
-          // const response = await fetch(`/api/books/${bookId}`);
-          // const data = await response.json();
-          // setFormData(data);
-          
-          // Mock data for now
-          console.log('Fetching book with id:', bookId);
+          const response = await booksAPI.getById(bookId);
+          if (response.data.success) {
+            const book = response.data.data;
+            
+            // If book has category, fetch school and grade from category
+            let schoolId = '';
+            let gradeId = '';
+            if (book.categoryId) {
+              try {
+                const categoryResponse = await categoriesAPI.getById(book.categoryId);
+                if (categoryResponse.data.success && categoryResponse.data.data.gradeId) {
+                  gradeId = categoryResponse.data.data.gradeId;
+                  // Fetch grade to get schoolId
+                  const gradeResponse = await gradesAPI.getById(gradeId);
+                  if (gradeResponse.data.success && gradeResponse.data.data.schoolId) {
+                    schoolId = gradeResponse.data.data.schoolId;
+                  }
+                }
+              } catch (error) {
+                console.error('Error fetching category/grade:', error);
+              }
+            }
+            
+            // Use book's direct schoolId and gradeId if available
+            schoolId = book.schoolId || schoolId;
+            gradeId = book.gradeId || gradeId;
+            
+            setFormData({
+              Id: book.id,
+              CoverImageUrl: book.coverImageUrl || '',
+              Title: book.title || '',
+              Author: book.author || '',
+              Publisher: book.publisher || '',
+              ISBN: book.isbn || '',
+              Description: book.description || '',
+              Price: book.price?.toString() || '0.00',
+              DiscountPrice: book.discountPrice?.toString() || '',
+              StockQuantity: book.stockQuantity?.toString() || '0',
+              BookType: book.bookType || '',
+              otherBookType: '',
+              SchoolId: schoolId,
+              GradeId: gradeId,
+              CategoryId: book.categoryId || '',
+            });
+            
+            // Load grades for the school
+            if (schoolId) {
+              loadGradesForSchool(schoolId);
+            }
+            
+            // Load categories for the grade
+            if (gradeId) {
+              loadCategoriesForGrade(gradeId);
+            }
+          }
         } catch (error) {
           console.error('Error fetching book:', error);
+          alert('Failed to load book data. Please try again.');
         }
       };
       fetchBook();
@@ -115,8 +174,35 @@ const UpsertBook = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     
+    // Handle SchoolId change - reload grades and reset grade/category
+    if (name === 'SchoolId') {
+      setFormData(prev => ({
+        ...prev,
+        SchoolId: value,
+        GradeId: '', // Reset grade when school changes
+        CategoryId: '', // Reset category when school changes
+      }));
+      setGrades([]);
+      setCategories([]);
+      if (value) {
+        loadGradesForSchool(value);
+      }
+    }
+    // Handle GradeId change - reload categories
+    else if (name === 'GradeId') {
+      setFormData(prev => ({
+        ...prev,
+        GradeId: value,
+        CategoryId: '', // Reset category when grade changes
+      }));
+      if (value) {
+        loadCategoriesForGrade(value);
+      } else {
+        setCategories([]);
+      }
+    }
     // Handle BookType change - show/hide otherBookType input
-    if (name === 'BookType') {
+    else if (name === 'BookType') {
       setShowOtherBookType(value === 'OTHER');
       if (value !== 'OTHER') {
         setFormData(prev => ({
@@ -146,16 +232,34 @@ const UpsertBook = () => {
     }
   };
 
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setCoverImageFile(file);
-      // Optionally preview the image
-      // const reader = new FileReader();
-      // reader.onloadend = () => {
-      //   setFormData(prev => ({ ...prev, CoverImageUrl: reader.result }));
-      // };
-      // reader.readAsDataURL(file);
+      // Upload image immediately when selected
+      uploadImage(file);
+    }
+  };
+
+  const uploadImage = async (file) => {
+    try {
+      setUploadingImage(true);
+      const response = await uploadAPI.uploadImage(file);
+      if (response.data.success) {
+        setFormData(prev => ({
+          ...prev,
+          CoverImageUrl: response.data.url,
+        }));
+      } else {
+        alert('Failed to upload image: ' + (response.data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -215,8 +319,16 @@ const UpsertBook = () => {
       newErrors.otherBookType = 'Please specify the book type.';
     }
     
+    if (!formData.SchoolId) {
+      newErrors.SchoolId = 'School is required.';
+    }
+    
+    if (!formData.GradeId) {
+      newErrors.GradeId = 'Grade is required.';
+    }
+    
     if (!formData.CategoryId) {
-      newErrors.CategoryId = 'Category ID is required.';
+      newErrors.CategoryId = 'Category is required.';
     }
     
     setErrors(newErrors);
@@ -233,44 +345,56 @@ const UpsertBook = () => {
     setIsSubmitting(true);
     
     try {
-      // Prepare form data for multipart/form-data
-      const submitData = new FormData();
+      // Prepare JSON data (file uploads will be handled separately if needed)
+      const submitData = {
+        Title: formData.Title,
+        Author: formData.Author,
+        Publisher: formData.Publisher || '',
+        ISBN: formData.ISBN,
+        Description: formData.Description || '',
+        Price: parseFloat(formData.Price) || 0,
+        DiscountPrice: formData.DiscountPrice ? parseFloat(formData.DiscountPrice) : null,
+        StockQuantity: parseInt(formData.StockQuantity) || 0,
+        CoverImageUrl: formData.CoverImageUrl || '',
+        BookType: formData.BookType === 'OTHER' ? formData.otherBookType : formData.BookType,
+        CategoryId: formData.CategoryId,
+        GradeId: formData.GradeId,
+        SchoolId: formData.SchoolId,
+      };
       
-      // Add all form fields
-      Object.keys(formData).forEach(key => {
-        if (key !== 'otherBookType') {
-          submitData.append(key, formData[key]);
-        }
-      });
-      
-      // Handle BookType - if OTHER, use otherBookType value
-      if (formData.BookType === 'OTHER') {
-        submitData.set('BookType', formData.otherBookType);
+      // Call API to save book
+      let response;
+      if (formData.Id === '0') {
+        response = await booksAPI.create(submitData);
+      } else {
+        response = await booksAPI.update(formData.Id, submitData);
       }
-      
-      // Add file if selected
-      if (coverImageFile) {
-        submitData.append('file', coverImageFile);
-      }
-      
-      // TODO: Call API to save book
-      // const response = await fetch('/api/books', {
-      //   method: bookId ? 'PUT' : 'POST',
-      //   body: submitData,
-      // });
-      
-      // if (response.ok) {
-      //   navigate('/get-all-books');
-      // }
-      
-      // Mock success for now
-      console.log('Saving book:', Object.fromEntries(submitData));
-      setTimeout(() => {
-        setIsSubmitting(false);
+
+      if (response.data.success) {
+        alert(bookId ? 'Book updated successfully' : 'Book created successfully');
         navigate('/get-all-books');
-      }, 1000);
+      } else {
+        // Show validation errors if available
+        const errorMessage = response.data.errors 
+          ? response.data.errors.join('\n')
+          : response.data.message || 'Failed to save book';
+        alert(errorMessage);
+        setIsSubmitting(false);
+      }
     } catch (error) {
       console.error('Error saving book:', error);
+      
+      // Show detailed error message
+      let errorMessage = 'Failed to save book. Please try again.';
+      if (error.response?.data) {
+        if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+          errorMessage = error.response.data.errors.join('\n');
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+      }
+      
+      alert(errorMessage);
       setIsSubmitting(false);
     }
   };
@@ -501,6 +625,72 @@ const UpsertBook = () => {
                 )}
 
                 <div className="mb-3">
+                  <label className="form-label" htmlFor="SchoolId">
+                    School <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    className={`form-control ${errors.SchoolId ? 'is-invalid' : ''}`}
+                    id="SchoolId"
+                    name="SchoolId"
+                    value={formData.SchoolId}
+                    onChange={handleChange}
+                    required
+                    disabled={loadingSchools}
+                  >
+                    <option value="">-- Select School --</option>
+                    {schools.map(school => (
+                      <option key={school.id} value={school.id}>
+                        {school.branchName 
+                          ? `${school.name} - ${school.branchName}`
+                          : school.name}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingSchools && (
+                    <small className="form-text text-muted">Loading schools...</small>
+                  )}
+                  {errors.SchoolId && (
+                    <span className="text-danger">{errors.SchoolId}</span>
+                  )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="GradeId">
+                    Grade <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    className={`form-control ${errors.GradeId ? 'is-invalid' : ''}`}
+                    id="GradeId"
+                    name="GradeId"
+                    value={formData.GradeId}
+                    onChange={handleChange}
+                    required
+                    disabled={!formData.SchoolId || loadingGrades}
+                  >
+                    <option value="">
+                      {!formData.SchoolId 
+                        ? '-- Select School First --'
+                        : loadingGrades 
+                        ? 'Loading grades...'
+                        : grades.length === 0
+                        ? 'No grades found for this school'
+                        : '-- Select Grade --'}
+                    </option>
+                    {grades.map(grade => (
+                      <option key={grade.id} value={grade.id}>
+                        {grade.name}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingGrades && (
+                    <small className="form-text text-muted">Loading grades...</small>
+                  )}
+                  {errors.GradeId && (
+                    <span className="text-danger">{errors.GradeId}</span>
+                  )}
+                </div>
+
+                <div className="mb-3">
                   <label className="form-label" htmlFor="CategoryId">
                     Category <span className="text-danger">*</span>
                   </label>
@@ -511,14 +701,26 @@ const UpsertBook = () => {
                     value={formData.CategoryId}
                     onChange={handleChange}
                     required
+                    disabled={!formData.GradeId || loadingCategories}
                   >
-                    <option value="">-- Select Category --</option>
-                    {categoryOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
+                    <option value="">
+                      {!formData.GradeId 
+                        ? '-- Select Grade First --'
+                        : loadingCategories 
+                        ? 'Loading categories...'
+                        : categories.length === 0
+                        ? 'No categories found for this grade'
+                        : '-- Select Category --'}
+                    </option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
                       </option>
                     ))}
                   </select>
+                  {loadingCategories && (
+                    <small className="form-text text-muted">Loading categories...</small>
+                  )}
                   {errors.CategoryId && (
                     <span className="text-danger">{errors.CategoryId}</span>
                   )}
@@ -532,11 +734,26 @@ const UpsertBook = () => {
                     className="form-control"
                     accept="image/*"
                     onChange={handleFileChange}
+                    disabled={uploadingImage}
                   />
-                  {coverImageFile && (
-                    <small className="form-text text-muted">
-                      Selected: {coverImageFile.name}
+                  {uploadingImage && (
+                    <small className="form-text text-info">
+                      Uploading image...
                     </small>
+                  )}
+                  {coverImageFile && !uploadingImage && (
+                    <small className="form-text text-success">
+                      ✓ Image uploaded: {coverImageFile.name}
+                    </small>
+                  )}
+                  {formData.CoverImageUrl && (
+                    <div className="mt-2">
+                      <img 
+                        src={formData.CoverImageUrl} 
+                        alt="Cover preview" 
+                        style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '8px' }}
+                      />
+                    </div>
                   )}
                 </div>
 

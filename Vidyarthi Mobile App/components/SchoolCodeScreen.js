@@ -7,30 +7,20 @@ import {
   ScrollView,
   Animated,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
+import ApiService from '../services/apiService';
 
-const SchoolCodeScreen = ({ onTabPress, onBack }) => {
+const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
   const [schoolCode, setSchoolCode] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredSchools, setFilteredSchools] = useState([]);
   const [dropdownAnimation] = useState(new Animated.Value(0));
   const [fadeAnimation] = useState(new Animated.Value(0));
-
-  const allSchools = [
-    { code: 'SCH-12345', name: 'PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { code: 'SCH-67890', name: 'BLOOMING MINDS-KORUTLA-CBSE' },
-    { code: 'SCH-11111', name: 'SRI CHAITANYA-JAGTIAL-STATE' },
-    { code: 'SCH-22222', name: 'KAKATIYA-KARIMNAGAR-ICSE' },
-    { code: 'SCH-33333', name: 'VIVEKANANDA-GODAVARIKHANI-STATE' },
-    { code: 'SCH-44444', name: 'APEX E-TECHNO-PEDDAPALLI-CBSE' },
-    { code: 'SCH-55555', name: 'DELHI PUBLIC SCHOOL-HYDERABAD-CBSE' },
-    { code: 'SCH-66666', name: 'CHINMAYA VIDYALAYA-BANGALORE-ICSE' },
-    { code: 'SCH-77777', name: 'KENDRIYA VIDYALAYA-MUMBAI-CBSE' },
-    { code: 'SCH-88888', name: 'DAV PUBLIC SCHOOL-CHENNAI-CBSE' },
-  ];
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     // Fade in animation on component mount
@@ -41,29 +31,43 @@ const SchoolCodeScreen = ({ onTabPress, onBack }) => {
     }).start();
   }, []);
 
-  const handleCodeChange = (text) => {
+  const handleCodeChange = async (text) => {
     setSchoolCode(text);
     
     if (text.length > 0) {
-      const filtered = allSchools.filter(school => 
-        school.code.toLowerCase().includes(text.toLowerCase()) ||
-        school.name.toLowerCase().includes(text.toLowerCase())
-      );
-      setFilteredSchools(filtered);
-      setShowDropdown(true);
-      
+      setIsSearching(true);
+      try {
+        // Search schools from Firebase
+        const result = await ApiService.searchSchools(text, 10);
+        
+        if (result.success && result.data) {
+          setFilteredSchools(result.data);
+          setShowDropdown(true);
+          
       // Animate dropdown opening
       Animated.timing(dropdownAnimation, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false, // maxHeight doesn't support native driver
       }).start();
+        } else {
+          setFilteredSchools([]);
+          setShowDropdown(false);
+        }
+      } catch (error) {
+        console.error('Error searching schools:', error);
+        setFilteredSchools([]);
+        setShowDropdown(false);
+      } finally {
+        setIsSearching(false);
+      }
     } else {
+      setFilteredSchools([]);
       setShowDropdown(false);
       Animated.timing(dropdownAnimation, {
         toValue: 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: false, // maxHeight doesn't support native driver
       }).start();
     }
   };
@@ -77,30 +81,41 @@ const SchoolCodeScreen = ({ onTabPress, onBack }) => {
     Animated.timing(dropdownAnimation, {
       toValue: 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: false, // maxHeight doesn't support native driver
     }).start();
-
-    // Show selection feedback
-    Alert.alert('School Selected', `You selected: ${school.name}`);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!schoolCode.trim()) {
       Alert.alert('Error', 'Please enter a school code');
       return;
     }
     
-    // Find the selected school
-    const selectedSchool = allSchools.find(school => school.code === schoolCode);
-    if (selectedSchool) {
-      Alert.alert('Success', `Proceeding with: ${selectedSchool.name}`);
-      // TODO: Navigate to next screen
-    } else {
-      Alert.alert('Invalid Code', 'Please enter a valid school code');
+    try {
+      setIsSearching(true);
+      
+      // Validate school code with Firebase
+      const result = await ApiService.validateSchoolCode(schoolCode.trim());
+      
+      if (result.success && result.isValid && result.data) {
+        // Navigate to school page
+        if (onSchoolSelected) {
+          onSchoolSelected(result.data);
+        } else {
+          Alert.alert('Success', `Proceeding with: ${result.data.name}`);
+        }
+      } else {
+        Alert.alert('Invalid Code', result.message || 'Please enter a valid school code');
+      }
+    } catch (error) {
+      console.error('Error validating school code:', error);
+      Alert.alert('Error', 'Failed to validate school code. Please try again.');
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  const dropdownHeight = dropdownAnimation.interpolate({
+  const dropdownMaxHeight = dropdownAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, Math.min(filteredSchools.length * 60, 300)],
   });
@@ -131,15 +146,22 @@ const SchoolCodeScreen = ({ onTabPress, onBack }) => {
           </Text>
           
           <View style={styles.schoolCodeInputContainer}>
-            <TextInput
-              style={styles.schoolCodeInput}
-              placeholder="e.g., SCH-12345"
-              placeholderTextColor={`${colors.textPrimary}60`}
-              value={schoolCode}
-              onChangeText={handleCodeChange}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
+            <View style={{ position: 'relative' }}>
+              <TextInput
+                style={styles.schoolCodeInput}
+                placeholder="e.g., SCH-12345"
+                placeholderTextColor={`${colors.textPrimary}60`}
+                value={schoolCode}
+                onChangeText={handleCodeChange}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              {isSearching && (
+                <View style={{ position: 'absolute', right: 12, top: 12 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+              )}
+            </View>
             
             {/* Dropdown */}
             {showDropdown && filteredSchools.length > 0 && (
@@ -147,8 +169,9 @@ const SchoolCodeScreen = ({ onTabPress, onBack }) => {
                 style={[
                   styles.dropdown,
                   {
-                    height: dropdownHeight,
+                    maxHeight: dropdownMaxHeight,
                     opacity: dropdownOpacity,
+                    overflow: 'hidden',
                   }
                 ]}
               >
@@ -156,14 +179,16 @@ const SchoolCodeScreen = ({ onTabPress, onBack }) => {
                   style={styles.dropdownScroll}
                   showsVerticalScrollIndicator={false}
                 >
-                  {filteredSchools.map((school, index) => (
+                  {filteredSchools.map((school) => (
                     <TouchableOpacity
-                      key={index}
+                      key={school.id || school.code}
                       style={styles.dropdownItem}
                       onPress={() => handleSchoolSelect(school)}
                     >
                       <Text style={styles.dropdownItemCode}>{school.code}</Text>
-                      <Text style={styles.dropdownItemName}>{school.name}</Text>
+                      <Text style={styles.dropdownItemName}>
+                        {school.name} {school.branchName ? `- ${school.branchName}` : ''}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -171,8 +196,16 @@ const SchoolCodeScreen = ({ onTabPress, onBack }) => {
             )}
           </View>
 
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-            <Text style={styles.continueButtonText}>Continue</Text>
+          <TouchableOpacity 
+            style={[styles.continueButton, isSearching && { opacity: 0.6 }]} 
+            onPress={handleContinue}
+            disabled={isSearching}
+          >
+            {isSearching ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.continueButtonText}>Continue</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>

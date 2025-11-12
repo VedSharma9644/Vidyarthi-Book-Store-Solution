@@ -4,12 +4,48 @@ const Category = require('../models/Category');
 // Get all categories
 const getAllCategories = async (req, res) => {
   try {
-    const categoriesSnapshot = await db.collection('categories').get();
-    const categories = [];
+    const { schoolId } = req.query;
+    let categories = [];
 
-    categoriesSnapshot.forEach((doc) => {
-      categories.push(Category.fromFirestore(doc));
-    });
+    if (schoolId) {
+      // Filter categories by schoolId through grades
+      // First, get all grades for this school
+      const gradesSnapshot = await db.collection('grades')
+        .where('schoolId', '==', schoolId)
+        .where('isActive', '==', true)
+        .get();
+      
+      const gradeIds = [];
+      gradesSnapshot.forEach((doc) => {
+        gradeIds.push(doc.id);
+      });
+
+      if (gradeIds.length > 0) {
+        // Get all categories for these grades
+        // Firestore doesn't support 'in' queries with more than 10 items, so we'll batch if needed
+        const batchSize = 10;
+        for (let i = 0; i < gradeIds.length; i += batchSize) {
+          const batch = gradeIds.slice(i, i + batchSize);
+          const categoriesSnapshot = await db.collection('categories')
+            .where('isActive', '==', true)
+            .where('gradeId', 'in', batch)
+            .get();
+          
+          categoriesSnapshot.forEach((doc) => {
+            categories.push(Category.fromFirestore(doc));
+          });
+        }
+      }
+    } else {
+      // Get all active categories
+      const categoriesSnapshot = await db.collection('categories')
+        .where('isActive', '==', true)
+        .get();
+      
+      categoriesSnapshot.forEach((doc) => {
+        categories.push(Category.fromFirestore(doc));
+      });
+    }
 
     res.json({
       success: true,

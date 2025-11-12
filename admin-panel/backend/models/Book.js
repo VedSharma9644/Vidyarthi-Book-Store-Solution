@@ -15,6 +15,8 @@ class Book {
     this.publicationDate = data.publicationDate || new Date();
     this.isFeatured = data.isFeatured !== undefined ? data.isFeatured : false;
     this.categoryId = data.categoryId || '';
+    this.gradeId = data.gradeId || '';
+    this.schoolId = data.schoolId || '';
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
@@ -44,6 +46,8 @@ class Book {
       publicationDate: this.publicationDate,
       isFeatured: this.isFeatured,
       categoryId: this.categoryId,
+      gradeId: this.gradeId,
+      schoolId: this.schoolId,
       isActive: this.isActive,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,

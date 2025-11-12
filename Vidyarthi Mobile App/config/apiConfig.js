@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.37:5000', // Updated for physical Android device - use your laptop's IP address
+  BASE_URL: 'http://192.168.1.36:5000', // Updated for physical Android device - use your laptop's IP address
   ENDPOINTS: {
     // Authentication
     AUTH: {
@@ -25,6 +25,23 @@ export const API_CONFIG = {
       COUNT: '/api/cart/count',
       CLEAR: '/api/cart/clear',
     },
+    // Schools
+    SCHOOLS: {
+      SEARCH: '/api/schools/search',
+      VALIDATE_CODE: '/api/schools/validate-code',
+      GET_BY_CODE: '/api/schools/code',
+      GET_BY_ID: '/api/schools',
+    },
+    // Grades
+    GRADES: {
+      GET_ALL: '/api/grades',
+      GET_BY_ID: '/api/grades',
+    },
+    // Categories
+    CATEGORIES: {
+      GET_ALL: '/api/categories',
+      GET_BY_ID: '/api/categories',
+    },
     // Health
     HEALTH: '/health',
   },
@@ -40,6 +57,6 @@ export const getApiUrl = (endpoint) => {
 // Example: 'http://192.168.1.100:5000'
 export const getDeviceApiUrl = (endpoint) => {
   // Use laptop's IP address for physical device testing
-  const DEVICE_BASE_URL = 'http://192.168.1.37:5000'; // Your laptop's IP
+  const DEVICE_BASE_URL = 'http://192.168.1.36:5000'; // Your laptop's IP
   return `${DEVICE_BASE_URL}${endpoint}`;
 };

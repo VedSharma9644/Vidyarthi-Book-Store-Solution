@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { schoolsAPI, gradesAPI, categoriesAPI } from '../services/api';
 import './UpsertCategory.css';
 
 const UpsertCategory = () => {
@@ -11,69 +12,36 @@ const UpsertCategory = () => {
     Id: categoryId || '0',
     Name: '',
     Description: '',
+    SchoolId: '',
     GradeId: '',
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Grade options - in production, fetch from API
-  const gradeOptions = [
-    { value: '3', label: 'CLASS 1 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '4', label: 'CLASS 2 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '5', label: 'CLASS 3 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '6', label: 'CLASS 4 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '7', label: 'CLASS 5 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '8', label: 'CLASS 6 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '9', label: 'CLASS 7 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '10', label: 'CLASS 8 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '11', label: 'CLASS 9 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '12', label: 'CLASS 10 - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '13', label: 'CLASS 6 -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '14', label: 'CLASS 7 -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '15', label: 'CLASS 8 -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '31', label: 'NURSERY - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '32', label: 'LKG - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '33', label: 'UKG - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '34', label: 'CLASS 1 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '36', label: 'CLASS 2 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '37', label: 'CLASS 3 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '38', label: 'CLASS 4 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '39', label: 'CLASS 5 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '40', label: 'CLASS 6 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '41', label: 'CLASS 7 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '42', label: 'CLASS 8 - PARAMITA HIGH SCHOOL-MANKAMMA THOTA' },
-    { value: '51', label: 'CLASS 6 - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { value: '52', label: 'CLASS 7 - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { value: '53', label: 'CLASS 8 - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { value: '54', label: 'CLASS 9 - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { value: '55', label: 'CLASS 10 - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { value: '58', label: 'CLASS 9 Bi P C -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '60', label: 'CLASS 10 Bi P C -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '61', label: 'GRADE 9 CBSE LANGUAGE HINDI - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '62', label: 'GRADE 10 CBSE LANGUAGE HINDI - PARAMITA HERITAGE CAMPUS-PADMANAGAR-CBSE' },
-    { value: '63', label: 'PARAMITA IIT CLASS 9 M.P.C -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '67', label: 'CLASS 6-IIT CAMPUS - PARAMITA HIGH SCHOOL-MANKAMMA THOTA- IIT CAMPUS' },
-    { value: '68', label: 'CLASS 7-IIT CAMPUS - PARAMITA HIGH SCHOOL-MANKAMMA THOTA- IIT CAMPUS' },
-    { value: '69', label: 'CLASS 8-IIT CAMPUS - PARAMITA HIGH SCHOOL-MANKAMMA THOTA- IIT CAMPUS' },
-    { value: '70', label: 'PARAMITA IIT CLASS 10 M.P.C -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '80', label: 'NURSERY - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '81', label: 'LKG -PP1 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '82', label: 'UKG -PP2 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '83', label: 'CLASS 1 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '84', label: 'CLASS 2 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '85', label: 'CLASS 3 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '86', label: 'CLASS 4 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '87', label: 'CLASS 5 - SIDDARTHA HIGH SCHOOL-MANKAMMA THOTA & VIDYANAGAR & BHAGATHNAGAR (KARIMNAGAR)' },
-    { value: '92', label: 'CLASS 9 Bi P C -HINDI LANGUAGE -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '93', label: 'CLASS 10 Bi P C -HINDI LANGUAGE -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '94', label: 'CLASS 9 M P C -HINDI LANGUAGE -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '95', label: 'CLASS 10 M P C -HINDI LANGUAGE -  PARAMITA PINNACLE CAMPUS-PADMANAGAR-IIT' },
-    { value: '96', label: 'GRADE 9 CBSE LANGUAGE HINDI - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-    { value: '97', label: 'GRADE 10 CBSE LANGUAGE HINDI - PARAMITA HERITAGE CAMPUS-ALUGUNUR-CBSE' },
-  ];
+  const [schools, setSchools] = useState([]);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const [grades, setGrades] = useState([]);
+  const [loadingGrades, setLoadingGrades] = useState(false);
 
   useEffect(() => {
+    // Fetch schools on component mount
+    const loadSchools = async () => {
+      try {
+        setLoadingSchools(true);
+        const response = await schoolsAPI.getAll();
+        if (response.data.success) {
+          setSchools(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error loading schools:', error);
+        alert('Failed to load schools. Please try again.');
+      } finally {
+        setLoadingSchools(false);
+      }
+    };
+
+    loadSchools();
+
     // If editing, fetch category data
     if (categoryId) {
       // TODO: Fetch category data from API
@@ -94,12 +62,23 @@ const UpsertCategory = () => {
     }
   }, [categoryId]);
 
-  const handleChange = (e) => {
+  const handleChange = async (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+    
+    // If school is changed, fetch grades for that school
+    if (name === 'SchoolId' && value) {
+      await loadGradesForSchool(value);
+      // Clear grade selection when school changes
+      setFormData(prev => ({
+        ...prev,
+        GradeId: ''
+      }));
+    }
+    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -109,11 +88,31 @@ const UpsertCategory = () => {
     }
   };
 
+  const loadGradesForSchool = async (schoolId) => {
+    try {
+      setLoadingGrades(true);
+      const response = await gradesAPI.getAll(schoolId);
+      if (response.data.success) {
+        setGrades(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading grades:', error);
+      alert('Failed to load grades. Please try again.');
+      setGrades([]);
+    } finally {
+      setLoadingGrades(false);
+    }
+  };
+
   const validate = () => {
     const newErrors = {};
     
     if (!formData.Name.trim()) {
       newErrors.Name = 'Category Name is Required';
+    }
+    
+    if (!formData.SchoolId) {
+      newErrors.SchoolId = 'School is Required';
     }
     
     if (!formData.GradeId) {
@@ -134,27 +133,37 @@ const UpsertCategory = () => {
     setIsSubmitting(true);
     
     try {
-      // TODO: Call API to save category
-      // const response = await fetch('/api/categories', {
-      //   method: categoryId ? 'PUT' : 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(formData),
-      // });
-      
-      // if (response.ok) {
-      //   navigate('/get-all-categories');
-      // }
-      
-      // Mock success for now
-      console.log('Saving category:', formData);
-      setTimeout(() => {
-        setIsSubmitting(false);
+      // Prepare data for API (convert field names to match backend expectations)
+      const categoryData = {
+        name: formData.Name,
+        description: formData.Description || '',
+        gradeId: formData.GradeId,
+      };
+
+      let response;
+      if (categoryId && categoryId !== '0') {
+        // Update existing category
+        response = await categoriesAPI.update(categoryId, categoryData);
+      } else {
+        // Create new category
+        response = await categoriesAPI.create(categoryData);
+      }
+
+      if (response.data && response.data.success) {
+        alert(categoryId && categoryId !== '0' ? 'Category updated successfully' : 'Category created successfully');
         navigate('/get-all-categories');
-      }, 1000);
+      } else {
+        const errorMsg = response.data?.message || response.data?.error || 'Failed to save category';
+        alert(errorMsg);
+        if (response.data?.errors) {
+          console.error('Validation errors:', response.data.errors);
+        }
+      }
     } catch (error) {
       console.error('Error saving category:', error);
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to save category. Please try again.';
+      alert(errorMsg);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -216,6 +225,34 @@ const UpsertCategory = () => {
                 </div>
 
                 <div className="mb-3">
+                  <label className="form-label" htmlFor="SchoolId">
+                    School <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    className={`form-select ${errors.SchoolId ? 'is-invalid' : ''}`}
+                    id="SchoolId"
+                    name="SchoolId"
+                    value={formData.SchoolId}
+                    onChange={handleChange}
+                    required
+                    disabled={loadingSchools}
+                  >
+                    <option value="">-- Select School --</option>
+                    {schools.map(school => (
+                      <option key={school.id} value={school.id}>
+                        {school.name} {school.branchName ? `- ${school.branchName}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingSchools && (
+                    <small className="text-muted">Loading schools...</small>
+                  )}
+                  {errors.SchoolId && (
+                    <span className="text-danger">{errors.SchoolId}</span>
+                  )}
+                </div>
+
+                <div className="mb-3">
                   <label className="form-label" htmlFor="GradeId">
                     Grade <span className="text-danger">*</span>
                   </label>
@@ -226,14 +263,30 @@ const UpsertCategory = () => {
                     value={formData.GradeId}
                     onChange={handleChange}
                     required
+                    disabled={!formData.SchoolId || loadingGrades}
                   >
-                    <option value="">-- Select Grade --</option>
-                    {gradeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
+                    <option value="">
+                      {!formData.SchoolId 
+                        ? '-- Select School First --' 
+                        : loadingGrades 
+                        ? 'Loading grades...' 
+                        : '-- Select Grade --'}
+                    </option>
+                    {grades.map(grade => (
+                      <option key={grade.id} value={grade.id}>
+                        {grade.name}
                       </option>
                     ))}
                   </select>
+                  {loadingGrades && (
+                    <small className="text-muted">Loading grades...</small>
+                  )}
+                  {!formData.SchoolId && (
+                    <small className="text-muted">Please select a school first</small>
+                  )}
+                  {formData.SchoolId && grades.length === 0 && !loadingGrades && (
+                    <small className="text-warning">No grades found for this school</small>
+                  )}
                   {errors.GradeId && (
                     <span className="text-danger">{errors.GradeId}</span>
                   )}

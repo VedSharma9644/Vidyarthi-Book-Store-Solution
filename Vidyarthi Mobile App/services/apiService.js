@@ -70,13 +70,21 @@ class ApiService {
 
   async sendOtp(mobileNumber) {
     try {
+      console.log('Sending OTP request to:', API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.AUTH.SEND_OTP);
+      console.log('Mobile number:', mobileNumber);
+      
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.SEND_OTP, {
         mobileNumber,
       });
+      
+      console.log('OTP Response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Send OTP API Error:', error.message);
-      console.error('Response:', error.response?.data);
+      console.error('Error code:', error.code);
+      console.error('Error response:', error.response?.data);
+      console.error('Error request:', error.request ? 'Request made but no response' : 'No request made');
+      
       // Return a user-friendly error
       if (error.response) {
         // Server responded with error
@@ -86,15 +94,23 @@ class ApiService {
         };
       } else if (error.request) {
         // Request made but no response (network error)
+        const errorMessage = error.code === 'ECONNREFUSED' 
+          ? `Cannot connect to server at ${API_CONFIG.BASE_URL}. Make sure:\n1. Backend server is running\n2. Device and server are on the same network\n3. IP address is correct`
+          : error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN'
+          ? `Cannot resolve server address ${API_CONFIG.BASE_URL}. Check your network connection.`
+          : error.code === 'ETIMEDOUT'
+          ? `Connection timeout. Server at ${API_CONFIG.BASE_URL} is not responding.`
+          : `Cannot connect to server at ${API_CONFIG.BASE_URL}. Make sure backend is running and device is on the same network.`;
+        
         return {
           success: false,
-          message: 'Cannot connect to server. Make sure backend is running at ' + API_CONFIG.BASE_URL,
+          message: errorMessage,
         };
       } else {
         // Something else happened
         return {
           success: false,
-          message: 'Failed to send OTP. Please try again.',
+          message: `Failed to send OTP: ${error.message || 'Unknown error'}`,
         };
       }
     }
@@ -167,16 +183,7 @@ class ApiService {
   }
 
   // Mobile OTP APIs
-  async sendOtp(mobileNumber) {
-    try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.SEND_OTP, {
-        mobileNumber,
-      });
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
+  // Note: sendOtp is defined earlier with better error handling
 
   async registerMobile(userData) {
     try {
@@ -248,7 +255,26 @@ class ApiService {
       const response = await apiClient.get(API_CONFIG.ENDPOINTS.CART.GET);
       return response.data;
     } catch (error) {
-      throw error;
+      console.error('Get cart API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch cart',
+          data: { items: [] },
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: { items: [] },
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to fetch cart. Please try again.',
+          data: { items: [] },
+        };
+      }
     }
   }
 
@@ -285,6 +311,165 @@ class ApiService {
   async clearCart() {
     try {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.CART.CLEAR);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Schools APIs
+  async searchSchools(searchTerm = '', limit = 20) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.SCHOOLS.SEARCH, {
+        params: { q: searchTerm, limit },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Search schools API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to search schools',
+          data: [],
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: [],
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to search schools. Please try again.',
+          data: [],
+        };
+      }
+    }
+  }
+
+  async validateSchoolCode(code) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.SCHOOLS.VALIDATE_CODE, {
+        params: { code },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Validate school code API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          isValid: false,
+          message: error.response.data?.message || 'Failed to validate school code',
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          isValid: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+        };
+      } else {
+        return {
+          success: false,
+          isValid: false,
+          message: 'Failed to validate school code. Please try again.',
+        };
+      }
+    }
+  }
+
+  async getSchoolByCode(code) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.SCHOOLS.GET_BY_CODE}/${code}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getSchoolById(id) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.SCHOOLS.GET_BY_ID}/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Grades APIs
+  async getGradesBySchoolId(schoolId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.GRADES.GET_ALL, {
+        params: { schoolId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get grades API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch grades',
+          data: [],
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: [],
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to fetch grades. Please try again.',
+          data: [],
+        };
+      }
+    }
+  }
+
+  async getGradeById(id) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.GRADES.GET_BY_ID}/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Categories APIs
+  async getCategoriesByGradeId(gradeId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.CATEGORIES.GET_ALL, {
+        params: { gradeId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get categories API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch categories',
+          data: [],
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: [],
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to fetch categories. Please try again.',
+          data: [],
+        };
+      }
+    }
+  }
+
+  async getCategoryById(id) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.CATEGORIES.GET_BY_ID}/${id}`);
       return response.data;
     } catch (error) {
       throw error;

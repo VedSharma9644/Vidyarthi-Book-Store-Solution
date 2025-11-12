@@ -8,6 +8,11 @@ require('./config/firebase');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
+const schoolRoutes = require('./routes/school.routes');
+const gradeRoutes = require('./routes/grade.routes');
+const categoryRoutes = require('./routes/category.routes');
+const bookRoutes = require('./routes/book.routes');
+const cartRoutes = require('./routes/cart.routes');
 
 // Initialize Express app
 const app = express();
@@ -38,6 +43,11 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/schools', schoolRoutes);
+app.use('/api/grades', gradeRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/books', bookRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Error handling
 app.use(notFound);
@@ -49,7 +59,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     console.log(`📱 Auth API: http://localhost:${PORT}/api/auth/test`);
-    console.log(`🌐 Network access: http://192.168.1.37:${PORT}/health`);
+    console.log(`🌐 Network access: http://192.168.1.36:${PORT}/health`);
 });
 
 module.exports = app;

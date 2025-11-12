@@ -7,6 +7,7 @@ import RegisterScreen from './components/RegisterScreen';
 import HomeScreen from './components/HomeScreen';
 import SchoolSearchScreen from './components/SchoolSearchScreen';
 import SchoolCodeScreen from './components/SchoolCodeScreen';
+import SchoolPage from './components/SchoolPage';
 import CartScreen from './components/CartScreen';
 import ProfileScreen from './components/ProfileScreen';
 import CheckoutScreen from './components/CheckoutScreen';
@@ -19,11 +20,14 @@ import ApiTestScreen from './components/ApiTestScreen';
 import OtpVerificationScreen from './components/OtpVerificationScreen';
 import ManageGradesScreen from './components/ManageGradesScreen';
 import UpsertGradeScreen from './components/UpsertGradeScreen';
+import GradeBooksPage from './components/GradeBooksPage';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
   const [otpVerificationData, setOtpVerificationData] = useState(null);
   const [upsertGradeId, setUpsertGradeId] = useState(null);
+  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [selectedGrade, setSelectedGrade] = useState(null);
 
   const switchToRegister = () => {
     setCurrentScreen('register');
@@ -111,7 +115,25 @@ export default function App() {
   };
 
   const goBack = () => {
-    setCurrentScreen('home');
+    if (currentScreen === 'gradeBooks') {
+      setSelectedGrade(null);
+      setCurrentScreen('schoolPage');
+    } else if (currentScreen === 'schoolPage') {
+      setSelectedSchool(null);
+      setCurrentScreen('schoolCode');
+    } else {
+      setCurrentScreen('home');
+    }
+  };
+
+  const goToSchoolPage = (school) => {
+    setSelectedSchool(school);
+    setCurrentScreen('schoolPage');
+  };
+
+  const goToGradeBooks = (grade) => {
+    setSelectedGrade(grade);
+    setCurrentScreen('gradeBooks');
   };
 
   const goToLogin = () => {
@@ -167,7 +189,23 @@ export default function App() {
         ) : currentScreen === 'search' ? (
           <SchoolSearchScreen onTabPress={handleTabPress} onClose={goBack} />
         ) : currentScreen === 'schoolCode' ? (
-          <SchoolCodeScreen onTabPress={handleTabPress} onBack={goBack} />
+          <SchoolCodeScreen onTabPress={handleTabPress} onBack={goBack} onSchoolSelected={goToSchoolPage} />
+        ) : currentScreen === 'schoolPage' ? (
+          <SchoolPage 
+            onTabPress={handleTabPress} 
+            onBack={goBack} 
+            schoolId={selectedSchool?.id}
+            schoolCode={selectedSchool?.code}
+            onViewBooks={goToGradeBooks}
+          />
+        ) : currentScreen === 'gradeBooks' ? (
+          <GradeBooksPage
+            onTabPress={handleTabPress}
+            onBack={goBack}
+            gradeId={selectedGrade?.id}
+            gradeName={selectedGrade?.name}
+            schoolId={selectedSchool?.id}
+          />
         ) : currentScreen === 'cart' ? (
           <CartScreen onTabPress={handleTabPress} onBack={goBack} onGoToCheckout={goToCheckout} />
         ) : currentScreen === 'profile' ? (
