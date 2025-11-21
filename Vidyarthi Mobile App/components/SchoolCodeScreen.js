@@ -21,6 +21,7 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
   const [dropdownAnimation] = useState(new Animated.Value(0));
   const [fadeAnimation] = useState(new Animated.Value(0));
   const [isSearching, setIsSearching] = useState(false);
+  const [isSchoolSelected, setIsSchoolSelected] = useState(false);
 
   useEffect(() => {
     // Fade in animation on component mount
@@ -33,6 +34,7 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
 
   const handleCodeChange = async (text) => {
     setSchoolCode(text);
+    setIsSchoolSelected(false); // Reset selection when user types
     
     if (text.length > 0) {
       setIsSearching(true);
@@ -74,6 +76,7 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
 
   const handleSchoolSelect = (school) => {
     setSchoolCode(school.code);
+    setIsSchoolSelected(true); // Mark that a school was selected from dropdown
     setShowDropdown(false);
     setFilteredSchools([]);
     
@@ -117,7 +120,7 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
 
   const dropdownMaxHeight = dropdownAnimation.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, Math.min(filteredSchools.length * 60, 300)],
+    outputRange: [0, Math.min(filteredSchools.length * 100, 400)],
   });
 
   const dropdownOpacity = dropdownAnimation.interpolate({
@@ -197,7 +200,11 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
           </View>
 
           <TouchableOpacity 
-            style={[styles.continueButton, isSearching && { opacity: 0.6 }]} 
+            style={[
+              styles.continueButton, 
+              isSchoolSelected && { backgroundColor: colors.primary, shadowColor: colors.primary },
+              isSearching && { opacity: 0.6 }
+            ]} 
             onPress={handleContinue}
             disabled={isSearching}
           >

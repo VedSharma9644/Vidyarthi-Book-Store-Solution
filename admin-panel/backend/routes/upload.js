@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { admin } = require('../config/database');
+const { admin, db } = require('../config/database');
+const { Timestamp } = require('firebase-admin/firestore');
 const path = require('path');
 
 const upload = multer({
@@ -24,7 +25,127 @@ const upload = multer({
 });
 
 /**
- * Upload image to Firebase Storage
+ * Get all uploaded images
+ * @route GET /api/upload/images
+ */
+router.get('/images', async (req, res) => {
+  try {
+    const { category, limit = 50 } = req.query;
+    
+    let query = db.collection('images').orderBy('uploadedAt', 'desc');
+    
+    if (category) {
+      query = query.where('category', '==', category);
+    }
+    
+    const snapshot = await query.limit(parseInt(limit)).get();
+    const images = [];
+    
+    snapshot.forEach(doc => {
+      images.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    res.json({
+      success: true,
+      data: images,
+      count: images.length,
+    });
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch images',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Get image by ID
+ * @route GET /api/upload/images/:id
+ */
+router.get('/images/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = await db.collection('images').doc(id).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Image not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: doc.id,
+        ...doc.data(),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch image',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Delete image
+ * @route DELETE /api/upload/images/:id
+ */
+router.delete('/images/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get image document
+    const doc = await db.collection('images').doc(id).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Image not found',
+      });
+    }
+
+    const imageData = doc.data();
+    
+    // Delete from Firebase Storage
+    try {
+      const bucket = admin.storage().bucket('vidyarthi-mobile-app.firebasestorage.app');
+      const file = bucket.file(imageData.storagePath);
+      await file.delete();
+      console.log('File deleted from Storage:', imageData.storagePath);
+    } catch (storageError) {
+      console.error('Error deleting from Storage:', storageError);
+      // Continue to delete from Firestore even if Storage deletion fails
+    }
+
+    // Delete from Firestore
+    await db.collection('images').doc(id).delete();
+
+    res.json({
+      success: true,
+      message: 'Image deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete image',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Upload image to Firebase Storage and Firestore
  * @route POST /api/upload/image
  */
 router.post('/image', upload.single('file'), async (req, res) => {
@@ -53,9 +174,12 @@ router.post('/image', upload.single('file'), async (req, res) => {
       });
     }
 
+    // Get folder path from request or use default
+    const folderPath = req.body.folderPath || 'images';
+    
     // Sanitize filename to remove special characters
     const sanitizedFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const fileName = `book-covers/${Date.now()}-${sanitizedFileName}`;
+    const fileName = `${folderPath}/${Date.now()}-${sanitizedFileName}`;
     const file = bucket.file(fileName);
 
     // Upload file to Firebase Storage using Promise-based approach
@@ -101,10 +225,34 @@ router.post('/image', upload.single('file'), async (req, res) => {
         throw new Error('File was not uploaded successfully');
       }
 
+      // Store metadata in Firestore
+      const imageMetadata = {
+        imageUrl: publicUrl,
+        fileName: req.file.originalname,
+        storagePath: fileName,
+        fileSize: req.file.size,
+        contentType: req.file.mimetype,
+        category: req.body.category || 'general',
+        description: req.body.description || '',
+        folderPath: req.body.folderPath || 'images',
+        uploadedAt: Timestamp.now(),
+        uploadedBy: req.body.uploadedBy || 'admin', // You can get from auth token
+      };
+
+      // Save to Firestore 'images' collection
+      try {
+        const imageRef = await db.collection('images').add(imageMetadata);
+        console.log('Image metadata saved to Firestore with ID:', imageRef.id);
+      } catch (firestoreError) {
+        console.error('Error saving to Firestore:', firestoreError);
+        // Continue even if Firestore save fails - the image is already uploaded
+      }
+
       res.json({
         success: true,
         message: 'Image uploaded successfully',
         url: publicUrl,
+        metadata: imageMetadata,
       });
     } catch (uploadError) {
       console.error('Error during upload process:', uploadError);

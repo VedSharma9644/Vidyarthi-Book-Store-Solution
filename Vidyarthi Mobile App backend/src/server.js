@@ -15,6 +15,8 @@ const bookRoutes = require('./routes/book.routes');
 const cartRoutes = require('./routes/cart.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const orderRoutes = require('./routes/order.routes');
+const imageRoutes = require('./routes/image.routes');
+const userRoutes = require('./routes/user.routes');
 
 // Initialize Express app
 const app = express();
@@ -53,6 +55,8 @@ app.use('/api/books', bookRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/images', imageRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling
 app.use(notFound);

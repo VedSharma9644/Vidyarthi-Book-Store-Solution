@@ -21,6 +21,7 @@ import OtpVerificationScreen from './components/OtpVerificationScreen';
 import ManageGradesScreen from './components/ManageGradesScreen';
 import UpsertGradeScreen from './components/UpsertGradeScreen';
 import GradeBooksPage from './components/GradeBooksPage';
+import ShippingAddressesScreen from './components/ShippingAddressesScreen';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
@@ -28,6 +29,7 @@ export default function App() {
   const [upsertGradeId, setUpsertGradeId] = useState(null);
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedGrade, setSelectedGrade] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   const switchToRegister = () => {
     setCurrentScreen('register');
@@ -69,8 +71,14 @@ export default function App() {
     setCurrentScreen('pastOrders');
   };
 
-  const goToOrderDetails = () => {
+  const goToOrderDetails = (orderId) => {
+    setSelectedOrderId(orderId);
     setCurrentScreen('orderDetails');
+  };
+
+  const goBackFromOrderDetails = () => {
+    setSelectedOrderId(null);
+    setCurrentScreen('orderHistory');
   };
 
   const goToAddStudent = () => {
@@ -83,6 +91,10 @@ export default function App() {
 
   const goToManageGrades = () => {
     setCurrentScreen('manageGrades');
+  };
+
+  const goToShippingAddresses = () => {
+    setCurrentScreen('shippingAddresses');
   };
 
   const goToUpsertGrade = (gradeId) => {
@@ -121,6 +133,8 @@ export default function App() {
     } else if (currentScreen === 'schoolPage') {
       setSelectedSchool(null);
       setCurrentScreen('schoolCode');
+    } else if (currentScreen === 'shippingAddresses') {
+      setCurrentScreen('profile');
     } else {
       setCurrentScreen('home');
     }
@@ -209,7 +223,7 @@ export default function App() {
         ) : currentScreen === 'cart' ? (
           <CartScreen onTabPress={handleTabPress} onBack={goBack} onGoToCheckout={goToCheckout} />
         ) : currentScreen === 'profile' ? (
-          <ProfileScreen onTabPress={handleTabPress} onBack={goToLogin} onLogout={goToLogin} onGoToOrderHistory={goToOrderHistory} onGoToPastOrders={goToPastOrders} onGoToStudents={goToStudents} onGoToManageGrades={goToManageGrades} />
+          <ProfileScreen onTabPress={handleTabPress} onBack={goToLogin} onLogout={goToLogin} onGoToOrderHistory={goToOrderHistory} onGoToPastOrders={goToPastOrders} onGoToStudents={goToStudents} onGoToManageGrades={goToManageGrades} onGoToShippingAddresses={goToShippingAddresses} />
         ) : currentScreen === 'checkout' ? (
           <CheckoutScreen onBack={goBack} onPlaceOrder={handlePlaceOrder} />
         ) : currentScreen === 'orderHistory' ? (
@@ -217,7 +231,7 @@ export default function App() {
         ) : currentScreen === 'pastOrders' ? (
           <PastOrdersScreen onTabPress={handleTabPress} onBack={goToProfile} />
         ) : currentScreen === 'orderDetails' ? (
-          <OrderDetailsScreen onTabPress={handleTabPress} onBack={goToOrderHistory} />
+          <OrderDetailsScreen onTabPress={handleTabPress} onBack={goBackFromOrderDetails} orderId={selectedOrderId} />
         ) : currentScreen === 'addStudent' ? (
           <AddStudentScreen onTabPress={handleTabPress} onBack={goToStudents} />
         ) : currentScreen === 'students' ? (
@@ -228,8 +242,14 @@ export default function App() {
           <UpsertGradeScreen onTabPress={handleTabPress} onBack={goBackFromUpsertGrade} gradeId={upsertGradeId} />
         ) : currentScreen === 'apiTest' ? (
           <ApiTestScreen onBack={goBack} />
+        ) : currentScreen === 'shippingAddresses' ? (
+          <ShippingAddressesScreen onBack={goBack} />
         ) : (
-          <HomeScreen onTabPress={handleTabPress} onGoToSearch={goToSchoolCode} />
+          <HomeScreen 
+            onTabPress={handleTabPress} 
+            onGoToSearch={goToSchoolCode}
+            onGoToOrderHistory={goToOrderHistory}
+          />
         )}
         <StatusBar style="light" />
       </AuthProvider>

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, getApiUrl } from '../config/apiConfig';
 
@@ -559,6 +560,197 @@ class ApiService {
       const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.CATEGORIES.GET_BY_ID}/${id}`);
       return response.data;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // Order APIs
+  async getOrders() {
+    try {
+      console.log('Calling orders API:', API_CONFIG.ENDPOINTS.ORDERS.GET_ALL);
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.ORDERS.GET_ALL);
+      console.log('Orders API Response Status:', response.status);
+      console.log('Orders API Response Data:', JSON.stringify(response.data, null, 2));
+      
+      // Handle Firebase order response structure
+      if (response.data) {
+        // If response.data already has success and data properties
+        if (response.data.success !== undefined && response.data.data) {
+          return {
+            success: response.data.success,
+            data: response.data.data || [],
+          };
+        }
+        // If response.data is directly the array (shouldn't happen but handle it)
+        if (Array.isArray(response.data)) {
+          return {
+            success: true,
+            data: response.data,
+          };
+        }
+      }
+      
+      return {
+        success: true,
+        data: [],
+      };
+    } catch (error) {
+      console.error('Get orders API Error:', error.message);
+      console.error('Error response:', error.response?.data);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch orders',
+          data: [],
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: [],
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to fetch orders. Please try again.',
+          data: [],
+        };
+      }
+    }
+  }
+
+  async getOrderById(orderId) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.ORDERS.GET_BY_ID}/${orderId}`);
+      if (response.data && response.data.success !== undefined) {
+        return response.data;
+      }
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('Get order API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch order',
+          data: null,
+        };
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: null,
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to fetch order. Please try again.',
+          data: null,
+        };
+      }
+    }
+  }
+
+  // Image APIs
+  async getBannerImage() {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.IMAGES.GET_BANNER);
+      if (response.data && response.data.success !== undefined) {
+        return response.data;
+      }
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('Get banner image API Error:', error.message);
+      // Return null on error so app can use fallback
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch banner image',
+        data: null,
+      };
+    }
+  }
+
+  async getImages(category, limit) {
+    try {
+      const params = {};
+      if (category) params.category = category;
+      if (limit) params.limit = limit;
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.IMAGES.GET_ALL, { params });
+      if (response.data && response.data.success !== undefined) {
+        return response.data;
+      }
+      return {
+        success: true,
+        data: response.data || [],
+      };
+    } catch (error) {
+      console.error('Get images API Error:', error.message);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch images',
+        data: [],
+      };
+    }
+  }
+
+  // Upload image (using admin panel backend)
+  async uploadImage(fileUri, metadata = {}) {
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Extract filename from URI
+      const filename = fileUri.split('/').pop() || 'profile-image.jpg';
+      // Determine file type from URI or default to jpeg
+      let fileType = 'jpeg';
+      if (filename.includes('.')) {
+        const ext = filename.split('.').pop().toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+          fileType = ext === 'jpg' ? 'jpeg' : ext;
+        }
+      }
+      
+      // For React Native, FormData needs the file object with uri, type, and name
+      formData.append('file', {
+        uri: Platform.OS === 'android' ? fileUri : fileUri.replace('file://', ''),
+        type: `image/${fileType}`,
+        name: filename,
+      });
+      
+      if (metadata.category) formData.append('category', metadata.category);
+      if (metadata.description) formData.append('description', metadata.description);
+      if (metadata.folderPath) formData.append('folderPath', metadata.folderPath);
+      if (metadata.uploadedBy) formData.append('uploadedBy', metadata.uploadedBy);
+
+      const response = await axios.post(API_CONFIG.ENDPOINTS.UPLOAD.IMAGE, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        transformRequest: (data) => {
+          return data; // Let axios handle FormData
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Upload image API Error:', error.message);
+      console.error('Upload error details:', error.response?.data);
+      throw error;
+    }
+  }
+
+  // Update user profile
+  async updateUserProfile(userId, updateData) {
+    try {
+      const response = await apiClient.put(`${API_CONFIG.ENDPOINTS.USERS.UPDATE}/${userId}`, updateData);
+      return response.data;
+    } catch (error) {
+      console.error('Update user profile API Error:', error.message);
       throw error;
     }
   }

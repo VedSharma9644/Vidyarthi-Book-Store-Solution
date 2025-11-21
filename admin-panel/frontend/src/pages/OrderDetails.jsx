@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { ordersAPI } from '../services/api';
 import './OrderDetails.css';
 
 const OrderDetails = () => {
@@ -9,108 +10,200 @@ const OrderDetails = () => {
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [newStatus, setNewStatus] = useState('Pending');
   const [isUpdating, setIsUpdating] = useState(false);
-
-  // Mock order data - replace with API call later
-  const mockOrder = {
-    id: 51,
-    orderNumber: 'ORD-20251105-5D73',
-    customerName: 'Eshwari Nilayam POLU',
-    phone: '9052226252',
-    address: 'C/o,P.Sathyanarayana,H.No.7-1-72(New),Mankammathota karimnagar, Kakinada, Andhra Pradesh - 505001',
-    orderDate: '05-11-2025 01:49 pm',
-    totalAmount: 7211.00,
-    status: 'Pending',
-    paymentStatus: 'Pending',
-    items: [
-      { id: 1, product: 'THOLI KIRANALUC-1', quantity: 1, price: 162.00, total: 162.00 },
-      { id: 2, product: 'HINDI PRAVESHIKA', quantity: 1, price: 340.00, total: 340.00 },
-      { id: 3, product: 'HappyCoder Program on Creative Computing Level -1', quantity: 1, price: 299.00, total: 299.00 },
-      { id: 4, product: "WHAT'S WHAT ,NEP/NCF EDITION,BOOK 1", quantity: 1, price: 295.00, total: 295.00 },
-      { id: 5, product: 'XSEED CBSE C-1 with Learnometer', quantity: 1, price: 4725.00, total: 4725.00 },
-      { id: 6, product: 'VALUE EDUCATION-1', quantity: 1, price: 500.00, total: 500.00 },
-      { id: 7, product: 'PARAMITA CBSE CLASS 1-NOTES PACK OF 9', quantity: 1, price: 540.00, total: 540.00 },
-      { id: 8, product: 'Stationary', quantity: 1, price: 100.00, total: 100.00 },
-    ],
-  };
+  const [shiprocketStatus, setShiprocketStatus] = useState(null);
+  const [isFetchingShiprocketStatus, setIsFetchingShiprocketStatus] = useState(false);
 
   useEffect(() => {
     const loadOrder = async () => {
+      if (!orderId) {
+        setError('Order ID is required');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        // TODO: Fetch order from API
-        // const response = await fetch(`/api/orders/${orderId}`);
-        // const data = await response.json();
-        // setOrder(data);
-        // setNewStatus(data.status);
+        setError(null);
+        const response = await ordersAPI.getById(orderId);
         
-        // Using mock data for now
-        setOrder(mockOrder);
-        setNewStatus(mockOrder.status);
+        if (response.data.success && response.data.data) {
+          const orderData = response.data.data;
+          
+          // Format shipping address
+          const formatAddress = (shippingAddress) => {
+            if (!shippingAddress) return 'N/A';
+            const parts = [];
+            if (shippingAddress.address) parts.push(shippingAddress.address);
+            if (shippingAddress.city) parts.push(shippingAddress.city);
+            if (shippingAddress.state) parts.push(shippingAddress.state);
+            if (shippingAddress.postalCode) parts.push(shippingAddress.postalCode);
+            if (shippingAddress.country) parts.push(shippingAddress.country);
+            return parts.join(', ') || 'N/A';
+          };
+
+          // Transform API data to match component format
+          const transformedOrder = {
+            id: orderData.id,
+            orderNumber: orderData.orderNumber || `ORD-${orderData.id}`,
+            customerName: orderData.customerName || 'Unknown Customer',
+            phone: orderData.shippingAddress?.phone || 
+                   orderData.customerInfo?.phoneNumber || 
+                   'N/A',
+            address: formatAddress(orderData.shippingAddress),
+            orderDate: orderData.dateCreated || 'N/A',
+            totalAmount: orderData.orderTotal || 0,
+            status: orderData.status || 'Pending',
+            paymentStatus: orderData.paymentStatus || 'Pending',
+            items: (orderData.items || []).map((item, index) => ({
+              id: item.itemId || index + 1,
+              product: item.title || 'Unknown Product',
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              total: item.subtotal || (item.price * (item.quantity || 1)),
+            })),
+            // Additional fields for reference
+            subtotal: orderData.subtotal || 0,
+            deliveryCharge: orderData.deliveryCharge || 0,
+            tax: orderData.tax || 0,
+            razorpayOrderId: orderData.razorpayOrderId || '',
+            razorpayPaymentId: orderData.razorpayPaymentId || '',
+            deliveryStatus: orderData.deliveryStatus || 'pending',
+            trackingNumber: orderData.trackingNumber || null,
+            shiprocketOrderId: orderData.shiprocketOrderId || null,
+            shiprocketShipmentId: orderData.shiprocketShipmentId || null,
+            shiprocketAWB: orderData.shiprocketAWB || null,
+            shiprocketStatus: orderData.shiprocketStatus || null,
+          };
+          
+          setOrder(transformedOrder);
+          // Set initial status, converting to lowercase to match dropdown values
+          const initialStatus = (transformedOrder.status || 'pending').toLowerCase();
+          setNewStatus(initialStatus);
+        } else {
+          setError(response.data.message || 'Order not found');
+        }
       } catch (error) {
         console.error('Error loading order:', error);
+        setError('Failed to load order. Please try again.');
       } finally {
         setLoading(false);
       }
     };
 
-    if (orderId) {
-      loadOrder();
-    }
+    loadOrder();
   }, [orderId]);
+
+  const fetchShiprocketStatus = async () => {
+    if (!orderId) return;
+    
+    setIsFetchingShiprocketStatus(true);
+    try {
+      const response = await ordersAPI.getShiprocketStatus(orderId);
+      console.log('📦 Shiprocket status response:', response.data);
+      if (response.data.success) {
+        const statusData = response.data.data;
+        console.log('📦 Shiprocket status data:', statusData);
+        setShiprocketStatus(statusData);
+      }
+    } catch (error) {
+      console.error('Error fetching Shiprocket status:', error);
+      console.error('Error details:', error.response?.data);
+      // Don't show error if order doesn't have Shiprocket ID yet
+      if (error.response?.status !== 400) {
+        console.warn('Could not fetch Shiprocket status:', error.response?.data?.message || error.message);
+      }
+    } finally {
+      setIsFetchingShiprocketStatus(false);
+    }
+  };
+
+  // Fetch Shiprocket status when order is loaded and has Shiprocket ID
+  useEffect(() => {
+    if (order && (order.shiprocketOrderId || order.shiprocketShipmentId)) {
+      fetchShiprocketStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.shiprocketOrderId, order?.shiprocketShipmentId]);
 
   const handleStatusUpdate = async (e) => {
     e.preventDefault();
     
+    if (!orderId) {
+      alert('Order ID is missing');
+      return;
+    }
+    
     setIsUpdating(true);
     try {
-      // TODO: Call API to update status
-      // const response = await fetch('/update-order-status', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     orderId: parseInt(orderId),
-      //     newStatus: newStatus,
-      //   }),
-      // });
+      const response = await ordersAPI.updateStatus(orderId, {
+        orderStatus: newStatus,
+      });
       
-      // if (response.ok) {
-      //   setOrder({ ...order, status: newStatus });
-      //   // Show success message
-      // }
-      
-      // Mock success
-      setOrder({ ...order, status: newStatus });
-      alert('Order status updated successfully!');
+      if (response.data.success) {
+        setOrder({ ...order, status: newStatus });
+        alert('Order status updated successfully!');
+      } else {
+        alert(response.data.message || 'Failed to update order status');
+      }
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update order status');
+      alert('Failed to update order status. Please try again.');
     } finally {
       setIsUpdating(false);
     }
   };
 
+  const [isCreatingShiprocket, setIsCreatingShiprocket] = useState(false);
+
   const handleCreateShiprocketOrder = async (e) => {
     e.preventDefault();
     
+    if (!orderId) {
+      alert('Order ID is missing');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to create a Shiprocket order for this order?')) {
+      return;
+    }
+
+    setIsCreatingShiprocket(true);
     try {
-      // TODO: Call API to create Shiprocket order
-      // const response = await fetch(`/create-shiprocket-order?orderId=${orderId}`, {
-      //   method: 'POST',
-      // });
+      const response = await ordersAPI.createShiprocketOrder(orderId);
       
-      // if (response.ok) {
-      //   alert('Shiprocket order created successfully!');
-      // }
-      
-      // Mock success
-      alert('Shiprocket order created successfully!');
+      if (response.data.success) {
+        const data = response.data.data || {};
+        let message = 'Shiprocket order created successfully!';
+        if (data.shiprocketOrderId) {
+          message += `\nOrder ID: ${data.shiprocketOrderId}`;
+        }
+        if (data.awb) {
+          message += `\nAWB Code: ${data.awb}`;
+        }
+        alert(message);
+        
+        // Reload order to get updated tracking info
+        const orderResponse = await ordersAPI.getById(orderId);
+        if (orderResponse.data.success && orderResponse.data.data) {
+          const orderData = orderResponse.data.data;
+          setOrder({ ...order, trackingNumber: data.awb || order.trackingNumber });
+          
+          // Fetch Shiprocket status after creating order
+          if (orderId) {
+            fetchShiprocketStatus();
+          }
+        }
+      } else {
+        alert(response.data.message || 'Failed to create Shiprocket order');
+      }
     } catch (error) {
       console.error('Error creating Shiprocket order:', error);
-      alert('Failed to create Shiprocket order');
+      alert(error.response?.data?.message || 'Failed to create Shiprocket order. Please check your Shiprocket credentials.');
+    } finally {
+      setIsCreatingShiprocket(false);
     }
   };
 
@@ -119,27 +212,35 @@ const OrderDetails = () => {
   };
 
   const getStatusBadge = (status) => {
-    if (status === 'Completed') {
-      return <span className="badge bg-success">{status}</span>;
-    } else if (status === 'Pending') {
-      return <span className="badge bg-warning">{status}</span>;
-    } else if (status === 'Processing') {
-      return <span className="badge bg-info">{status}</span>;
-    } else if (status === 'Shipped') {
-      return <span className="badge bg-primary">{status}</span>;
-    } else if (status === 'Cancelled') {
-      return <span className="badge bg-danger">{status}</span>;
+    const statusLower = (status || '').toLowerCase();
+    
+    // Handle ORDER_* prefixed statuses and standard statuses
+    if (statusLower.includes('delivered') || statusLower === 'completed' || statusLower === 'order_delivered') {
+      return <span className="badge bg-success">{status || 'N/A'}</span>;
+    } else if (statusLower.includes('confirmed') || statusLower === 'order_confirmed') {
+      return <span className="badge bg-success">{status || 'N/A'}</span>;
+    } else if (statusLower.includes('shipped') || statusLower === 'order_shipped') {
+      return <span className="badge bg-primary">{status || 'N/A'}</span>;
+    } else if (statusLower.includes('placed') || statusLower === 'pending' || statusLower === 'order_placed') {
+      return <span className="badge bg-warning">{status || 'N/A'}</span>;
+    } else if (statusLower === 'processing') {
+      return <span className="badge bg-info">{status || 'N/A'}</span>;
+    } else if (statusLower.includes('cancelled') || statusLower.includes('canceled')) {
+      return <span className="badge bg-danger">{status || 'N/A'}</span>;
     }
-    return <span className="badge bg-secondary">{status}</span>;
+    return <span className="badge bg-secondary">{status || 'N/A'}</span>;
   };
 
   const getPaymentStatusBadge = (status) => {
-    if (status === 'Paid') {
-      return <span className="badge bg-success">{status}</span>;
-    } else if (status === 'Pending') {
-      return <span className="badge bg-danger">{status}</span>;
+    const statusLower = (status || '').toLowerCase();
+    if (statusLower === 'paid') {
+      return <span className="badge bg-success">{status || 'N/A'}</span>;
+    } else if (statusLower === 'pending') {
+      return <span className="badge bg-danger">{status || 'N/A'}</span>;
+    } else if (statusLower === 'failed' || statusLower === 'refunded') {
+      return <span className="badge bg-danger">{status || 'N/A'}</span>;
     }
-    return <span className="badge bg-secondary">{status}</span>;
+    return <span className="badge bg-secondary">{status || 'N/A'}</span>;
   };
 
   if (loading) {
@@ -149,15 +250,24 @@ const OrderDetails = () => {
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
+          <p className="ms-3">Loading order details...</p>
         </div>
       </div>
     );
   }
 
-  if (!order) {
+  if (error || !order) {
     return (
       <div className="container-fluid">
-        <div className="alert alert-danger">Order not found</div>
+        <div className="alert alert-danger">
+          {error || 'Order not found'}
+          <button 
+            className="btn btn-sm btn-outline-danger ms-2"
+            onClick={() => navigate('/get-all-orders')}
+          >
+            Back to Orders
+          </button>
+        </div>
       </div>
     );
   }
@@ -184,11 +294,13 @@ const OrderDetails = () => {
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value)}
                   >
-                    <option value="Pending">Pending</option>
-                    <option value="Processing">Processing</option>
-                    <option value="Shipped">Shipped</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
                 <div>
@@ -200,8 +312,12 @@ const OrderDetails = () => {
 
               {/* Middle: Create Shiprocket Order */}
               <form className="submit-form" onSubmit={handleCreateShiprocketOrder}>
-                <button type="submit" className="btn btn-sm btn-primary">
-                  Create Shiprockt Order
+                <button 
+                  type="submit" 
+                  className="btn btn-sm btn-primary"
+                  disabled={isCreatingShiprocket}
+                >
+                  {isCreatingShiprocket ? 'Creating...' : 'Create Shiprocket Order'}
                 </button>
               </form>
 
@@ -231,6 +347,26 @@ const OrderDetails = () => {
               <p>
                 <strong>Status:</strong> {getStatusBadge(order.status)}
               </p>
+              {(order.shiprocketOrderId || order.shiprocketShipmentId) && (
+                <p>
+                  <strong>Shiprocket Status:</strong> {getStatusBadge(
+                    shiprocketStatus?.status 
+                    || shiprocketStatus?.orderStatus 
+                    || shiprocketStatus?.shipment_status
+                    || shiprocketStatus?.current_status
+                    || order.shiprocketStatus // Fallback to stored status from Firebase
+                    || 'Not Available'
+                  )}
+                  <button
+                    className="btn btn-sm btn-outline-secondary ms-2"
+                    onClick={fetchShiprocketStatus}
+                    disabled={isFetchingShiprocketStatus}
+                    title="Refresh Shiprocket status"
+                  >
+                    {isFetchingShiprocketStatus ? '...' : '🔄'}
+                  </button>
+                </p>
+              )}
               <p>
                 <strong>Payment:</strong> {getPaymentStatusBadge(order.paymentStatus)}
               </p>
@@ -238,8 +374,45 @@ const OrderDetails = () => {
                 <strong>Order Date:</strong> {order.orderDate}
               </p>
               <p>
+                <strong>Subtotal:</strong> {formatCurrency(order.subtotal || 0)}
+              </p>
+              <p>
+                <strong>Delivery Charge:</strong> {formatCurrency(order.deliveryCharge || 0)}
+              </p>
+              <p>
+                <strong>Tax:</strong> {formatCurrency(order.tax || 0)}
+              </p>
+              <p>
                 <strong>Total Amount:</strong> {formatCurrency(order.totalAmount)}
               </p>
+              {order.razorpayOrderId && (
+                <p>
+                  <strong>Razorpay Order ID:</strong> <small>{order.razorpayOrderId}</small>
+                </p>
+              )}
+              {(order.trackingNumber || shiprocketStatus?.awb) && (
+                <p>
+                  <strong>Tracking Number (AWB):</strong> {shiprocketStatus?.awb || order.trackingNumber}
+                </p>
+              )}
+              {shiprocketStatus?.trackingUrl && (
+                <p>
+                  <strong>Tracking URL:</strong>{' '}
+                  <a href={shiprocketStatus.trackingUrl} target="_blank" rel="noopener noreferrer">
+                    View Tracking
+                  </a>
+                </p>
+              )}
+              {shiprocketStatus?.shipmentId && (
+                <p>
+                  <strong>Shiprocket Shipment ID:</strong> <small>{shiprocketStatus.shipmentId}</small>
+                </p>
+              )}
+              {shiprocketStatus?.orderId && (
+                <p>
+                  <strong>Shiprocket Order ID:</strong> <small>{shiprocketStatus.orderId}</small>
+                </p>
+              )}
             </div>
           </div>
         </div>

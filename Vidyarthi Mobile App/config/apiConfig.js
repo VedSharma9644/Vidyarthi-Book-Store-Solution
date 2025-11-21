@@ -49,9 +49,22 @@ export const API_CONFIG = {
           },
           // Orders
           ORDERS: {
-            CREATE: '/api/orders/create',
             GET_ALL: '/api/orders',
             GET_BY_ID: '/api/orders',
+          },
+          // Images
+          IMAGES: {
+            GET_BANNER: '/api/images/banner',
+            GET_ALL: '/api/images',
+          },
+          // Users
+          USERS: {
+            UPDATE: '/api/users',
+            GET_BY_ID: '/api/users',
+          },
+          // Upload (using admin panel backend)
+          UPLOAD: {
+            IMAGE: 'https://admin-panel-backend-594708558503.us-central1.run.app/api/upload/image',
           },
     // Health
     HEALTH: '/health',

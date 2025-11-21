@@ -60,15 +60,36 @@ export const booksAPI = {
 
 // Upload API
 export const uploadAPI = {
-  uploadImage: (file) => {
+  uploadImage: (file, metadata = {}) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (metadata.category) formData.append('category', metadata.category);
+    if (metadata.description) formData.append('description', metadata.description);
+    if (metadata.folderPath) formData.append('folderPath', metadata.folderPath);
+    if (metadata.uploadedBy) formData.append('uploadedBy', metadata.uploadedBy);
     return api.post('/api/upload/image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
   },
+  getAllImages: (category, limit) => {
+    const params = {};
+    if (category) params.category = category;
+    if (limit) params.limit = limit;
+    return api.get('/api/upload/images', { params });
+  },
+  getImageById: (id) => api.get(`/api/upload/images/${id}`),
+  deleteImage: (id) => api.delete(`/api/upload/images/${id}`),
+};
+
+// Orders API
+export const ordersAPI = {
+  getAll: () => api.get('/api/orders'),
+  getById: (id) => api.get(`/api/orders/${id}`),
+  updateStatus: (id, data) => api.put(`/api/orders/${id}/status`, data),
+  createShiprocketOrder: (id) => api.post(`/api/orders/${id}/shiprocket`),
+  getShiprocketStatus: (id) => api.get(`/api/orders/${id}/shiprocket-status`),
 };
 
 export default api;

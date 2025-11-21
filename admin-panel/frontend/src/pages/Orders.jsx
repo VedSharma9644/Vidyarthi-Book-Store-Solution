@@ -1,65 +1,52 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
+import { ordersAPI } from '../services/api';
 import './Orders.css';
 
 const Orders = () => {
-  // Mock data - replace with API call later
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      orderNumber: 'ORD-20251105-5D73',
-      customerName: 'Eshwari Nilayam POLU',
-      orderTotal: 7211.00,
-      status: 'Pending',
-      paymentStatus: 'Pending',
-      dateCreated: '05-11-2025 01:49 pm',
-      orderId: 51,
-    },
-    {
-      id: 2,
-      orderNumber: 'ORD-20250921-F13D',
-      customerName: 'Chaitanya S',
-      orderTotal: 17285.00,
-      status: 'Pending',
-      paymentStatus: 'Pending',
-      dateCreated: '21-09-2025 03:04 pm',
-      orderId: 50,
-    },
-    {
-      id: 3,
-      orderNumber: 'ORD-20250531-329E',
-      customerName: 'Srinivas Machidi',
-      orderTotal: 7735.00,
-      status: 'Completed',
-      paymentStatus: 'Paid',
-      dateCreated: '31-05-2025 05:33 pm',
-      orderId: 49,
-    },
-    {
-      id: 4,
-      orderNumber: 'ORD-20250528-3AE3',
-      customerName: ' Satyanarayana adapa',
-      orderTotal: 6463.00,
-      status: 'Completed',
-      paymentStatus: 'Paid',
-      dateCreated: '29-05-2025 06:58 am',
-      orderId: 48,
-    },
-    {
-      id: 5,
-      orderNumber: 'ORD-20250528-BDE0',
-      customerName: ' Satyanarayana adapa',
-      orderTotal: 6695.00,
-      status: 'Completed',
-      paymentStatus: 'Paid',
-      dateCreated: '29-05-2025 06:53 am',
-      orderId: 47,
-    },
-  ]);
-
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filterText, setFilterText] = useState('');
   const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
+
+  // Fetch orders from API
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await ordersAPI.getAll();
+      
+      if (response.data.success) {
+        // Transform data to match table format
+        const transformedOrders = response.data.data.map((order, index) => ({
+          id: index + 1, // Sequential number for display
+          orderId: order.id, // Firestore document ID
+          orderNumber: order.orderNumber || `ORD-${order.id}`,
+          customerName: order.customerName || 'Unknown Customer',
+          orderTotal: order.orderTotal || 0,
+          status: order.status || 'Pending',
+          paymentStatus: order.paymentStatus || 'Pending',
+          dateCreated: order.dateCreated || 'N/A',
+        }));
+        setOrders(transformedOrders);
+      } else {
+        setError(response.data.message || 'Failed to load orders');
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      setError('Failed to load orders. Please try again.');
+      setOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredItems = useMemo(() => {
     if (!filterText) return orders;
@@ -94,21 +81,27 @@ const Orders = () => {
   };
 
   const getStatusBadge = (status) => {
-    if (status === 'Completed') {
-      return <span className="badge bg-success">{status}</span>;
-    } else if (status === 'Pending') {
-      return <span className="badge bg-warning">{status}</span>;
+    const statusLower = (status || '').toLowerCase();
+    if (statusLower === 'completed' || statusLower === 'confirmed' || statusLower === 'delivered') {
+      return <span className="badge bg-success">{status || 'N/A'}</span>;
+    } else if (statusLower === 'pending' || statusLower === 'processing') {
+      return <span className="badge bg-warning">{status || 'N/A'}</span>;
+    } else if (statusLower === 'cancelled' || statusLower === 'cancelled') {
+      return <span className="badge bg-danger">{status || 'N/A'}</span>;
     }
-    return <span className="badge bg-secondary">{status}</span>;
+    return <span className="badge bg-secondary">{status || 'N/A'}</span>;
   };
 
   const getPaymentStatusBadge = (status) => {
-    if (status === 'Paid') {
-      return <span className="badge bg-success">{status}</span>;
-    } else if (status === 'Pending') {
-      return <span className="badge bg-danger">{status}</span>;
+    const statusLower = (status || '').toLowerCase();
+    if (statusLower === 'paid') {
+      return <span className="badge bg-success">{status || 'N/A'}</span>;
+    } else if (statusLower === 'pending') {
+      return <span className="badge bg-danger">{status || 'N/A'}</span>;
+    } else if (statusLower === 'failed' || statusLower === 'refunded') {
+      return <span className="badge bg-danger">{status || 'N/A'}</span>;
     }
-    return <span className="badge bg-secondary">{status}</span>;
+    return <span className="badge bg-secondary">{status || 'N/A'}</span>;
   };
 
   const columns = [
@@ -168,8 +161,6 @@ const Orders = () => {
         </Link>
       ),
       ignoreRowClick: true,
-      allowOverflow: true,
-      button: true,
       width: '100px',
     },
   ];
@@ -209,21 +200,41 @@ const Orders = () => {
               <h5 className="card-title mb-0 text-white">Order List</h5>
             </div>
             <div className="card-body">
-              <DataTable
-                columns={columns}
-                data={filteredItems}
-                pagination
-                paginationResetDefaultPage={resetPaginationToggle}
-                subHeader
-                subHeaderComponent={subHeaderComponentMemo}
-                persistTableHead
-                highlightOnHover
-                striped
-                customStyles={customStyles}
-                paginationPerPage={10}
-                paginationRowsPerPageOptions={[10, 25, 50, 100]}
-                noDataComponent="No orders found"
-              />
+              {isLoading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2">Loading orders...</p>
+                </div>
+              ) : error ? (
+                <div className="alert alert-danger" role="alert">
+                  {error}
+                  <button 
+                    className="btn btn-sm btn-outline-danger ms-2"
+                    onClick={loadOrders}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  data={filteredItems}
+                  pagination
+                  paginationResetDefaultPage={resetPaginationToggle}
+                  subHeader
+                  subHeaderComponent={subHeaderComponentMemo}
+                  persistTableHead
+                  highlightOnHover
+                  striped
+                  customStyles={customStyles}
+                  paginationPerPage={10}
+                  paginationRowsPerPageOptions={[10, 25, 50, 100]}
+                  noDataComponent="No orders found"
+                  progressPending={isLoading}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -12,6 +12,8 @@ import UpsertGrade from './pages/UpsertGrade';
 import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
 import Customers from './pages/Customers';
+import ManageImages from './pages/ManageImages';
+import ImageUpload from './pages/ImageUpload';
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
           <Route path="/get-all-orders" element={<Orders />} />
           <Route path="/get-order-details" element={<OrderDetails />} />
           <Route path="/all-customers" element={<Customers />} />
+          <Route path="/manage-images" element={<ManageImages />} />
+          <Route path="/upload-image" element={<ImageUpload />} />
         </Routes>
       </Layout>
     </Router>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { schoolsAPI } from '../services/api';
+import { schoolsAPI, uploadAPI } from '../services/api';
 import './UpsertSchool.css';
 
 const UpsertSchool = () => {
@@ -25,6 +25,8 @@ const UpsertSchool = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   useEffect(() => {
     // If editing, fetch school data
@@ -47,6 +49,10 @@ const UpsertSchool = () => {
               PhoneNumber: school.phoneNumber || '',
               Email: school.email || '',
             });
+            // Set logo preview if logo exists
+            if (school.schoolLogo) {
+              setLogoPreview(school.schoolLogo);
+            }
           }
         } catch (error) {
           console.error('Error fetching school:', error);
@@ -75,7 +81,28 @@ const UpsertSchool = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        e.target.value = '';
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size should be less than 5MB');
+        e.target.value = '';
+        return;
+      }
+      
       setLogoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -157,6 +184,36 @@ const UpsertSchool = () => {
     setIsSubmitting(true);
     
     try {
+      let logoUrl = formData.SchoolLogo; // Use existing logo URL if no new file selected
+      
+      // Upload logo file if a new one is selected
+      if (logoFile) {
+        setIsUploadingLogo(true);
+        try {
+          const uploadResponse = await uploadAPI.uploadImage(logoFile, {
+            category: 'school-logos',
+            description: `Logo for ${formData.Name}`,
+            folderPath: 'school-logos',
+            uploadedBy: 'admin',
+          });
+          
+          // The upload API returns { success: true, url: "...", metadata: {...} }
+          if (uploadResponse.data.success && uploadResponse.data.url) {
+            logoUrl = uploadResponse.data.url;
+          } else {
+            throw new Error(uploadResponse.data.message || 'Failed to upload logo');
+          }
+        } catch (uploadError) {
+          console.error('Error uploading logo:', uploadError);
+          alert(uploadError.response?.data?.message || 'Failed to upload logo. Please try again.');
+          setIsUploadingLogo(false);
+          setIsSubmitting(false);
+          return;
+        } finally {
+          setIsUploadingLogo(false);
+        }
+      }
+      
       // Prepare data for API
       const submitData = {
         name: formData.Name,
@@ -168,7 +225,7 @@ const UpsertSchool = () => {
         state: formData.State,
         phoneNumber: formData.PhoneNumber,
         email: formData.Email,
-        schoolLogo: formData.SchoolLogo,
+        schoolLogo: logoUrl, // Use uploaded logo URL or existing one
       };
 
       let response;
@@ -461,7 +518,7 @@ const UpsertSchool = () => {
                   <div className="row">
                     <div className="col-lg-6">
                       <label className="form-label" htmlFor="SchoolLogo">
-                        Logo URL
+                        School Logo
                       </label>
                       <input
                         type="file"
@@ -469,14 +526,33 @@ const UpsertSchool = () => {
                         className="form-control"
                         accept="image/*"
                         onChange={handleFileChange}
+                        disabled={isUploadingLogo}
                       />
                       {logoFile && (
                         <small className="form-text text-muted">
-                          Selected: {logoFile.name}
+                          Selected: {logoFile.name} ({(logoFile.size / 1024).toFixed(2)} KB)
+                        </small>
+                      )}
+                      {isUploadingLogo && (
+                        <small className="form-text text-info">
+                          Uploading logo...
                         </small>
                       )}
                     </div>
                     <div className="col-lg-6">
+                      {logoPreview && (
+                        <div>
+                          <label className="form-label">Logo Preview</label>
+                          <div className="border rounded p-2" style={{ maxWidth: '200px', maxHeight: '200px', overflow: 'hidden' }}>
+                            <img 
+                              src={logoPreview} 
+                              alt="Logo preview" 
+                              className="img-fluid"
+                              style={{ maxWidth: '100%', height: 'auto' }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -484,9 +560,9 @@ const UpsertSchool = () => {
                 <button
                   type="submit"
                   className="btn btn-success"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isUploadingLogo}
                 >
-                  {isSubmitting ? 'Saving...' : schoolId ? 'Update' : 'Create'}
+                  {isUploadingLogo ? 'Uploading Logo...' : isSubmitting ? 'Saving...' : schoolId ? 'Update' : 'Create'}
                 </button>
               </form>
             </div>

@@ -13,8 +13,22 @@
     },
     "android": {
       "package": "com.vidyarthi.mobileapp",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
+      ]
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them.",
+          "cameraPermission": "The app accesses your camera to let you take photos."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "6b5fe893-fd62-40bf-8e2a-a89bdfa6c8bb"

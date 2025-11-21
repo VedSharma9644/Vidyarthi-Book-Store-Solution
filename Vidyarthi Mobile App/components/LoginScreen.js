@@ -144,7 +144,11 @@ const LoginScreen = ({ onSwitchToRegister, onGoToSearch, onGoToApiTest }) => {
             {/* Send OTP Button */}
             {!otpSent && (
               <TouchableOpacity 
-                style={[styles.sendOtpButton, isLoading && styles.sendOtpButtonDisabled]} 
+                style={[
+                  styles.sendOtpButton, 
+                  mobileNumber.trim().length === 10 && { backgroundColor: colors.primary, shadowColor: colors.primary },
+                  isLoading && styles.sendOtpButtonDisabled
+                ]} 
                 onPress={handleSendOtp}
                 disabled={isLoading}
               >

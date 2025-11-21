@@ -245,24 +245,31 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
       <View style={{
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f8fcfa',
+        backgroundColor: colors.primary,
+        paddingVertical: 16,
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 8,
         justifyContent: 'space-between',
+        shadowColor: colors.black,
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
       }}>
         <TouchableOpacity
           style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
           onPress={onBack}
         >
-          <Text style={{ fontSize: 24, color: '#0e1b16' }}>←</Text>
+          <Text style={{ fontSize: 24, color: colors.white }}>←</Text>
         </TouchableOpacity>
         <Text style={{
           flex: 1,
           textAlign: 'center',
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: 'bold',
-          color: '#0e1b16',
+          color: colors.white,
         }}>
           {gradeName || 'Grade Books'}
         </Text>
@@ -276,7 +283,7 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
           }}
           onPress={() => onTabPress('cart')}
         >
-          <Text style={{ fontSize: 24, color: '#0e1b16' }}>🛒</Text>
+          <Text style={{ fontSize: 24, color: colors.white }}>🛒</Text>
           {cartCount > 0 && (
             <View style={{
               position: 'absolute',

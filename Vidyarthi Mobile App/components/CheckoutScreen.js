@@ -61,7 +61,9 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   const [error, setError] = useState(null);
   const [showRazorpayWebView, setShowRazorpayWebView] = useState(false);
   const [razorpayOrderData, setRazorpayOrderData] = useState(null);
-  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [showAddressSelectionModal, setShowAddressSelectionModal] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
     phone: '',
@@ -76,24 +78,78 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   // Delivery charge per package (in INR) - same as CartScreen
   const DELIVERY_CHARGE = 300;
 
-  // Load user's shipping address on mount
+  // Load saved addresses and set default
   useEffect(() => {
-    if (user) {
-      // Load from user's saved address or use defaults
-      const userAddress = user.address || {};
-      setShippingAddress({
-        name: user.firstName && user.lastName 
-          ? `${user.firstName} ${user.lastName}`.trim()
-          : user.firstName || user.userName || '',
-        phone: user.phoneNumber || '',
-        address: userAddress.address || '',
-        city: userAddress.city || '',
-        state: userAddress.state || '',
-        postalCode: userAddress.postalCode || '',
-        country: userAddress.country || 'India',
-      });
+    loadSavedAddresses();
+  }, []);
+
+  const loadSavedAddresses = async () => {
+    try {
+      const addressesJson = await AsyncStorage.getItem('shippingAddresses');
+      if (addressesJson) {
+        const addresses = JSON.parse(addressesJson);
+        setSavedAddresses(addresses);
+        
+        // Auto-select default address if available
+        const defaultAddress = addresses.find(addr => addr.isDefault);
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.id);
+          setShippingAddress({
+            name: defaultAddress.name || '',
+            phone: defaultAddress.phone || '',
+            address: defaultAddress.address || '',
+            city: defaultAddress.city || '',
+            state: defaultAddress.state || '',
+            postalCode: defaultAddress.postalCode || '',
+            country: defaultAddress.country || 'India',
+          });
+        } else if (addresses.length > 0) {
+          // If no default, select first address
+          const firstAddress = addresses[0];
+          setSelectedAddressId(firstAddress.id);
+          setShippingAddress({
+            name: firstAddress.name || '',
+            phone: firstAddress.phone || '',
+            address: firstAddress.address || '',
+            city: firstAddress.city || '',
+            state: firstAddress.state || '',
+            postalCode: firstAddress.postalCode || '',
+            country: firstAddress.country || 'India',
+          });
+        } else if (user) {
+          // Fallback to user data if no saved addresses
+          const userAddress = user.address || {};
+          setShippingAddress({
+            name: user.firstName && user.lastName 
+              ? `${user.firstName} ${user.lastName}`.trim()
+              : user.firstName || user.userName || '',
+            phone: user.phoneNumber || '',
+            address: userAddress.address || '',
+            city: userAddress.city || '',
+            state: userAddress.state || '',
+            postalCode: userAddress.postalCode || '',
+            country: userAddress.country || 'India',
+          });
+        }
+      } else if (user) {
+        // Fallback to user data if no saved addresses
+        const userAddress = user.address || {};
+        setShippingAddress({
+          name: user.firstName && user.lastName 
+            ? `${user.firstName} ${user.lastName}`.trim()
+            : user.firstName || user.userName || '',
+          phone: user.phoneNumber || '',
+          address: userAddress.address || '',
+          city: userAddress.city || '',
+          state: userAddress.state || '',
+          postalCode: userAddress.postalCode || '',
+          country: userAddress.country || 'India',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading saved addresses:', error);
     }
-  }, [user]);
+  };
 
   // Load cart data from API
   useEffect(() => {
@@ -206,39 +262,34 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   };
 
   const handleEditShipping = () => {
-    setShowShippingModal(true);
+    // Reload addresses in case new ones were added
+    loadSavedAddresses();
+    setShowAddressSelectionModal(true);
   };
 
-  const handleSaveShippingAddress = () => {
-    // Validate required fields
-    if (!shippingAddress.name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
-      return;
-    }
-    if (!shippingAddress.phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
-      return;
-    }
-    if (!shippingAddress.address.trim()) {
-      Alert.alert('Error', 'Please enter your address');
-      return;
-    }
-    if (!shippingAddress.city.trim()) {
-      Alert.alert('Error', 'Please enter your city');
-      return;
-    }
-    if (!shippingAddress.state.trim()) {
-      Alert.alert('Error', 'Please enter your state');
-      return;
-    }
-    if (!shippingAddress.postalCode.trim()) {
-      Alert.alert('Error', 'Please enter your postal code');
-      return;
-    }
-
-    setShowShippingModal(false);
-    Alert.alert('Success', 'Shipping address updated');
+  const handleSelectAddress = (address) => {
+    setSelectedAddressId(address.id);
+    setShippingAddress({
+      name: address.name || '',
+      phone: address.phone || '',
+      address: address.address || '',
+      city: address.city || '',
+      state: address.state || '',
+      postalCode: address.postalCode || '',
+      country: address.country || 'India',
+    });
+    setShowAddressSelectionModal(false);
   };
+
+  const formatAddressDisplay = (address) => {
+    const parts = [];
+    if (address.address) parts.push(address.address);
+    if (address.city) parts.push(address.city);
+    if (address.state) parts.push(address.state);
+    if (address.postalCode) parts.push(address.postalCode);
+    return parts.join(', ');
+  };
+
 
   const handleEditPayment = () => {
     Alert.alert('Edit Payment', 'Edit payment method functionality will be implemented');
@@ -619,221 +670,67 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
         </SafeAreaView>
       </Modal>
 
-      {/* Shipping Address Edit Modal */}
+      {/* Address Selection Modal */}
       <Modal
-        visible={showShippingModal}
+        visible={showAddressSelectionModal}
+        transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowShippingModal(false)}
+        onRequestClose={() => setShowAddressSelectionModal(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
-          >
-            {/* Header */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              padding: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: '#e0e0e0',
-              backgroundColor: '#fff',
-            }}>
-              <TouchableOpacity
-                onPress={() => setShowShippingModal(false)}
-                style={{ padding: 8 }}
-              >
-                <Text style={{ fontSize: 24 }}>←</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.addressSelectionModalContent}>
+            <View style={styles.addressModalHeader}>
+              <Text style={styles.addressModalTitle}>Select Shipping Address</Text>
+              <TouchableOpacity onPress={() => setShowAddressSelectionModal(false)}>
+                <Text style={styles.modalCloseButton}>✕</Text>
               </TouchableOpacity>
-              <Text style={{
-                flex: 1,
-                fontSize: 18,
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginRight: 40,
-              }}>
-                Shipping Address
-              </Text>
             </View>
 
-            {/* Form */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-              <View style={{ gap: 16 }}>
-                {/* Name */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    Full Name <Text style={{ color: '#e74c3c' }}>*</Text>
+            <ScrollView style={styles.addressSelectionModalBody} showsVerticalScrollIndicator={false}>
+              {savedAddresses.length === 0 ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 48, marginBottom: 16 }}>📍</Text>
+                  <Text style={{ color: '#666', fontSize: 18, fontWeight: '500', marginBottom: 8 }}>
+                    No addresses saved
                   </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                    }}
-                    placeholder="Enter your full name"
-                    value={shippingAddress.name}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, name: text })}
-                  />
-                </View>
-
-                {/* Phone */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    Phone Number <Text style={{ color: '#e74c3c' }}>*</Text>
+                  <Text style={{ color: '#999', fontSize: 14, textAlign: 'center', paddingHorizontal: 32 }}>
+                    Please add an address from your profile first
                   </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                    }}
-                    placeholder="Enter your phone number"
-                    value={shippingAddress.phone}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, phone: text })}
-                    keyboardType="phone-pad"
-                  />
                 </View>
-
-                {/* Address */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    Address <Text style={{ color: '#e74c3c' }}>*</Text>
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                      minHeight: 80,
-                      textAlignVertical: 'top',
-                    }}
-                    placeholder="Enter your complete address"
-                    value={shippingAddress.address}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, address: text })}
-                    multiline
-                    numberOfLines={3}
-                  />
-                </View>
-
-                {/* City */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    City <Text style={{ color: '#e74c3c' }}>*</Text>
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                    }}
-                    placeholder="Enter your city"
-                    value={shippingAddress.city}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, city: text })}
-                  />
-                </View>
-
-                {/* State */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    State <Text style={{ color: '#e74c3c' }}>*</Text>
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                    }}
-                    placeholder="Enter your state"
-                    value={shippingAddress.state}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, state: text })}
-                  />
-                </View>
-
-                {/* Postal Code */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    Postal Code <Text style={{ color: '#e74c3c' }}>*</Text>
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                    }}
-                    placeholder="Enter your postal code"
-                    value={shippingAddress.postalCode}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, postalCode: text })}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                {/* Country */}
-                <View>
-                  <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 8, color: '#0e1b16' }}>
-                    Country
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e0e0e0',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 16,
-                    }}
-                    placeholder="Enter your country"
-                    value={shippingAddress.country}
-                    onChangeText={(text) => setShippingAddress({ ...shippingAddress, country: text })}
-                  />
-                </View>
-              </View>
+              ) : (
+                savedAddresses.map((address) => (
+                  <TouchableOpacity
+                    key={address.id}
+                    style={[
+                      styles.addressSelectionCard,
+                      selectedAddressId === address.id && styles.addressSelectionCardSelected,
+                    ]}
+                    onPress={() => handleSelectAddress(address)}
+                  >
+                    {address.isDefault && (
+                      <View style={styles.defaultBadge}>
+                        <Text style={styles.defaultBadgeText}>Default</Text>
+                      </View>
+                    )}
+                    <View style={styles.addressSelectionCardContent}>
+                      <Text style={styles.addressSelectionCardName}>{address.name}</Text>
+                      <Text style={styles.addressSelectionCardPhone}>{address.phone}</Text>
+                      <Text style={styles.addressSelectionCardAddress}>{formatAddressDisplay(address)}</Text>
+                      {address.country && (
+                        <Text style={styles.addressSelectionCardCountry}>{address.country}</Text>
+                      )}
+                    </View>
+                    {selectedAddressId === address.id && (
+                      <View style={styles.selectedIndicator}>
+                        <Text style={styles.selectedIndicatorText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
-
-            {/* Save Button */}
-            <View style={{
-              padding: 16,
-              borderTopWidth: 1,
-              borderTopColor: '#e0e0e0',
-              backgroundColor: '#fff',
-            }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#06412c',
-                  borderRadius: 8,
-                  padding: 16,
-                  alignItems: 'center',
-                }}
-                onPress={handleSaveShippingAddress}
-              >
-                <Text style={{
-                  color: '#f8fcfa',
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                }}>
-                  Save Address
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );

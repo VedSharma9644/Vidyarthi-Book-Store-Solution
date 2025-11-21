@@ -161,6 +161,26 @@ const Sidebar = ({ isOpen }) => {
             </ul>
           </li>
 
+          {/* Image Management */}
+          <li className="sidebar-item">
+            <a onClick={(e) => { e.preventDefault(); toggleMenu('images'); }} className={`sidebar-link ${!openMenus.images ? 'collapsed' : ''}`} style={{ cursor: 'pointer' }}>
+              <i className="align-middle me-2 fas fa-fw fa-images"></i>
+              <span className="align-middle">Image Management</span>
+            </a>
+            <ul id="images" className={`sidebar-dropdown list-unstyled ${openMenus.images ? 'show' : 'collapse'}`}>
+              <li className={`sidebar-item ${isActive('/manage-images') ? 'active' : ''}`}>
+                <Link to="/manage-images" className="sidebar-link">
+                  <i className="fas fa-images me-2"></i>Manage Images
+                </Link>
+              </li>
+              <li className={`sidebar-item ${isActive('/upload-image') ? 'active' : ''}`}>
+                <Link to="/upload-image" className="sidebar-link">
+                  <i className="fas fa-upload me-2"></i>Upload Image
+                </Link>
+              </li>
+            </ul>
+          </li>
+
           {/* Support Tickets */}
           <li className="sidebar-item">
             <a className="sidebar-link" href="/admin/tickets-list">

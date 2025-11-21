@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Image,
@@ -14,120 +13,171 @@ import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
 
-const HomeScreen = ({ onTabPress, onGoToSearch }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [books, setBooks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Popular schools data
-  const popularSchools = [
-    {
-      id: 1,
-      name: 'Delhi Public School',
-      logo: { uri: 'https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=DPS' }
-    },
-    {
-      id: 2,
-      name: 'Kendriya Vidyalaya',
-      logo: { uri: 'https://via.placeholder.com/60x60/7ED321/FFFFFF?text=KV' }
-    },
-    {
-      id: 3,
-      name: 'St. Xavier\'s School',
-      logo: { uri: 'https://via.placeholder.com/60x60/F5A623/FFFFFF?text=SXS' }
-    },
-    {
-      id: 4,
-      name: 'Ryan International',
-      logo: { uri: 'https://via.placeholder.com/60x60/BD10E0/FFFFFF?text=RI' }
-    },
-    {
-      id: 5,
-      name: 'DAV Public School',
-      logo: { uri: 'https://via.placeholder.com/60x60/50E3C2/FFFFFF?text=DAV' }
-    },
-    {
-      id: 6,
-      name: 'Amity International',
-      logo: { uri: 'https://via.placeholder.com/60x60/B8E986/FFFFFF?text=AI' }
-    }
-  ];
+const HomeScreen = ({ onTabPress, onGoToSearch, onGoToOrderHistory }) => {
+  const [bannerImage, setBannerImage] = useState(null);
+  const [isLoadingBanner, setIsLoadingBanner] = useState(true);
 
   useEffect(() => {
-    fetchBooks();
+    loadBannerImage();
   }, []);
 
-  const fetchBooks = async () => {
+  const loadBannerImage = async () => {
     try {
-      setIsLoading(true);
-      const response = await ApiService.getAllBooks({ limit: 6 });
+      setIsLoadingBanner(true);
+      const result = await ApiService.getBannerImage();
       
-      if (response.success) {
-        setBooks(response.data);
+      if (result.success && result.data && result.data.imageUrl) {
+        setBannerImage(result.data.imageUrl);
       } else {
-        Alert.alert('Error', 'Failed to fetch books');
+        // Use fallback placeholder if no banner found
+        setBannerImage('https://via.placeholder.com/400x200/06429c/FFFFFF?text=Welcome+to+Vidyatrhi+Book+Bank');
       }
     } catch (error) {
-      console.log('Error fetching books:', error);
-      Alert.alert('Error', 'Failed to fetch books. Please check your connection.');
+      console.error('Error loading banner image:', error);
+      // Use fallback on error
+      setBannerImage('https://via.placeholder.com/400x200/06429c/FFFFFF?text=Welcome+to+Vidyatrhi+Book+Bank');
     } finally {
-      setIsLoading(false);
+      setIsLoadingBanner(false);
+    }
+  };
+  const handleBrowseBooks = () => {
+    if (onGoToSearch) {
+      onGoToSearch();
     }
   };
 
-  const handleSchoolSelect = (school) => {
-    Alert.alert('School Selected', `You selected: ${school.name}`);
+  const handleShopStationery = () => {
+    // Navigate to stationery shop
+    Alert.alert('Shop Stationery', 'Stationery shop functionality will be implemented');
   };
 
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      Alert.alert('Search', `Searching for: ${searchQuery}`);
+  const handleReorderPrevious = () => {
+    // Navigate to reorder previous orders
+    Alert.alert('Re-order Previous', 'Re-order functionality will be implemented');
+  };
+
+  const handleTrackOrder = () => {
+    // Navigate to order tracking/order history
+    if (onGoToOrderHistory) {
+      onGoToOrderHistory();
+    } else if (onTabPress) {
+      onTabPress('profile');
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.searchHeader}>
-        <View style={styles.searchHeaderContent}>
-          <View style={styles.searchHeaderSpacer} />
-          <Text style={styles.searchHeaderTitle}>Find your school</Text>
-          <View style={styles.searchHeaderSpacer} />
+      <View style={styles.homeHeader}>
+        <View style={styles.homeHeaderContent}>
+          <View style={styles.homeHeaderLeft}>
+            <View style={styles.homeLogoContainer}>
+              <Text style={styles.homeLogoText}>V</Text>
+            </View>
+            <View>
+              <Text style={styles.homeHeaderTitle}>Vidyatrhi</Text>
+              <Text style={styles.homeHeaderSubtitle}>Book Bank</Text>
+            </View>
+          </View>
+          <View style={styles.homeHeaderRight}>
+            <TouchableOpacity style={styles.homeHeaderIcon}>
+              <Text style={styles.homeHeaderIconText}>🔔</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.homeHeaderIcon}
+              onPress={() => onTabPress && onTabPress('cart')}
+            >
+              <Text style={styles.homeHeaderIconText}>🛒</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
       {/* Main Content */}
-      <ScrollView style={styles.searchMainContent} showsVerticalScrollIndicator={false}>
-        {/* Search Bar */}
-        <View style={styles.searchBarContainer}>
-          <View style={styles.searchInputContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for your school"
-              placeholderTextColor={`${colors.textLight}80`}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
+      <ScrollView style={styles.homeMainContent} showsVerticalScrollIndicator={false}>
+        {/* Image Banner */}
+        <View style={styles.homeBannerContainer}>
+          {isLoadingBanner ? (
+            <View style={styles.homeBannerLoading}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : bannerImage ? (
+            <Image
+              source={{ uri: bannerImage }}
+              style={styles.homeBannerImage}
+              resizeMode="cover"
+              onError={() => {
+                // Fallback to placeholder if image fails to load
+                setBannerImage('https://via.placeholder.com/400x200/06429c/FFFFFF?text=Welcome+to+Vidyatrhi+Book+Bank');
+              }}
             />
+          ) : (
+            <Image
+              source={{
+                uri: 'https://via.placeholder.com/400x200/06429c/FFFFFF?text=Welcome+to+Vidyatrhi+Book+Bank'
+              }}
+              style={styles.homeBannerImage}
+              resizeMode="cover"
+            />
+          )}
+        </View>
+
+        {/* Text Banner */}
+        <View style={styles.homeTextBanner}>
+          <Text style={styles.homeTextBannerText}>
+            Back to School Sale! Get 10% Off all Stationery until Friday.
+          </Text>
+        </View>
+
+        {/* Explore & Shop Section */}
+        <View style={styles.homeSection}>
+          <Text style={styles.homeSectionTitle}>Explore & Shop</Text>
+          <View style={styles.homeCardsRow}>
+            <TouchableOpacity 
+              style={styles.homeCard}
+              onPress={handleBrowseBooks}
+            >
+              <View style={styles.homeCardIconContainer}>
+                <Text style={styles.homeCardIcon}>📚</Text>
+              </View>
+              <Text style={styles.homeCardText}>Browse Books</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.homeCard}
+              onPress={handleShopStationery}
+            >
+              <View style={styles.homeCardIconContainer}>
+                <Text style={styles.homeCardIcon}>✏️</Text>
+              </View>
+              <Text style={styles.homeCardText}>Shop Stationery</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Popular Schools Section */}
-        <View style={styles.popularSchoolsContainer}>
-          <Text style={styles.popularSchoolsTitle}>Popular schools</Text>
-          <View style={styles.schoolsGrid}>
-            {popularSchools.map((school, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.schoolCard}
-                onPress={() => handleSchoolSelect(school)}
-              >
-                <Image source={school.logo} style={styles.schoolLogo} />
-                <Text style={styles.schoolCardText}>{school.name}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* Quick Links Section */}
+        <View style={styles.homeSection}>
+          <Text style={styles.homeSectionTitle}>Quick Links</Text>
+          <View style={styles.homeCardsRow}>
+            <TouchableOpacity 
+              style={styles.homeCard}
+              onPress={handleReorderPrevious}
+            >
+              <View style={styles.homeCardIconContainer}>
+                <Text style={styles.homeCardIcon}>📋</Text>
+              </View>
+              <Text style={styles.homeCardText}>Re-order Previous</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.homeCard}
+              onPress={handleTrackOrder}
+            >
+              <View style={styles.homeCardIconContainer}>
+                <Text style={styles.homeCardIcon}>📦</Text>
+              </View>
+              <Text style={styles.homeCardText}>Track My Order</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
