@@ -47,63 +47,25 @@ const getImages = async (req, res) => {
 /**
  * Get banner images for homepage
  * @route GET /api/images/banner
+ * @deprecated This endpoint is kept for backward compatibility but returns static image path
+ * The mobile app now uses a local static image instead of database banners
  */
 const getBannerImages = async (req, res) => {
   try {
-    // Fetch images with category 'banner' or 'home-banner' or 'homepage'
-    const categories = ['banner', 'home-banner', 'homepage', 'home'];
-    
-    // Try to get banner images from any of these categories
-    let bannerImages = [];
-    
-    for (const category of categories) {
-      const snapshot = await db.collection('images')
-        .where('category', '==', category)
-        .orderBy('uploadedAt', 'desc')
-        .limit(5)
-        .get();
-      
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        bannerImages.push({
-          id: doc.id,
-          imageUrl: data.imageUrl,
-          category: data.category,
-          description: data.description,
-        });
-      });
-      
-      // If we found images, break
-      if (bannerImages.length > 0) break;
-    }
-    
-    // If no banner images found, get the most recent image as fallback
-    if (bannerImages.length === 0) {
-      const snapshot = await db.collection('images')
-        .orderBy('uploadedAt', 'desc')
-        .limit(1)
-        .get();
-      
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        bannerImages.push({
-          id: doc.id,
-          imageUrl: data.imageUrl,
-          category: data.category,
-          description: data.description,
-        });
-      });
-    }
-
+    // Return static image path - mobile app should use local asset instead
+    // This endpoint is maintained for backward compatibility only
     res.json({
       success: true,
-      data: bannerImages.length > 0 ? bannerImages[0] : null, // Return first banner image
+      data: {
+        imageUrl: 'static://assets/images/DELIVERY IMG.png',
+        isStatic: true,
+      },
     });
   } catch (error) {
-    console.error('Error fetching banner images:', error);
+    console.error('Error in banner endpoint:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch banner images',
+      message: 'Failed to fetch banner image',
       error: error.message,
     });
   }

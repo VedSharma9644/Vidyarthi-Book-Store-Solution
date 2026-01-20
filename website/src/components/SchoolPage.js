@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { styles, colors } from '../css/styles';
 import { GRADE_IMAGES } from '../config/imagePaths';
 import { useHeaderHeight } from '../hooks/useHeaderHeight';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
 
@@ -10,6 +11,7 @@ const SchoolPage = () => {
   const { schoolId } = useParams();
   const navigate = useNavigate();
   const headerHeight = useHeaderHeight();
+  const isMobile = useIsMobile();
   const [school, setSchool] = useState(null);
   const [grades, setGrades] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -207,21 +209,38 @@ const SchoolPage = () => {
             </p>
           </div>
         ) : (
-          <div style={{ padding: '0 16px 16px', width: '100%' }}>
+          <div style={{ 
+            padding: '0 16px 16px', 
+            width: '100%',
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+            gap: '16px',
+          }}>
             {grades.map((grade) => {
               // Use the default grade image for all grades
               const gradeImage = GRADE_IMAGES.DEFAULT;
               return (
-                <div key={grade.id} style={{ marginBottom: '16px', width: '100%' }}>
+                <div key={grade.id} style={{ width: '100%' }}>
                   <div style={{
                     width: '100%',
-                    height: '350px',
+                    height: '180px',
                     borderRadius: '8px',
                     overflow: 'hidden',
                     position: 'relative',
                     backgroundColor: colors.gray100,
-                    minHeight: '250px',
-                  }}>
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                  onClick={() => handleViewBooks(grade)}
+                  >
                     {/* Background Image */}
                     <img
                       src={gradeImage}
@@ -262,16 +281,16 @@ const SchoolPage = () => {
                       flexDirection: 'row',
                       alignItems: 'flex-end',
                       justifyContent: 'space-between',
-                      padding: '16px',
-                      gap: '16px',
+                      padding: '12px',
+                      gap: '8px',
                       zIndex: 2,
                     }}>
                       <h3 style={{
                         flex: 1,
                         color: colors.white,
-                        fontSize: '24px',
+                        fontSize: '18px',
                         fontWeight: 'bold',
-                        lineHeight: '28px',
+                        lineHeight: '22px',
                         margin: 0,
                         textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
                       }}>
@@ -279,26 +298,28 @@ const SchoolPage = () => {
                       </h3>
                       <button
                         style={{
-                          minWidth: '84px',
-                          height: '40px',
+                          minWidth: '80px',
+                          height: '32px',
                           backgroundColor: '#000000',
-                          borderRadius: '8px',
+                          borderRadius: '6px',
                           border: 'none',
                           cursor: 'pointer',
-                          padding: '0 16px',
+                          padding: '0 12px',
                           color: colors.white,
-                          fontSize: '14px',
+                          fontSize: '12px',
                           fontWeight: 'bold',
                           flexShrink: 0,
+                          transition: 'background-color 0.2s ease',
                         }}
-                        onClick={() => handleViewBooks(grade)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewBooks(grade);
+                        }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.9';
-                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.backgroundColor = '#333333';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = '#000000';
                         }}
                       >
                         View Books

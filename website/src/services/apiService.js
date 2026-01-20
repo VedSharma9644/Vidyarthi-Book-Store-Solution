@@ -311,6 +311,13 @@ class ApiService {
       if (response.data && response.data.success !== undefined) {
         return response.data;
       }
+      // Handle case where response.data is the banner object directly
+      if (response.data && response.data.imageUrl) {
+        return {
+          success: true,
+          data: response.data,
+        };
+      }
       return {
         success: true,
         data: response.data,

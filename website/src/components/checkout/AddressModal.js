@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { checkoutStyles, colors } from '../../css/checkoutStyles';
 import { borderRadius } from '../../css/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import ApiService from '../../services/apiService';
 import AddressForm from './AddressForm';
 
 const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
@@ -15,26 +16,41 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
     loadSavedAddresses();
   }, []);
 
-  const loadSavedAddresses = () => {
+  const loadSavedAddresses = async () => {
     try {
-      const addressesJson = localStorage.getItem('shippingAddresses');
-      if (addressesJson) {
-        const addresses = JSON.parse(addressesJson);
-        setSavedAddresses(addresses);
-        
-        // Auto-select default address or first address
-        const defaultAddress = addresses.find(addr => addr.isDefault);
-        if (defaultAddress) {
-          setSelectedId(defaultAddress.id);
-          if (!selectedAddress.name) {
-            onSelectAddress(defaultAddress);
+      let addresses = [];
+      
+      // First, try to load from user data (database)
+      try {
+        const userId = user?.id || localStorage.getItem('userId');
+        if (userId) {
+          const userDataResponse = await ApiService.getUserById(userId);
+          if (userDataResponse.success && userDataResponse.data) {
+            const userData = userDataResponse.data;
+            // Check if user has addresses array in database
+            if (userData.addresses && Array.isArray(userData.addresses) && userData.addresses.length > 0) {
+              addresses = userData.addresses;
+              // Sync to localStorage for offline access
+              localStorage.setItem('shippingAddresses', JSON.stringify(addresses));
+              console.log('Loaded addresses from database');
+            }
           }
-        } else if (addresses.length > 0 && !selectedAddress.name) {
-          setSelectedId(addresses[0].id);
-          onSelectAddress(addresses[0]);
         }
-      } else if (user) {
-        // Fallback to user data
+      } catch (apiError) {
+        console.log('Could not load addresses from database, trying local storage:', apiError);
+      }
+      
+      // If no addresses from database, try localStorage
+      if (addresses.length === 0) {
+        const addressesJson = localStorage.getItem('shippingAddresses');
+        if (addressesJson) {
+          addresses = JSON.parse(addressesJson);
+          console.log('Loaded addresses from local storage');
+        }
+      }
+      
+      // If still no addresses, try fallback to user data
+      if (addresses.length === 0 && user) {
         const userAddress = user.address || {};
         const fallbackAddress = {
           id: 'user-default',
@@ -49,10 +65,22 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
           country: userAddress.country || 'India',
           isDefault: true,
         };
-        setSavedAddresses([fallbackAddress]);
-        setSelectedId('user-default');
-        if (!selectedAddress.name) {
-          onSelectAddress(fallbackAddress);
+        addresses = [fallbackAddress];
+      }
+      
+      if (addresses.length > 0) {
+        setSavedAddresses(addresses);
+        
+        // Auto-select default address or first address
+        const defaultAddress = addresses.find(addr => addr.isDefault);
+        if (defaultAddress) {
+          setSelectedId(defaultAddress.id);
+          if (!selectedAddress.name) {
+            onSelectAddress(defaultAddress);
+          }
+        } else if (!selectedAddress.name) {
+          setSelectedId(addresses[0].id);
+          onSelectAddress(addresses[0]);
         }
       }
     } catch (error) {
@@ -76,7 +104,7 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
     setShowAddForm(true);
   };
 
-  const handleSaveAddress = (formData) => {
+  const handleSaveAddress = async (formData) => {
     try {
       let updatedAddresses = [...savedAddresses];
 
@@ -116,8 +144,43 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
         updatedAddresses.push(newAddress);
       }
 
+      // Save to localStorage first
       localStorage.setItem('shippingAddresses', JSON.stringify(updatedAddresses));
       setSavedAddresses(updatedAddresses);
+
+      // Save to API/database
+      try {
+        const userId = user?.id || localStorage.getItem('userId');
+        if (userId) {
+          // Get current user data
+          const userDataResponse = await ApiService.getUserById(userId);
+          const currentUserData = userDataResponse.success && userDataResponse.data 
+            ? userDataResponse.data 
+            : user || {};
+          
+          const updateData = {
+            ...currentUserData,
+            addresses: updatedAddresses,
+          };
+          
+          const updatedUserDataResponse = await ApiService.updateUserProfile(userId, updateData);
+          
+          // Update local storage with the updated user data from server
+          if (updatedUserDataResponse.success && updatedUserDataResponse.data) {
+            const updatedUserData = updatedUserDataResponse.data;
+            localStorage.setItem('userData', JSON.stringify(updatedUserData));
+            console.log('Addresses saved to database successfully');
+          } else {
+            // If API doesn't return updated data, update local storage manually
+            localStorage.setItem('userData', JSON.stringify(updateData));
+            console.log('Addresses saved to database (manual update)');
+          }
+        } else {
+          console.log('User ID not available, saved locally only');
+        }
+      } catch (apiError) {
+        console.error('Could not save to API, saved locally only:', apiError);
+      }
 
       // Auto-select if it's the default or first address
       const savedAddress = editingAddress

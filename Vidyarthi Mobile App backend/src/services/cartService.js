@@ -109,7 +109,8 @@ class CartService {
             }
 
             const bookData = bookDoc.data();
-            const price = bookData.discountPrice || bookData.price || 0;
+            const price = bookData.price || 0;
+
 
             // Find existing item in cart
             const items = cart.items || [];

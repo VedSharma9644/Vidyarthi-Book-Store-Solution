@@ -97,13 +97,6 @@ const TopNavigation = ({ onLogout }) => {
               {isMenuOpen ? '✕' : '☰'}
             </button>
           )}
-          <button
-            style={navStyles.topNavIconButton}
-            onClick={() => alert('Notifications will be implemented')}
-            title="Notifications"
-          >
-            <span style={navStyles.topNavIconText}>🔔</span>
-          </button>
           <Link
             to="/cart"
             style={{

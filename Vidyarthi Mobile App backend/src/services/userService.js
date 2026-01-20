@@ -17,26 +17,51 @@ class UserService {
                 mobileNumber,
                 firstName,
                 lastName,
+                userName,
                 email,
+                password,
                 schoolName,
                 classStandard,
                 roleName = 'Customer',
             } = userData;
 
-            // Check if user already exists
-            const existingUser = await this.getUserByPhoneNumber(mobileNumber);
-            if (existingUser) {
-                throw new Error('User already exists with this phone number');
+            // Check if user already exists by phone or email
+            if (mobileNumber) {
+                const existingUser = await this.getUserByPhoneNumber(mobileNumber);
+                if (existingUser) {
+                    throw new Error('User already exists with this phone number');
+                }
+            }
+            
+            if (email) {
+                const existingUser = await this.getUserByEmail(email);
+                if (existingUser) {
+                    throw new Error('User already exists with this email');
+                }
             }
 
             // Create user document
+            // Use provided userName, or construct from firstName+lastName, or fallback to phone/email
+            let finalUserName = userName;
+            if (!finalUserName && firstName && lastName) {
+                finalUserName = `${firstName} ${lastName}`.trim();
+            } else if (!finalUserName && firstName) {
+                finalUserName = firstName;
+            } else if (!finalUserName && lastName) {
+                finalUserName = lastName;
+            } else if (!finalUserName) {
+                // Fallback to phone number or email prefix
+                finalUserName = mobileNumber ? mobileNumber.replace('+91', '') : (email ? email.split('@')[0] : 'User');
+            }
+            
             const userDoc = {
-                userName: mobileNumber.replace('+91', ''), // Store without +91 prefix
-                phoneNumber: mobileNumber,
-                phoneNumberConfirmed: true,
+                userName: finalUserName,
+                phoneNumber: mobileNumber || null,
+                phoneNumberConfirmed: !!mobileNumber,
                 firstName: firstName || null,
                 lastName: lastName || null,
                 email: email || null,
+                password: password || null, // Store hashed password
                 schoolName: schoolName || null,
                 classStandard: classStandard || null,
                 roleName: roleName,
@@ -94,6 +119,33 @@ class UserService {
     }
 
     /**
+     * Get user by email
+     * @param {string} email - User email address
+     * @returns {Promise<object|null>} - User object or null
+     */
+    async getUserByEmail(email) {
+        try {
+            const snapshot = await this.usersRef
+                .where('email', '==', email.toLowerCase().trim())
+                .limit(1)
+                .get();
+
+            if (snapshot.empty) {
+                return null;
+            }
+
+            const doc = snapshot.docs[0];
+            return {
+                id: doc.id,
+                ...doc.data(),
+            };
+        } catch (error) {
+            console.error('Error getting user by email:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Get user by ID
      * @param {string} userId - User document ID
      * @returns {Promise<object|null>} - User object or null
@@ -124,9 +176,19 @@ class UserService {
      */
     async updateUser(userId, updateData) {
         try {
+            // Log address updates for debugging
+            if (updateData.addresses && Array.isArray(updateData.addresses)) {
+                console.log(`📍 Updating user ${userId} with ${updateData.addresses.length} address(es)`);
+                updateData.addresses.forEach((addr, index) => {
+                    console.log(`  Address ${index + 1}: ${addr.name || 'Unnamed'}, ${addr.city || 'No city'}, ${addr.isDefault ? '(Default)' : ''}`);
+                });
+            }
+            
             updateData.updatedAt = Timestamp.now();
             
             await this.usersRef.doc(userId).update(updateData);
+            
+            console.log(`✅ User ${userId} updated successfully`);
             
             return await this.getUserById(userId);
         } catch (error) {

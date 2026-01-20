@@ -68,6 +68,9 @@ const createBook = async (req, res) => {
       isbn: req.body.ISBN || req.body.isbn,
       description: req.body.Description || req.body.description || '',
       price: req.body.Price || req.body.price,
+      productQuantity: req.body.ProductQuantity || req.body.productQuantity || '',
+      perProductPrice: req.body.PerProductPrice || req.body.perProductPrice || null,
+
       discountPrice: req.body.DiscountPrice || req.body.discountPrice || null,
       stockQuantity: req.body.StockQuantity || req.body.stockQuantity,
       coverImageUrl: req.body.CoverImageUrl || req.body.coverImageUrl || '',
@@ -173,6 +176,20 @@ const updateBook = async (req, res) => {
       isbn: req.body.ISBN !== undefined ? req.body.ISBN : (req.body.isbn !== undefined ? req.body.isbn : existingBook.isbn),
       description: req.body.Description !== undefined ? req.body.Description : (req.body.description !== undefined ? req.body.description : existingBook.description),
       price: req.body.Price !== undefined ? req.body.Price : (req.body.price !== undefined ? req.body.price : existingBook.price),
+      productQuantity:
+                    req.body.ProductQuantity !== undefined
+                      ? req.body.ProductQuantity
+                      : (req.body.productQuantity !== undefined
+                          ? req.body.productQuantity
+                          : existingBook.productQuantity || ''),
+
+      perProductPrice:
+                    req.body.PerProductPrice !== undefined
+                      ? req.body.PerProductPrice
+                      : (req.body.perProductPrice !== undefined
+                          ? req.body.perProductPrice
+                          : existingBook.perProductPrice || null),
+
       discountPrice: req.body.DiscountPrice !== undefined ? req.body.DiscountPrice : (req.body.discountPrice !== undefined ? req.body.discountPrice : existingBook.discountPrice),
       stockQuantity: req.body.StockQuantity !== undefined ? req.body.StockQuantity : (req.body.stockQuantity !== undefined ? req.body.stockQuantity : existingBook.stockQuantity),
       coverImageUrl: req.body.CoverImageUrl !== undefined ? req.body.CoverImageUrl : (req.body.coverImageUrl !== undefined ? req.body.coverImageUrl : existingBook.coverImageUrl),

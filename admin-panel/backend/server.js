@@ -76,15 +76,24 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// API Routes
-app.use('/api/schools', require('./routes/schools'));
-app.use('/api/categories', require('./routes/categories'));
-app.use('/api/books', require('./routes/books'));
-app.use('/api/customers', require('./routes/customers'));
-app.use('/api/grades', require('./routes/grades'));
-app.use('/api/upload', require('./routes/upload'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/webhooks', require('./routes/webhooks'));
+// Authentication routes (public - no auth required)
+app.use('/api/auth', require('./routes/auth'));
+
+// Email routes (public for password reset, protected for config)
+app.use('/api/email', require('./routes/email'));
+
+// Import authentication middleware
+const { authenticate } = require('./middleware/auth');
+
+// Protected API Routes (require authentication)
+app.use('/api/schools', authenticate, require('./routes/schools'));
+app.use('/api/categories', authenticate, require('./routes/categories'));
+app.use('/api/books', authenticate, require('./routes/books'));
+app.use('/api/customers', authenticate, require('./routes/customers'));
+app.use('/api/grades', authenticate, require('./routes/grades'));
+app.use('/api/upload', authenticate, require('./routes/upload'));
+app.use('/api/orders', authenticate, require('./routes/orders'));
+app.use('/api/webhooks', require('./routes/webhooks')); // Webhooks may need to be public for external services
 
 // Error handling middleware
 app.use((err, req, res, next) => {

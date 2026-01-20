@@ -1,17 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cartStyles, colors } from '../css/cartStyles';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
 import CartItem from './cart/CartItem';
+import CartTable from './cart/CartTable';
 import CartSummary from './cart/CartSummary';
+import { useModal } from '../contexts/ModalContext';
+
+// Helper function to format category name
+const getCategoryName = (bookType) => {
+  if (!bookType) return 'Other';
+  
+  const categoryMap = {
+    'TEXTBOOK': 'Textbooks',
+    'NOTEBOOK': 'Notebooks',
+    'UNIFORM': 'Uniforms',
+    'STATIONARY': 'Stationary',
+    'STATIONERY': 'Stationery',
+    'OTHER': 'Other',
+  };
+  
+  return categoryMap[bookType.toUpperCase()] || bookType.charAt(0) + bookType.slice(1).toLowerCase().replace(/_/g, ' ');
+};
 
 const CartPage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const { showSuccess, showError } = useModal();
   const [cartItems, setCartItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
   const [error, setError] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState({});
 
   useEffect(() => {
     loadCart();
@@ -31,12 +53,23 @@ const CartPage = () => {
           name: item.title || 'Unknown Item',
           price: item.price || 0,
           quantity: item.quantity || 1,
+          bundlePieceCount: item.bundlePieceCount || item.piecesInBundle || null, // Bundle piece count from database
           image: item.coverImageUrl || '',
           subtotal: item.subtotal || (item.price || 0) * (item.quantity || 1),
           bookType: item.bookType || 'OTHER',
         }));
         
         setCartItems(items);
+        
+        // Initialize expanded categories - expand all by default
+        const categories = {};
+        items.forEach(item => {
+          const category = item.bookType || 'OTHER';
+          if (categories[category] === undefined) {
+            categories[category] = true; // Expand by default
+          }
+        });
+        setExpandedCategories(categories);
       } else {
         setCartItems([]);
         if (result.message) {
@@ -52,6 +85,26 @@ const CartPage = () => {
     }
   };
 
+  // Group items by category
+  const groupItemsByCategory = () => {
+    const grouped = {};
+    cartItems.forEach(item => {
+      const category = item.bookType || 'OTHER';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(item);
+    });
+    return grouped;
+  };
+
+  const toggleCategory = (category) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
+
   const handleClearCart = async () => {
     if (!window.confirm('Are you sure you want to clear your entire cart? This action cannot be undone.')) {
       return;
@@ -64,13 +117,13 @@ const CartPage = () => {
       
       if (result.success) {
         setCartItems([]);
-        alert('Cart cleared successfully');
+        showSuccess('Cart cleared successfully');
       } else {
-        alert(result.message || 'Failed to clear cart');
+        showError(result.message || 'Failed to clear cart');
       }
     } catch (error) {
       console.error('Error clearing cart:', error);
-      alert('Failed to clear cart. Please try again.');
+      showError('Failed to clear cart. Please try again.');
     } finally {
       setIsClearing(false);
     }
@@ -179,12 +232,94 @@ const CartPage = () => {
               </button>
             </div>
 
-            {cartItems.map((item) => (
-              <CartItem
-                key={item.id}
-                item={item}
-              />
-            ))}
+            {/* Category-wise grouped items */}
+            {(() => {
+              const groupedItems = groupItemsByCategory();
+              const categories = Object.keys(groupedItems).sort((a, b) => {
+                // Sort: TEXTBOOK first, then others alphabetically
+                if (a === 'TEXTBOOK') return -1;
+                if (b === 'TEXTBOOK') return 1;
+                return a.localeCompare(b);
+              });
+
+              return categories.map((category) => {
+                const items = groupedItems[category];
+                const isExpanded = expandedCategories[category] !== false; // Default to true
+                const categoryName = getCategoryName(category);
+
+                return (
+                  <div key={category} style={{ marginBottom: '24px' }}>
+                    {/* Category Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        backgroundColor: colors.gray50,
+                        borderRadius: '8px',
+                        border: `1px solid ${colors.borderLight}`,
+                        cursor: 'pointer',
+                        marginBottom: isExpanded ? '12px' : '0',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                      onClick={() => toggleCategory(category)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = colors.gray100;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = colors.gray50;
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          fontSize: '20px',
+                          transition: 'transform 0.2s ease',
+                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        }}>
+                          ▶
+                        </span>
+                        <h3 style={{
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: colors.textPrimary,
+                          margin: 0,
+                        }}>
+                          {categoryName}
+                        </h3>
+                        <span style={{
+                          fontSize: '14px',
+                          color: colors.textSecondary,
+                          marginLeft: '8px',
+                        }}>
+                          ({items.length} item{items.length !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Category Items - Table on desktop, Cards on mobile */}
+                    {isExpanded && (
+                      <>
+                        {isMobile ? (
+                          <div>
+                            {items.map((item) => (
+                              <CartItem
+                                key={item.id}
+                                item={item}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <CartTable
+                            items={items}
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           {/* Cart Summary */}

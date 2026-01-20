@@ -35,7 +35,22 @@ const createOrder = async (req, res) => {
             });
         }
 
+        // Log shipping address information
         console.log(`📦 Creating order for user: ${userId}, Razorpay Order: ${paymentData.razorpayOrderId}`);
+        if (shippingAddress) {
+            console.log(`📍 Shipping address provided:`, {
+                hasName: !!shippingAddress.name,
+                hasPhone: !!shippingAddress.phone,
+                hasAddress: !!shippingAddress.address,
+                hasCity: !!shippingAddress.city,
+                hasState: !!shippingAddress.state,
+                hasPostalCode: !!shippingAddress.postalCode,
+                hasCountry: !!shippingAddress.country,
+            });
+        } else {
+            console.log(`⚠️ No shipping address provided, will use user's default address`);
+        }
+
         const order = await orderService.createOrder(userId, paymentData, shippingAddress);
         console.log(`✅ Order created successfully: ${order.orderNumber} (${order.id})`);
 

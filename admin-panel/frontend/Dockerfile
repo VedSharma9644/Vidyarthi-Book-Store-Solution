@@ -13,7 +13,7 @@ RUN npm ci
 COPY . .
 
 # Set production backend URL for build (can be overridden with build arg)
-ARG VITE_API_BASE_URL=https://admin-panel-backend-594708558503.us-central1.run.app
+ARG VITE_API_BASE_URL=https://admin-panel-backend-ntb4llmyya-uc.a.run.app
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Build the React app

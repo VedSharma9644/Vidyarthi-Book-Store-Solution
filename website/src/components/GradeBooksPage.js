@@ -5,6 +5,7 @@ import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
 import BookCard from './books/BookCard';
+import BookTable from './books/BookTable';
 import OptionalBundleSection from './books/OptionalBundleSection';
 
 const GradeBooksPage = () => {
@@ -186,6 +187,19 @@ const GradeBooksPage = () => {
         return;
       }
 
+      // Clear existing cart first before adding new items
+      // This ensures only one grade's products are in cart at a time
+      try {
+        const clearResult = await ApiService.clearCart();
+        if (!clearResult.success) {
+          console.warn('Warning: Failed to clear cart, but continuing to add items:', clearResult.message);
+        }
+      } catch (error) {
+        console.error('Error clearing cart:', error);
+        // Continue even if clearing fails - we'll still try to add items
+      }
+
+      // Add each item to cart
       let successCount = 0;
       let failCount = 0;
 
@@ -287,14 +301,18 @@ const GradeBooksPage = () => {
         {textbooks.length > 0 && (
           <>
             <h2 style={booksStyles.sectionHeader}>Mandatory Textbooks</h2>
-            <div style={booksStyles.booksGrid}>
-              {textbooks.map((book) => (
-                <BookCard
-                  key={book.id}
-                  book={book}
-                />
-              ))}
-            </div>
+            {isMobile ? (
+              <div style={booksStyles.booksGrid}>
+                {textbooks.map((book) => (
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                  />
+                ))}
+              </div>
+            ) : (
+              <BookTable books={textbooks} />
+            )}
           </>
         )}
 

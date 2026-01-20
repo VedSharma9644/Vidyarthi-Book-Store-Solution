@@ -214,13 +214,6 @@ const OrderDetailsPage = () => {
               </div>
             )}
             
-            {orderData.tax && (
-              <div style={orderStyles.orderDetailsRow}>
-                <span style={orderStyles.orderDetailsLabel}>Tax</span>
-                <span style={orderStyles.orderDetailsValue}>₹{orderData.tax.toFixed(2)}</span>
-              </div>
-            )}
-            
             <div style={{
               ...orderStyles.orderDetailsRow,
               marginTop: '12px',

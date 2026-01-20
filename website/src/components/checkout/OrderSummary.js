@@ -2,7 +2,6 @@ import React from 'react';
 import { checkoutStyles, colors } from '../../css/checkoutStyles';
 
 const DELIVERY_CHARGE = 300;
-const TAX_RATE = 0.1; // 10%
 
 const OrderSummary = ({ cartItems, onPlaceOrder, isProcessing }) => {
   const calculateSubtotal = () => {
@@ -15,17 +14,12 @@ const OrderSummary = ({ cartItems, onPlaceOrder, isProcessing }) => {
     return cartItems.length > 0 ? DELIVERY_CHARGE : 0;
   };
 
-  const calculateTax = () => {
-    return calculateSubtotal() * TAX_RATE;
-  };
-
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax() + calculateDelivery();
+    return calculateSubtotal() + calculateDelivery();
   };
 
   const subtotal = calculateSubtotal();
   const delivery = calculateDelivery();
-  const tax = calculateTax();
   const total = calculateTotal();
 
   return (
@@ -41,11 +35,6 @@ const OrderSummary = ({ cartItems, onPlaceOrder, isProcessing }) => {
         <div style={checkoutStyles.priceRow}>
           <span style={checkoutStyles.priceLabel}>Delivery Charge:</span>
           <span style={checkoutStyles.priceValue}>₹{delivery.toFixed(2)}</span>
-        </div>
-
-        <div style={checkoutStyles.priceRow}>
-          <span style={checkoutStyles.priceLabel}>Tax (10%):</span>
-          <span style={checkoutStyles.priceValue}>₹{tax.toFixed(2)}</span>
         </div>
 
         <div style={checkoutStyles.priceTotalRow}>

@@ -1,0 +1,137 @@
+# Privacy Policy for Vidyarthi Kart
+
+**Last Updated:** December 3, 2025
+
+## Introduction
+
+Welcome to Vidyarthi Kart ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application ("App").
+
+By using our App, you agree to the collection and use of information in accordance with this policy.
+
+## Information We Collect
+
+### Personal Information
+We collect the following personal information when you register and use our App:
+
+- **Account Information:** Email address, password, mobile phone number
+- **Profile Information:** Full name, school name, class/grade, profile picture
+- **Student Information:** Student names and details (if you are a parent/guardian managing multiple students)
+- **Shipping Information:** Delivery addresses for order fulfillment
+- **Payment Information:** Payment details are processed securely through Razorpay payment gateway. We do not store your complete payment card information on our servers.
+
+### Usage Information
+- **Device Information:** Device type, operating system, unique device identifiers
+- **App Usage Data:** Pages viewed, features used, time spent in the app
+- **Order History:** Details of books ordered, purchase history, order status
+
+### Media and Files
+- **Photos:** Profile pictures and images you choose to upload
+- **Camera Access:** Used only when you choose to take photos for your profile
+
+## How We Use Your Information
+
+We use the collected information for the following purposes:
+
+1. **Account Management:** To create and manage your account, authenticate your identity, and provide access to our services
+2. **Order Processing:** To process and fulfill your book orders, manage your cart, and handle shipping
+3. **Payment Processing:** To process payments securely through our payment gateway partner (Razorpay)
+4. **Communication:** To send you order confirmations, updates, and important notifications about your account
+5. **Customer Support:** To respond to your inquiries, provide customer support, and resolve issues
+6. **App Improvement:** To analyze app usage, improve our services, and enhance user experience
+7. **Legal Compliance:** To comply with applicable laws, regulations, and legal processes
+
+## Data Storage and Security
+
+- Your data is stored securely on our servers hosted on Google Cloud Platform
+- We use industry-standard security measures including encryption, secure authentication, and access controls
+- Payment information is processed securely through Razorpay and is not stored on our servers
+- We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction
+
+## Data Sharing and Disclosure
+
+We do not sell your personal information. We may share your information in the following circumstances:
+
+1. **Service Providers:** We may share information with third-party service providers who assist us in operating our App, including:
+   - Payment processing (Razorpay)
+   - Cloud hosting services (Google Cloud Platform)
+   - Analytics services
+
+2. **Legal Requirements:** We may disclose your information if required by law, court order, or government regulation
+
+3. **Business Transfers:** In the event of a merger, acquisition, or sale of assets, your information may be transferred as part of that transaction
+
+4. **With Your Consent:** We may share your information with your explicit consent
+
+## Your Rights and Choices
+
+You have the following rights regarding your personal information:
+
+- **Access:** You can access and review your personal information through the App's profile section
+- **Update:** You can update your personal information, including profile details and shipping addresses, at any time
+- **Delete:** You can request deletion of your account by contacting us at the email address provided below
+- **Opt-Out:** You can opt out of certain communications, though we may still send you essential service-related messages
+
+## Children's Privacy
+
+Our App is designed for students and their parents/guardians. We take special care to protect the privacy of children:
+
+- We collect minimal information necessary to provide our services
+- Parental consent is required for users under the age of 18
+- We do not knowingly collect personal information from children without appropriate consent
+
+## Third-Party Services
+
+Our App uses the following third-party services:
+
+- **Razorpay:** For secure payment processing. Their privacy policy can be found at [https://razorpay.com/privacy/](https://razorpay.com/privacy/)
+- **Google Cloud Platform:** For cloud hosting and data storage
+- **Expo:** For app development and deployment services
+
+We encourage you to review the privacy policies of these third-party services.
+
+## Permissions We Request
+
+Our App requests the following permissions:
+
+- **Internet Access:** Required to connect to our servers and process orders
+- **Camera:** Used only when you choose to take photos for your profile picture
+- **Photo Library:** Used only when you choose to select photos from your gallery for your profile picture
+- **Storage:** Used to store app data and cache for improved performance
+
+These permissions are requested only when needed, and you can deny them, though some features may not be available.
+
+## Data Retention
+
+We retain your personal information for as long as necessary to:
+- Provide our services to you
+- Comply with legal obligations
+- Resolve disputes and enforce our agreements
+
+When you delete your account, we will delete or anonymize your personal information, except where we are required to retain it for legal purposes.
+
+## Changes to This Privacy Policy
+
+We may update this Privacy Policy from time to time. We will notify you of any changes by:
+- Posting the new Privacy Policy in the App
+- Updating the "Last Updated" date at the top of this policy
+- Sending you a notification (for significant changes)
+
+Your continued use of the App after any changes constitutes acceptance of the updated Privacy Policy.
+
+## Contact Us
+
+If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us at:
+
+**Email:** support@vidyakart.com  
+**App Name:** Vidyarthi Kart  
+**Developer:** Creayaa Technologies
+
+## Consent
+
+By using our App, you consent to our Privacy Policy and agree to its terms. If you do not agree with this policy, please do not use our App.
+
+---
+
+*This Privacy Policy is effective as of the date stated above and applies to all users of the Vidyarthi Kart mobile application.*
+
+

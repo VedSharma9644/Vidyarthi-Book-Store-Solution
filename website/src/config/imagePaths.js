@@ -41,6 +41,11 @@ export const GRADE_IMAGES = {
   DEFAULT: encodeImagePath(`${PUBLIC_IMAGES}/grade/Select Class Image.jpeg`),
 };
 
+// Banner images
+export const BANNER_IMAGES = {
+  HOMEPAGE: encodeImagePath(`${PUBLIC_IMAGES}/banner/DELIVERY IMG.png`), // Main homepage banner
+};
+
 // Default/fallback images
 export const DEFAULT_IMAGES = {
   PROFILE: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBpjxEfE7ea34iS2cRGSWsmeaKsAFJRhbMGl69cHfVqKLFhPihowan-DypyvXbvvn0088j2FSLVvnYQccFUXJ73y1eNXuGDz7KAWV5_t5tguQ_78LpNELkmN9zjgxGwv15mYEGnQ2BLbuOaM5v3bB4ZqMjmnvbwFuvNwUatcbej9LbHH92_fwVOMKk2vqSYRmMUXx-d7urQeB4sjVbew1-CARvegFPvB4-ifYUqGvVa0YgVIlUqEF2rkCV3WZX3WmnVstFVlPqbGTI',

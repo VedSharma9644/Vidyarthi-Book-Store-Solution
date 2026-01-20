@@ -211,14 +211,16 @@ export const checkoutStyles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '24px',
+    position: 'sticky',
+    top: '90px',
+    height: 'fit-content',
+    alignSelf: 'flex-start',
   },
   orderSummaryCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
     padding: '24px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-    position: 'sticky',
-    top: '90px',
     height: 'fit-content',
   },
   placeOrderButton: {

@@ -239,10 +239,21 @@ router.post('/image', upload.single('file'), async (req, res) => {
         uploadedBy: req.body.uploadedBy || 'admin', // You can get from auth token
       };
 
-      // Save to Firestore 'images' collection
+      // Determine which collection to save to
+      // Profile images should go to 'profile-images' collection, not 'images' collection
+      // The 'images' collection is only for admin-uploaded images (banners, etc.)
+      const isProfileImage = 
+        req.body.category === 'profile-images' || 
+        req.body.folderPath === 'profile-images' ||
+        imageMetadata.category === 'profile-images' ||
+        imageMetadata.folderPath === 'profile-images';
+      
+      const collectionName = isProfileImage ? 'profile-images' : 'images';
+
+      // Save to appropriate Firestore collection
       try {
-        const imageRef = await db.collection('images').add(imageMetadata);
-        console.log('Image metadata saved to Firestore with ID:', imageRef.id);
+        const imageRef = await db.collection(collectionName).add(imageMetadata);
+        console.log(`Image metadata saved to Firestore collection '${collectionName}' with ID:`, imageRef.id);
       } catch (firestoreError) {
         console.error('Error saving to Firestore:', firestoreError);
         // Continue even if Firestore save fails - the image is already uploaded

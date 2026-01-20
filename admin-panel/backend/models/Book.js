@@ -8,6 +8,10 @@ class Book {
     this.isbn = data.isbn || '';
     this.description = data.description || '';
     this.price = data.price !== undefined ? parseFloat(data.price) : 0;
+    
+    this.productQuantity = data.productQuantity || '';
+    this.perProductPrice = data.perProductPrice !== undefined ? parseFloat(data.perProductPrice) : null;
+
     this.discountPrice = data.discountPrice !== undefined ? parseFloat(data.discountPrice) : null;
     this.stockQuantity = data.stockQuantity !== undefined ? parseInt(data.stockQuantity) : 0;
     this.coverImageUrl = data.coverImageUrl || '';
@@ -40,6 +44,8 @@ class Book {
       isbn: this.isbn,
       description: this.description,
       price: this.price,
+      productQuantity: this.productQuantity,
+      perProductPrice: this.perProductPrice,
       stockQuantity: this.stockQuantity,
       coverImageUrl: this.coverImageUrl,
       bookType: this.bookType,
@@ -97,11 +103,11 @@ class Book {
       errors.push('Price must be between 0 and 99999.');
     }
 
-    if (this.discountPrice !== null && this.discountPrice !== undefined) {
-      if (isNaN(this.discountPrice) || this.discountPrice < 0 || this.discountPrice > 99999) {
-        errors.push('Discount price must be between 0 and 99999.');
-      }
-    }
+    // if (this.discountPrice !== null && this.discountPrice !== undefined) {
+    //   if (isNaN(this.discountPrice) || this.discountPrice < 0 || this.discountPrice > 99999) {
+    //     errors.push('Discount price must be between 0 and 99999.');
+    //   }
+    // }
 
     if (this.stockQuantity === undefined || this.stockQuantity === null || isNaN(this.stockQuantity)) {
       errors.push('Stock quantity is required.');

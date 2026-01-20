@@ -6,6 +6,7 @@ class PaymentService {
     constructor() {
         // Razorpay client will be initialized after fetching config from Firestore
         this.razorpay = null;
+        this.cachedConfigKey = null; // Track the current API key to detect config changes
     }
 
     /**
@@ -47,15 +48,20 @@ class PaymentService {
 
     /**
      * Initialize Razorpay client with config
+     * Reinitializes if config has changed
      * @returns {Promise<Razorpay>} Razorpay client instance
      */
     async getRazorpayClient() {
-        if (!this.razorpay) {
-            const config = await this.getPaymentGatewayConfig();
+        const config = await this.getPaymentGatewayConfig();
+        
+        // Reinitialize if client doesn't exist or config has changed
+        if (!this.razorpay || this.cachedConfigKey !== config.apiKey) {
+            console.log('Initializing Razorpay client with key:', config.apiKey.substring(0, 10) + '...');
             this.razorpay = new Razorpay({
                 key_id: config.apiKey,
                 key_secret: config.secretKey,
             });
+            this.cachedConfigKey = config.apiKey; // Store current key for comparison
         }
         return this.razorpay;
     }

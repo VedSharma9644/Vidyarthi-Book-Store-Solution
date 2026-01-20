@@ -1,4 +1,5 @@
 import axios from 'axios';
+import authService from './auth';
 
 // Use production backend URL by default, or environment variable if set
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://admin-panel-backend-594708558503.us-central1.run.app';
@@ -9,6 +10,36 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add authentication token to all requests
+api.interceptors.request.use(
+  (config) => {
+    const token = authService.getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Handle 401 errors (unauthorized) - redirect to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      authService.logout();
+      // Redirect to login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Schools API
 export const schoolsAPI = {
@@ -90,6 +121,15 @@ export const ordersAPI = {
   updateStatus: (id, data) => api.put(`/api/orders/${id}/status`, data),
   createShiprocketOrder: (id) => api.post(`/api/orders/${id}/shiprocket`),
   getShiprocketStatus: (id) => api.get(`/api/orders/${id}/shiprocket-status`),
+};
+
+// Email API
+export const emailAPI = {
+  getConfig: () => api.get('/api/email/config'),
+  saveConfig: (data) => api.post('/api/email/config', data),
+  testConfig: (testEmail) => api.post('/api/email/test', { testEmail }),
+  requestPasswordReset: () => api.post('/api/email/request-reset'),
+  resetPassword: (otp, newPassword) => api.post('/api/email/reset-password', { otp, newPassword }),
 };
 
 export default api;

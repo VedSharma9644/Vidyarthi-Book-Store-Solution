@@ -42,6 +42,40 @@ class OrderService {
             // Generate order number
             const orderNumber = this.generateOrderNumber();
 
+            // Prepare shipping address - use provided address or fallback to user's default address
+            let finalShippingAddress = null;
+            if (shippingAddress) {
+                // Use the provided shipping address
+                finalShippingAddress = {
+                    name: shippingAddress.name || (user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}`.trim()
+                        : user.firstName || user.userName || 'Customer'),
+                    phone: shippingAddress.phone || user.phoneNumber || null,
+                    address: shippingAddress.address || null,
+                    city: shippingAddress.city || null,
+                    state: shippingAddress.state || null,
+                    postalCode: shippingAddress.postalCode || null,
+                    country: shippingAddress.country || 'India',
+                };
+                console.log(`✅ Using provided shipping address: ${finalShippingAddress.name}, ${finalShippingAddress.city}`);
+            } else if (user.address && (user.address.address || user.address.city)) {
+                // Fallback to user's default address
+                finalShippingAddress = {
+                    name: user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}`.trim()
+                        : user.firstName || user.userName || 'Customer',
+                    phone: user.phoneNumber || null,
+                    address: user.address.address || null,
+                    city: user.address.city || null,
+                    state: user.address.state || null,
+                    postalCode: user.address.postalCode || null,
+                    country: user.address.country || 'India',
+                };
+                console.log(`⚠️ Using user's default address: ${finalShippingAddress.city}`);
+            } else {
+                console.warn(`⚠️ No shipping address available for order ${orderNumber}`);
+            }
+
             // Create order document
             const orderData = {
                 orderNumber: orderNumber,
@@ -80,8 +114,8 @@ class OrderService {
                 razorpayOrderId: paymentData.razorpayOrderId,
                 razorpayPaymentId: paymentData.razorpayPaymentId,
                 razorpaySignature: paymentData.razorpaySignature,
-                // Shipping information
-                shippingAddress: shippingAddress || user.address || null,
+                // Shipping information - now includes complete address with name and phone
+                shippingAddress: finalShippingAddress,
                 // Tracking (can be added later when shipped)
                 trackingNumber: null,
                 // Timestamps
@@ -96,6 +130,9 @@ class OrderService {
                 itemCount: orderData.items.length,
                 total: orderData.total,
                 orderNumber,
+                hasShippingAddress: !!orderData.shippingAddress,
+                shippingAddressName: orderData.shippingAddress?.name || 'N/A',
+                shippingAddressCity: orderData.shippingAddress?.city || 'N/A',
             });
             
             const orderRef = await this.ordersRef.add(orderData);

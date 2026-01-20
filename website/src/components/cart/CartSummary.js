@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { cartStyles, colors } from '../../css/cartStyles';
 
 const DELIVERY_CHARGE = 300;
-const TAX_RATE = 0.1; // 10%
 
 const CartSummary = ({ cartItems }) => {
   const navigate = useNavigate();
@@ -18,17 +17,12 @@ const CartSummary = ({ cartItems }) => {
     return cartItems.length > 0 ? DELIVERY_CHARGE : 0;
   };
 
-  const calculateTax = () => {
-    return calculateSubtotal() * TAX_RATE;
-  };
-
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax() + calculateDelivery();
+    return calculateSubtotal() + calculateDelivery();
   };
 
   const subtotal = calculateSubtotal();
   const delivery = calculateDelivery();
-  const tax = calculateTax();
   const total = calculateTotal();
 
   const handleCheckout = () => {
@@ -47,11 +41,6 @@ const CartSummary = ({ cartItems }) => {
       <div style={cartStyles.cartSummaryRow}>
         <span style={cartStyles.cartSummaryLabel}>Delivery Charge:</span>
         <span style={cartStyles.cartSummaryValue}>₹{delivery.toFixed(2)}</span>
-      </div>
-
-      <div style={cartStyles.cartSummaryRow}>
-        <span style={cartStyles.cartSummaryLabel}>Tax (10%):</span>
-        <span style={cartStyles.cartSummaryValue}>₹{tax.toFixed(2)}</span>
       </div>
 
       <div style={cartStyles.cartSummaryTotal}>

@@ -16,5 +16,12 @@ router.put('/:id', userController.updateUser);
  */
 router.get('/:id', userController.getUserById);
 
+/**
+ * @route   POST /api/users/:id/profile-image
+ * @desc    Upload profile image for user
+ * @access  Private (should add auth middleware later)
+ */
+router.post('/:id/profile-image', userController.upload, userController.uploadProfileImage);
+
 module.exports = router;
 

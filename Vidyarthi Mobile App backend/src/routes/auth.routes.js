@@ -33,6 +33,22 @@ router.post('/register-mobile', authController.registerMobile);
  */
 router.post('/login-mobile', authController.loginMobile);
 
+/**
+ * @route   POST /api/auth/register
+ * @desc    Register user with email and password
+ * @access  Public
+ * @body    { email: string, password: string, firstName?: string, lastName?: string, schoolName?: string, classStandard?: string }
+ */
+router.post('/register', authController.register);
+
+/**
+ * @route   POST /api/auth/login
+ * @desc    Login with email and password
+ * @access  Public
+ * @body    { email: string, password: string }
+ */
+router.post('/login', authController.login);
+
 module.exports = router;
 
 

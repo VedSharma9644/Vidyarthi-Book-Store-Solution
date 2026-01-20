@@ -3,6 +3,22 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { schoolsAPI, categoriesAPI, booksAPI, gradesAPI, uploadAPI } from '../services/api';
 import './UpsertBook.css';
 
+
+
+
+// disable wheel and arrow change for input fields
+const preventWheelChange = (e) => {
+  e.target.blur();
+};
+const preventArrowChange = (e) => {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+  }
+};
+
+
+
+
 const UpsertBook = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -10,6 +26,8 @@ const UpsertBook = () => {
 
   const [formData, setFormData] = useState({
     Id: bookId || '0',
+    ProductQuantity: '',
+    PerProductPrice: '',
     CoverImageUrl: '',
     Title: '',
     Author: '',
@@ -17,13 +35,14 @@ const UpsertBook = () => {
     ISBN: '',
     Description: '',
     Price: '0.00',
-    DiscountPrice: '',
     StockQuantity: '0',
     BookType: '',
     otherBookType: '',
     SchoolId: '',
     GradeId: '',
     CategoryId: '',
+    
+
   });
 
   const [errors, setErrors] = useState({});
@@ -136,6 +155,8 @@ const UpsertBook = () => {
             
             setFormData({
               Id: book.id,
+              ProductQuantity: book.productQuantity || '',
+              PerProductPrice: book.perProductPrice?.toString() || '',
               CoverImageUrl: book.coverImageUrl || '',
               Title: book.title || '',
               Author: book.author || '',
@@ -143,13 +164,13 @@ const UpsertBook = () => {
               ISBN: book.isbn || '',
               Description: book.description || '',
               Price: book.price?.toString() || '0.00',
-              DiscountPrice: book.discountPrice?.toString() || '',
               StockQuantity: book.stockQuantity?.toString() || '0',
               BookType: book.bookType || '',
               otherBookType: '',
               SchoolId: schoolId,
               GradeId: gradeId,
               CategoryId: book.categoryId || '',
+
             });
             
             // Load grades for the school
@@ -299,13 +320,6 @@ const UpsertBook = () => {
       newErrors.Price = 'Price must be between 0 and 99999.';
     }
     
-    if (formData.DiscountPrice) {
-      const discountPrice = parseFloat(formData.DiscountPrice);
-      if (isNaN(discountPrice) || discountPrice < 0 || discountPrice > 99999) {
-        newErrors.DiscountPrice = 'Discount price must be between 0 and 99999.';
-      }
-    }
-    
     const stockQuantity = parseInt(formData.StockQuantity);
     if (formData.StockQuantity === '' || isNaN(stockQuantity)) {
       newErrors.StockQuantity = 'The StockQuantity field is required.';
@@ -353,13 +367,17 @@ const UpsertBook = () => {
         ISBN: formData.ISBN,
         Description: formData.Description || '',
         Price: parseFloat(formData.Price) || 0,
-        DiscountPrice: formData.DiscountPrice ? parseFloat(formData.DiscountPrice) : null,
+        DiscountPrice: null, // Always set to null - discount price field removed
         StockQuantity: parseInt(formData.StockQuantity) || 0,
         CoverImageUrl: formData.CoverImageUrl || '',
         BookType: formData.BookType === 'OTHER' ? formData.otherBookType : formData.BookType,
         CategoryId: formData.CategoryId,
         GradeId: formData.GradeId,
         SchoolId: formData.SchoolId,
+
+        // ⭐ Additional fields for product quantity and per product price
+        ProductQuantity: formData.ProductQuantity || '',
+        PerProductPrice: formData.PerProductPrice ? parseFloat(formData.PerProductPrice) : null,
       };
       
       // Call API to save book
@@ -443,6 +461,7 @@ const UpsertBook = () => {
                     onChange={handleChange}
                     required
                   />
+
                   {errors.Title && (
                     <span className="text-danger">{errors.Title}</span>
                   )}
@@ -522,10 +541,48 @@ const UpsertBook = () => {
                   )}
                 </div>
 
+                {/* Product Quantity */}
                 <div className="row">
-                  <div className="col-md-6 mb-3">
+                  <div className="col-md-12 mb-3">
+                    <label className="form-label" htmlFor="ProductQuantity">
+                      Product Quantity
+                    </label>
+                    <input
+                      className="form-control"
+                      type="text"
+                      id="ProductQuantity"
+                      name="ProductQuantity"
+                      value={formData.ProductQuantity || ""}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                {/* Per Product Price */}
+                <div className="row">
+                  <div className="col-md-12 mb-3">
+                    <label className="form-label" htmlFor="PerProductPrice">
+                      Per Product Price
+                    </label>
+                    <input
+                      className="form-control"
+                      type="number"
+                      step="0.01"
+                      onWheel={preventWheelChange}
+                      id="PerProductPrice"
+                      name="PerProductPrice"
+                      value={formData.PerProductPrice || ""}
+                      onChange={handleChange}
+                      onKeyDown={preventArrowChange}
+                    />
+                  </div>
+                </div>
+
+                {/* Total Price */}
+                <div className="row">
+                  <div className="col-md-12 mb-3">
                     <label className="form-label" htmlFor="Price">
-                      Price <span className="text-danger">*</span>
+                      Total Price <span className="text-danger">*</span>
                     </label>
                     <input
                       className={`form-control ${errors.Price ? 'is-invalid' : ''}`}
@@ -540,28 +597,14 @@ const UpsertBook = () => {
                       <span className="text-danger">{errors.Price}</span>
                     )}
                   </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label" htmlFor="DiscountPrice">
-                      DiscountPrice
-                    </label>
-                    <input
-                      className={`form-control ${errors.DiscountPrice ? 'is-invalid' : ''}`}
-                      type="text"
-                      id="DiscountPrice"
-                      name="DiscountPrice"
-                      value={formData.DiscountPrice}
-                      onChange={handleChange}
-                    />
-                    {errors.DiscountPrice && (
-                      <span className="text-danger">{errors.DiscountPrice}</span>
-                    )}
-                  </div>
                 </div>
+
+                {/* Additional fields for product quantity and price ends here */}
 
                 <div className="row">
                   <div className="col-md-12 mb-3">
                     <label className="form-label" htmlFor="StockQuantity">
-                      StockQuantity <span className="text-danger">*</span>
+                      Stock Quantity <span className="text-danger">*</span>
                     </label>
                     <input
                       className={`form-control ${errors.StockQuantity ? 'is-invalid' : ''}`}
@@ -571,6 +614,8 @@ const UpsertBook = () => {
                       min="0"
                       value={formData.StockQuantity}
                       onChange={handleChange}
+                      onWheel={preventWheelChange}
+                      onKeyDown={preventArrowChange}
                       required
                     />
                     {errors.StockQuantity && (
@@ -581,7 +626,7 @@ const UpsertBook = () => {
 
                 <div className="mb-3">
                   <label className="form-label" htmlFor="BookType">
-                    BookType <span className="text-danger">*</span>
+                    Product Type <span className="text-danger">*</span>
                   </label>
                   <select
                     className={`form-control ${errors.BookType ? 'is-invalid' : ''}`}

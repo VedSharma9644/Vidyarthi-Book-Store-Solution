@@ -74,21 +74,31 @@ export const getResponsiveHomeStyles = (isMobile, isTablet) => ({
     flex: 1,
     backgroundColor: colors.backgroundLight,
     overflowY: 'auto',
-    paddingTop: isMobile ? '10px' : '20px',
+    paddingTop: 0, // No padding to ensure banner touches header
+    marginTop: 0, // No margin to ensure banner touches header
   },
   homeBannerContainer: {
     width: '100%',
+    marginTop: 0, // No top margin
     marginBottom: 0,
+    paddingTop: 0, // No top padding
+    paddingBottom: 0, // No bottom padding
     backgroundColor: colors.gray100,
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    lineHeight: 0, // Remove any line-height spacing
   },
   homeBannerImage: {
     width: '100%',
     maxHeight: isMobile ? '200px' : isTablet ? '300px' : '400px',
     objectFit: 'cover',
+    display: 'block', // Remove any inline spacing
+    margin: 0, // No margins
+    padding: 0, // No padding
+    verticalAlign: 'top', // Align to top
+    lineHeight: 0, // Remove line-height spacing
   },
   homeBannerLoading: {
     width: '100%',

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { profileStyles, colors } from '../css/profileStyles';
 import { borderRadius } from '../css/theme';
 import { useAuth } from '../contexts/AuthContext';
+import ApiService from '../services/apiService';
 import AddressForm from './checkout/AddressForm';
 import LoadingScreen from './common/LoadingScreen';
 
@@ -18,15 +19,42 @@ const ShippingAddressesPage = () => {
     loadAddresses();
   }, []);
 
-  const loadAddresses = () => {
+  const loadAddresses = async () => {
     try {
       setIsLoading(true);
-      const addressesJson = localStorage.getItem('shippingAddresses');
-      if (addressesJson) {
-        const addresses = JSON.parse(addressesJson);
-        setAddresses(addresses);
-      } else if (user) {
-        // Fallback to user data
+      let addresses = [];
+      
+      // First, try to load from user data (database)
+      try {
+        const userId = user?.id || localStorage.getItem('userId');
+        if (userId) {
+          const userDataResponse = await ApiService.getUserById(userId);
+          if (userDataResponse.success && userDataResponse.data) {
+            const userData = userDataResponse.data;
+            // Check if user has addresses array in database
+            if (userData.addresses && Array.isArray(userData.addresses) && userData.addresses.length > 0) {
+              addresses = userData.addresses;
+              // Sync to localStorage for offline access
+              localStorage.setItem('shippingAddresses', JSON.stringify(addresses));
+              console.log('Loaded addresses from database');
+            }
+          }
+        }
+      } catch (apiError) {
+        console.log('Could not load addresses from database, trying local storage:', apiError);
+      }
+      
+      // If no addresses from database, try localStorage
+      if (addresses.length === 0) {
+        const addressesJson = localStorage.getItem('shippingAddresses');
+        if (addressesJson) {
+          addresses = JSON.parse(addressesJson);
+          console.log('Loaded addresses from local storage');
+        }
+      }
+      
+      // If still no addresses, try fallback to user data
+      if (addresses.length === 0 && user) {
         const userAddress = user.address || {};
         const fallbackAddress = {
           id: 'user-default',
@@ -43,10 +71,10 @@ const ShippingAddressesPage = () => {
           studentRollNumber: '',
           isDefault: true,
         };
-        setAddresses([fallbackAddress]);
-      } else {
-        setAddresses([]);
+        addresses = [fallbackAddress];
       }
+      
+      setAddresses(addresses);
     } catch (error) {
       console.error('Error loading addresses:', error);
       setAddresses([]);
@@ -65,7 +93,7 @@ const ShippingAddressesPage = () => {
     setShowAddForm(true);
   };
 
-  const handleSaveAddress = (formData) => {
+  const handleSaveAddress = async (formData) => {
     try {
       let updatedAddresses = [...addresses];
 
@@ -105,8 +133,44 @@ const ShippingAddressesPage = () => {
         updatedAddresses.push(newAddress);
       }
 
+      // Save to localStorage first
       localStorage.setItem('shippingAddresses', JSON.stringify(updatedAddresses));
       setAddresses(updatedAddresses);
+
+      // Save to API/database
+      try {
+        const userId = user?.id || localStorage.getItem('userId');
+        if (userId) {
+          // Get current user data
+          const userDataResponse = await ApiService.getUserById(userId);
+          const currentUserData = userDataResponse.success && userDataResponse.data 
+            ? userDataResponse.data 
+            : user || {};
+          
+          const updateData = {
+            ...currentUserData,
+            addresses: updatedAddresses,
+          };
+          
+          const updatedUserDataResponse = await ApiService.updateUserProfile(userId, updateData);
+          
+          // Update local storage with the updated user data from server
+          if (updatedUserDataResponse.success && updatedUserDataResponse.data) {
+            const updatedUserData = updatedUserDataResponse.data;
+            localStorage.setItem('userData', JSON.stringify(updatedUserData));
+            console.log('Addresses saved to database successfully');
+          } else {
+            // If API doesn't return updated data, update local storage manually
+            localStorage.setItem('userData', JSON.stringify(updateData));
+            console.log('Addresses saved to database (manual update)');
+          }
+        } else {
+          console.log('User ID not available, saved locally only');
+        }
+      } catch (apiError) {
+        console.error('Could not save to API, saved locally only:', apiError);
+      }
+
       setShowAddForm(false);
       setEditingAddress(null);
     } catch (error) {
@@ -115,12 +179,45 @@ const ShippingAddressesPage = () => {
     }
   };
 
-  const handleDeleteAddress = (addressId) => {
+  const handleDeleteAddress = async (addressId) => {
     if (window.confirm('Are you sure you want to delete this address?')) {
       try {
         const updatedAddresses = addresses.filter(addr => addr.id !== addressId);
+        
+        // Save to localStorage first
         localStorage.setItem('shippingAddresses', JSON.stringify(updatedAddresses));
         setAddresses(updatedAddresses);
+
+        // Save to API/database
+        try {
+          const userId = user?.id || localStorage.getItem('userId');
+          if (userId) {
+            // Get current user data
+            const userDataResponse = await ApiService.getUserById(userId);
+            const currentUserData = userDataResponse.success && userDataResponse.data 
+              ? userDataResponse.data 
+              : user || {};
+            
+            const updateData = {
+              ...currentUserData,
+              addresses: updatedAddresses,
+            };
+            
+            const updatedUserDataResponse = await ApiService.updateUserProfile(userId, updateData);
+            
+            // Update local storage with the updated user data from server
+            if (updatedUserDataResponse.success && updatedUserDataResponse.data) {
+              const updatedUserData = updatedUserDataResponse.data;
+              localStorage.setItem('userData', JSON.stringify(updatedUserData));
+              console.log('Address deleted from database successfully');
+            } else {
+              localStorage.setItem('userData', JSON.stringify(updateData));
+              console.log('Address deleted from database (manual update)');
+            }
+          }
+        } catch (apiError) {
+          console.error('Could not delete from API, deleted locally only:', apiError);
+        }
       } catch (error) {
         console.error('Error deleting address:', error);
         alert('Failed to delete address. Please try again.');
@@ -128,14 +225,47 @@ const ShippingAddressesPage = () => {
     }
   };
 
-  const handleSetDefault = (addressId) => {
+  const handleSetDefault = async (addressId) => {
     try {
       const updatedAddresses = addresses.map(addr => ({
         ...addr,
         isDefault: addr.id === addressId,
       }));
+      
+      // Save to localStorage first
       localStorage.setItem('shippingAddresses', JSON.stringify(updatedAddresses));
       setAddresses(updatedAddresses);
+
+      // Save to API/database
+      try {
+        const userId = user?.id || localStorage.getItem('userId');
+        if (userId) {
+          // Get current user data
+          const userDataResponse = await ApiService.getUserById(userId);
+          const currentUserData = userDataResponse.success && userDataResponse.data 
+            ? userDataResponse.data 
+            : user || {};
+          
+          const updateData = {
+            ...currentUserData,
+            addresses: updatedAddresses,
+          };
+          
+          const updatedUserDataResponse = await ApiService.updateUserProfile(userId, updateData);
+          
+          // Update local storage with the updated user data from server
+          if (updatedUserDataResponse.success && updatedUserDataResponse.data) {
+            const updatedUserData = updatedUserDataResponse.data;
+            localStorage.setItem('userData', JSON.stringify(updatedUserData));
+            console.log('Default address updated in database successfully');
+          } else {
+            localStorage.setItem('userData', JSON.stringify(updateData));
+            console.log('Default address updated in database (manual update)');
+          }
+        }
+      } catch (apiError) {
+        console.error('Could not update default in API, updated locally only:', apiError);
+      }
     } catch (error) {
       console.error('Error setting default address:', error);
       alert('Failed to set default address. Please try again.');

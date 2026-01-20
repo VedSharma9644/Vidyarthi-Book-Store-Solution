@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getResponsiveBooksStyles } from '../../css/booksStyles';
 import { useIsMobile, useIsTablet } from '../../hooks/useMediaQuery';
 import BookCard from './BookCard';
+import BookTable from './BookTable';
 
 const OptionalBundleSection = ({ 
   bundleType, 
@@ -64,16 +65,22 @@ const OptionalBundleSection = ({
         </button>
       </div>
 
-      {/* Bundle Items Grid */}
+      {/* Bundle Items - Table on desktop, Cards on mobile */}
       {isExpanded && (
-        <div style={booksStyles.booksGrid}>
-          {items.map((item) => (
-            <BookCard
-              key={item.id}
-              book={item}
-            />
-          ))}
-        </div>
+        <>
+          {isMobile ? (
+            <div style={booksStyles.booksGrid}>
+              {items.map((item) => (
+                <BookCard
+                  key={item.id}
+                  book={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <BookTable books={items} />
+          )}
+        </>
       )}
     </div>
   );

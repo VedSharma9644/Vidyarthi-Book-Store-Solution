@@ -60,10 +60,10 @@ const Sidebar = ({ isOpen }) => {
               <span className="align-middle">Settings</span>
             </a>
             <ul id="settings" className={`sidebar-dropdown list-unstyled ${openMenus.settings ? 'show' : 'collapse'}`}>
-              <li className="sidebar-item">
-                <a className="sidebar-link" href="/ad/email-config">
+              <li className={`sidebar-item ${isActive('/email-config') ? 'active' : ''}`}>
+                <Link to="/email-config" className="sidebar-link">
                   <i className="fas fa-envelope me-2"></i>Email Configuration
-                </a>
+                </Link>
               </li>
             </ul>
           </li>
@@ -136,57 +136,6 @@ const Sidebar = ({ isOpen }) => {
                 </Link>
               </li>
             </ul>
-          </li>
-
-          {/* Coupons */}
-          <li className="sidebar-item">
-            <a className="sidebar-link" href="/manage-coupon">
-              <i className="align-middle me-2 fas fa-fw fa-tag"></i>
-              <span className="align-middle">Coupons</span>
-            </a>
-          </li>
-
-          {/* CMS Management */}
-          <li className="sidebar-item">
-            <a onClick={(e) => { e.preventDefault(); toggleMenu('slider'); }} className={`sidebar-link ${!openMenus.slider ? 'collapsed' : ''}`} style={{ cursor: 'pointer' }}>
-              <i className="align-middle me-2 fas fa-fw fa-users"></i>
-              <span className="align-middle">CMS Management</span>
-            </a>
-            <ul id="slider" className={`sidebar-dropdown list-unstyled ${openMenus.slider ? 'show' : 'collapse'}`}>
-              <li className="sidebar-item">
-                <a className="sidebar-link" href="/manage-banners">
-                  <i className="fas fa-user-friends me-2"></i>Manage Slider
-                </a>
-              </li>
-            </ul>
-          </li>
-
-          {/* Image Management */}
-          <li className="sidebar-item">
-            <a onClick={(e) => { e.preventDefault(); toggleMenu('images'); }} className={`sidebar-link ${!openMenus.images ? 'collapsed' : ''}`} style={{ cursor: 'pointer' }}>
-              <i className="align-middle me-2 fas fa-fw fa-images"></i>
-              <span className="align-middle">Image Management</span>
-            </a>
-            <ul id="images" className={`sidebar-dropdown list-unstyled ${openMenus.images ? 'show' : 'collapse'}`}>
-              <li className={`sidebar-item ${isActive('/manage-images') ? 'active' : ''}`}>
-                <Link to="/manage-images" className="sidebar-link">
-                  <i className="fas fa-images me-2"></i>Manage Images
-                </Link>
-              </li>
-              <li className={`sidebar-item ${isActive('/upload-image') ? 'active' : ''}`}>
-                <Link to="/upload-image" className="sidebar-link">
-                  <i className="fas fa-upload me-2"></i>Upload Image
-                </Link>
-              </li>
-            </ul>
-          </li>
-
-          {/* Support Tickets */}
-          <li className="sidebar-item">
-            <a className="sidebar-link" href="/admin/tickets-list">
-              <i className="align-middle me-2 fas fa-fw fa-headset"></i>
-              <span className="align-middle">Support Tickets</span>
-            </a>
           </li>
 
           {/* Logout Section */}

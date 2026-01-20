@@ -7,7 +7,7 @@ const getCategoryName = (bookType) => {
   if (!bookType) return 'Other';
   
   const categoryMap = {
-    'TEXTBOOK': 'Mandatory',
+    'TEXTBOOK': 'Textbook',
     'NOTEBOOK': 'Notebook',
     'UNIFORM': 'Uniform',
     'STATIONARY': 'Stationary',
@@ -56,12 +56,26 @@ const CartItem = ({ item }) => {
       <div style={cartStyles.cartItemDetails}>
         {/* Category Badge */}
         <div style={cartStyles.cartItemCategory}>
-          <span style={{
-            ...cartStyles.cartItemCategoryBadge,
-            ...(item.bookType === 'TEXTBOOK' && cartStyles.cartItemCategoryBadgeMandatory),
-          }}>
-            {categoryName}
-          </span>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={cartStyles.cartItemCategoryBadge}>
+              {categoryName}
+            </span>
+            {item.bookType === 'TEXTBOOK' && (
+              <span style={{
+                display: 'inline-block',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                fontWeight: '700',
+                backgroundColor: '#dc2626',
+                color: colors.white,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>
+                Required
+              </span>
+            )}
+          </div>
         </div>
         
         <h3 style={cartStyles.cartItemTitle}>{item.name}</h3>
@@ -73,8 +87,8 @@ const CartItem = ({ item }) => {
             <span style={cartStyles.cartItemPriceValue}>₹{item.price || 0}</span>
           </div>
           <div style={cartStyles.cartItemPriceRow}>
-            <span style={cartStyles.cartItemPriceLabel}>Quantity:</span>
-            <span style={cartStyles.cartItemPriceValue}>{item.quantity}</span>
+            <span style={cartStyles.cartItemPriceLabel}>Pieces in Bundle:</span>
+            <span style={cartStyles.cartItemPriceValue}>{item.bundlePieceCount || item.quantity || 0}</span>
           </div>
           <div style={{
             ...cartStyles.cartItemPriceRow,

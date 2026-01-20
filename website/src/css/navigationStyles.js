@@ -107,17 +107,12 @@ export const getResponsiveNavigationStyles = (isMobile, isTablet) => ({
     alignItems: 'center',
     paddingLeft: '12px',
     paddingRight: '12px',
-    paddingTop: '6px',
-    paddingBottom: '6px',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: borderRadius.md,
-    height: isMobile ? '36px' : isTablet ? '44px' : '40px',
-    width: isMobile ? '36px' : isTablet ? '44px' : '40px',
   },
   topNavUserName: {
     fontSize: isMobile ? '12px' : isTablet ? '14px' : '14px',
     fontWeight: '500',
     color: colors.white,
+    opacity: 0.95,
   },
   // Mobile menu
   mobileMenuToggle: {

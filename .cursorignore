@@ -1,0 +1,9 @@
+# Exclude node_modules from analysis
+node_modules/
+**/node_modules/**
+
+# Exclude Gradle build files in node_modules
+**/node_modules/**/android/build.gradle
+**/node_modules/**/android/**/*.gradle
+
+

@@ -1,6 +1,7 @@
 const smsService = require('../services/smsService');
 const otpStorage = require('../services/otpStorage');
 const userService = require('../services/userService');
+const bcrypt = require('bcrypt');
 
 /**
  * Send OTP to mobile number
@@ -75,7 +76,7 @@ const sendOtp = async (req, res) => {
  */
 const registerMobile = async (req, res) => {
     try {
-        const { mobileNumber, otp, firstName, lastName, schoolName, classStandard, email } = req.body;
+        const { mobileNumber, otp, firstName, lastName, userName, schoolName, classStandard, email } = req.body;
 
         // Validation
         if (!mobileNumber || !otp) {
@@ -130,6 +131,7 @@ const registerMobile = async (req, res) => {
             mobileNumber: formattedNumber,
             firstName: firstName || null,
             lastName: lastName || null,
+            userName: userName || null, // Pass userName if provided
             email: email || null,
             schoolName: schoolName || null,
             classStandard: classStandard || null,
@@ -246,6 +248,167 @@ const loginMobile = async (req, res) => {
 };
 
 /**
+ * Register user with email and password
+ */
+const register = async (req, res) => {
+    try {
+        const { email, password, firstName, lastName, schoolName, classStandard } = req.body;
+
+        // Validation
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required',
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format',
+            });
+        }
+
+        // Validate password length
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters',
+            });
+        }
+
+        // Check if user already exists
+        const existingUser = await userService.getUserByEmail(email.trim().toLowerCase());
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already registered with this email. Please login instead.',
+            });
+        }
+
+        // Hash password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // Create user in Firestore
+        const user = await userService.createUser({
+            email: email.trim().toLowerCase(),
+            password: hashedPassword,
+            firstName: firstName || null,
+            lastName: lastName || null,
+            schoolName: schoolName || null,
+            classStandard: classStandard || null,
+            roleName: 'Customer',
+        });
+
+        // TODO: Generate JWT token (next phase)
+        const token = 'temp_token_will_be_replaced_with_jwt';
+
+        res.json({
+            success: true,
+            message: 'User registered successfully',
+            user: {
+                id: user.id,
+                userName: user.userName,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                schoolName: user.schoolName,
+                classStandard: user.classStandard,
+            },
+            token,
+        });
+    } catch (error) {
+        console.error('Register Error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Registration failed',
+        });
+    }
+};
+
+/**
+ * Login with email and password
+ */
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Validation
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required',
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format',
+            });
+        }
+
+        // Fetch user from Firestore
+        const user = await userService.getUserByEmail(email.trim().toLowerCase());
+        
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password',
+            });
+        }
+
+        // Check if user has a password (for email/password login)
+        if (!user.password) {
+            return res.status(401).json({
+                success: false,
+                message: 'This account was created with mobile OTP. Please use mobile login.',
+            });
+        }
+
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password',
+            });
+        }
+
+        // TODO: Generate JWT token (next phase)
+        const token = 'temp_token_will_be_replaced_with_jwt';
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            user: {
+                id: user.id,
+                userName: user.userName,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                schoolName: user.schoolName,
+                classStandard: user.classStandard,
+            },
+            token,
+        });
+    } catch (error) {
+        console.error('Login Error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Login failed',
+        });
+    }
+};
+
+/**
  * Test endpoint
  */
 const testAuth = async (req, res) => {
@@ -260,6 +423,8 @@ module.exports = {
     sendOtp,
     registerMobile,
     loginMobile,
+    register,
+    login,
     testAuth,
 };
 

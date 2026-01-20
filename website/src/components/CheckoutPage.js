@@ -1,13 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkoutStyles, colors } from '../css/checkoutStyles';
-import { getProductImageByCategory } from '../config/imagePaths';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../contexts/ModalContext';
 import LoadingScreen from './common/LoadingScreen';
 import OrderSummary from './checkout/OrderSummary';
 import AddressSection from './checkout/AddressSection';
-import PaymentSection from './checkout/PaymentSection';
+import CartTable from './cart/CartTable';
+import CartItem from './cart/CartItem';
+
+// Helper function to format category name
+const getCategoryName = (bookType) => {
+  if (!bookType) return 'Other';
+  
+  const categoryMap = {
+    'TEXTBOOK': 'Textbooks',
+    'NOTEBOOK': 'Notebooks',
+    'UNIFORM': 'Uniforms',
+    'STATIONARY': 'Stationary',
+    'STATIONERY': 'Stationery',
+    'OTHER': 'Other',
+  };
+  
+  return categoryMap[bookType.toUpperCase()] || bookType.charAt(0) + bookType.slice(1).toLowerCase().replace(/_/g, ' ');
+};
 
 // Load Razorpay script
 const loadRazorpayScript = () => {
@@ -28,10 +46,13 @@ const loadRazorpayScript = () => {
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showError, showSuccess, showWarning } = useModal();
+  const isMobile = useIsMobile();
   const [cartItems, setCartItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
     phone: '',
@@ -60,14 +81,27 @@ const CheckoutPage = () => {
         const items = (result.data.items || []).map(item => ({
           id: item.itemId,
           itemId: item.itemId,
-          title: item.title || 'Unknown Item',
+          name: item.title || 'Unknown Item',
+          title: item.title || 'Unknown Item', // Keep for backward compatibility
           price: item.price || 0,
           quantity: item.quantity || 1,
+          bundlePieceCount: item.bundlePieceCount || item.piecesInBundle || null,
           image: item.coverImageUrl || '',
           subtotal: item.subtotal || (item.price || 0) * (item.quantity || 1),
+          bookType: item.bookType || 'OTHER',
         }));
         
         setCartItems(items);
+        
+        // Initialize expanded categories - expand all by default
+        const categories = {};
+        items.forEach(item => {
+          const category = item.bookType || 'OTHER';
+          if (categories[category] === undefined) {
+            categories[category] = true; // Expand by default
+          }
+        });
+        setExpandedCategories(categories);
       } else {
         setCartItems([]);
         if (result.message) {
@@ -91,37 +125,53 @@ const CheckoutPage = () => {
     return cartItems.length > 0 ? 300 : 0;
   };
 
-  const calculateTax = () => {
-    return calculateSubtotal() * 0.1;
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateDelivery();
   };
 
-  const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax() + calculateDelivery();
+  // Group items by category
+  const groupItemsByCategory = () => {
+    const grouped = {};
+    cartItems.forEach(item => {
+      const category = item.bookType || 'OTHER';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(item);
+    });
+    return grouped;
+  };
+
+  const toggleCategory = (category) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
   };
 
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
-      alert('Your cart is empty. Please add items before placing an order.');
+      showWarning('Your cart is empty. Please add items before placing an order.');
       return;
     }
 
     // Validate shipping address
     if (!shippingAddress.name || !shippingAddress.address || !shippingAddress.city) {
-      alert('Please select a shipping address before placing your order.');
+      showWarning('Please select a shipping address before placing your order.');
       return;
     }
 
     try {
       setIsProcessing(true);
 
-      const totalAmount = calculateTotal() * 100; // Convert to paise
+      const totalAmount = calculateTotal(); // Amount in rupees (backend will convert to paise)
       const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Create Razorpay order
       const orderResult = await ApiService.createPaymentOrder(totalAmount, receipt);
 
       if (!orderResult.success || !orderResult.data) {
-        alert(orderResult.message || 'Failed to create payment order');
+        showError(orderResult.message || 'Failed to create payment order');
         setIsProcessing(false);
         return;
       }
@@ -129,7 +179,7 @@ const CheckoutPage = () => {
       const orderData = orderResult.data;
 
       if (!orderData.keyId || !orderData.orderId || !orderData.amount) {
-        alert('Invalid payment order data. Please try again.');
+        showError('Invalid payment order data. Please try again.');
         setIsProcessing(false);
         return;
       }
@@ -141,7 +191,7 @@ const CheckoutPage = () => {
 
       // Ensure Razorpay is loaded
       if (!window.Razorpay) {
-        alert('Payment gateway failed to load. Please refresh the page and try again.');
+        showError('Payment gateway failed to load. Please refresh the page and try again.');
         setIsProcessing(false);
         return;
       }
@@ -181,22 +231,24 @@ const CheckoutPage = () => {
               console.log('Order creation result:', orderResult);
 
               if (orderResult.success) {
-                alert(
-                  `Payment Successful!\n\nYour order has been placed successfully!\n\nOrder Number: ${orderResult.data?.orderNumber || response.razorpay_order_id}`
+                showSuccess(
+                  `Your order has been placed successfully!\n\nOrder Number: ${orderResult.data?.orderNumber || response.razorpay_order_id}`,
+                  'Payment Successful!'
                 );
                 navigate('/');
               } else {
-                alert(
-                  `Payment Verified\n\nYour payment was successful, but there was an issue saving your order. Please contact support with Order ID: ${response.razorpay_order_id}`
+                showWarning(
+                  `Your payment was successful, but there was an issue saving your order. Please contact support with Order ID: ${response.razorpay_order_id}`,
+                  'Payment Verified'
                 );
                 navigate('/');
               }
             } else {
-              alert('Payment Verification Failed: ' + (verifyResult.message || 'Please contact support.'));
+              showError('Payment Verification Failed: ' + (verifyResult.message || 'Please contact support.'));
             }
           } catch (error) {
             console.error('Error processing payment:', error);
-            alert('Error processing payment. Please contact support.');
+            showError('Error processing payment. Please contact support.');
           } finally {
             setIsProcessing(false);
           }
@@ -231,18 +283,18 @@ const CheckoutPage = () => {
         const razorpay = new window.Razorpay(options);
         razorpay.on('payment.failed', function (response) {
           console.error('Payment failed:', response.error);
-          alert(`Payment Failed: ${response.error.description || 'Please try again.'}`);
+          showError(`Payment Failed: ${response.error.description || 'Please try again.'}`);
           setIsProcessing(false);
         });
         razorpay.open();
       } catch (error) {
         console.error('Error opening Razorpay:', error);
-        alert('Failed to open payment gateway. Please try again.');
+        showError('Failed to open payment gateway. Please try again.');
         setIsProcessing(false);
       }
     } catch (error) {
       console.error('Error initiating payment:', error);
-      alert('Failed to initiate payment. Please try again.');
+      showError('Failed to initiate payment. Please try again.');
       setIsProcessing(false);
     }
   };
@@ -338,76 +390,110 @@ const CheckoutPage = () => {
           {/* Order Items */}
           <div style={checkoutStyles.checkoutSection}>
             <h2 style={checkoutStyles.checkoutSectionTitle}>Order Items</h2>
-            <div style={checkoutStyles.orderItemsList}>
-              {cartItems.map((item) => {
-                const imageUri = item.image && item.image.trim() !== '' ? item.image : null;
-                const fallbackImage = getProductImageByCategory(item.bookType || item.category);
+            
+            {/* Category-wise grouped items */}
+            {(() => {
+              const groupedItems = groupItemsByCategory();
+              const categories = Object.keys(groupedItems).sort((a, b) => {
+                // Sort: TEXTBOOK first, then others alphabetically
+                if (a === 'TEXTBOOK') return -1;
+                if (b === 'TEXTBOOK') return 1;
+                return a.localeCompare(b);
+              });
+
+              return categories.map((category) => {
+                const items = groupedItems[category];
+                const isExpanded = expandedCategories[category] !== false; // Default to true
+                const categoryName = getCategoryName(category);
+
                 return (
-                  <div key={item.id} style={checkoutStyles.orderItem}>
-                    {imageUri ? (
-                      <img
-                        src={imageUri}
-                        alt={item.title}
-                        style={checkoutStyles.orderItemImage}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          if (e.target.nextSibling) {
-                            e.target.nextSibling.style.display = 'block';
-                          }
-                        }}
-                      />
-                    ) : null}
-                    <img
-                      src={fallbackImage}
-                      alt={item.title || 'Product'}
+                  <div key={category} style={{ marginBottom: '24px' }}>
+                    {/* Category Header */}
+                    <div
                       style={{
-                        ...checkoutStyles.orderItemImage,
-                        display: imageUri ? 'none' : 'block',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        backgroundColor: colors.gray50,
+                        borderRadius: '8px',
+                        border: `1px solid ${colors.borderLight}`,
+                        cursor: 'pointer',
+                        marginBottom: isExpanded ? '12px' : '0',
+                        transition: 'background-color 0.2s ease',
                       }}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        if (e.target.nextSibling) {
-                          e.target.nextSibling.style.display = 'flex';
-                        }
+                      onClick={() => toggleCategory(category)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = colors.gray100;
                       }}
-                    />
-                    <div style={{
-                      ...checkoutStyles.orderItemImagePlaceholder,
-                      display: 'none',
-                    }}>
-                      📚
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = colors.gray50;
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          fontSize: '20px',
+                          transition: 'transform 0.2s ease',
+                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        }}>
+                          ▶
+                        </span>
+                        <h3 style={{
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: colors.textPrimary,
+                          margin: 0,
+                        }}>
+                          {categoryName}
+                        </h3>
+                        <span style={{
+                          fontSize: '14px',
+                          color: colors.textSecondary,
+                          marginLeft: '8px',
+                        }}>
+                          ({items.length} item{items.length !== 1 ? 's' : ''})
+                        </span>
+                      </div>
                     </div>
-                    <div style={checkoutStyles.orderItemDetails}>
-                      <h3 style={checkoutStyles.orderItemTitle}>{item.title}</h3>
-                      <p style={checkoutStyles.orderItemQuantity}>
-                        Quantity: {item.quantity} × ₹{item.price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div style={checkoutStyles.orderItemPrice}>
-                      ₹{(item.subtotal || (item.price * item.quantity)).toFixed(2)}
-                    </div>
+
+                    {/* Category Items - Table on desktop, Cards on mobile */}
+                    {isExpanded && (
+                      <>
+                        {isMobile ? (
+                          <div>
+                            {items.map((item) => (
+                              <CartItem
+                                key={item.id}
+                                item={item}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <CartTable
+                            items={items}
+                          />
+                        )}
+                      </>
+                    )}
                   </div>
                 );
-              })}
-            </div>
+              });
+            })()}
           </div>
-
-          {/* Shipping Address */}
-          <AddressSection
-            shippingAddress={shippingAddress}
-            onAddressChange={handleAddressChange}
-          />
-
-          {/* Payment Method */}
-          <PaymentSection />
         </div>
 
-        {/* Right Column - Order Summary */}
+        {/* Right Column - Order Summary & Shipping Address */}
         <div style={checkoutStyles.checkoutSidebar}>
           <OrderSummary
             cartItems={cartItems}
             onPlaceOrder={handlePlaceOrder}
             isProcessing={isProcessing}
+          />
+          
+          {/* Shipping Address */}
+          <AddressSection
+            shippingAddress={shippingAddress}
+            onAddressChange={handleAddressChange}
           />
         </div>
       </div>
