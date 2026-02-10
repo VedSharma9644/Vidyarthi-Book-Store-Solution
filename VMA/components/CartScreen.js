@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
+import { getOptionalTypeTitle, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
 
 const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   const [cartItems, setCartItems] = useState([]);
@@ -23,8 +24,10 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   
   // State for dropdown expansion (open by default)
   const [expandedCategories, setExpandedCategories] = useState({
+    optionalFirst: true,
     mandatoryTextbooks: true,
-    optionalItems: true,
+    mandatoryNotebooks: true,
+    optionalRest: true,
   });
   
   // State for individual optional bundle expansion (open by default)
@@ -43,14 +46,17 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
         const items = (result.data.items || []).map(item => {
           // Filter out "N/A" values and treat them as empty
           
+          const quantity = item.quantity || 1;
+          const productQuantity = item.productQuantity != null ? Number(item.productQuantity) : 1;
           return {
             id: item.itemId,
             itemId: item.itemId,
             name: item.title || 'Unknown Item',
             price: item.price || 0,
-            quantity: item.quantity || 1,
+            quantity,
+            productQuantity, // Units per bundle (e.g. 3 pens per bundle)
             image: item.coverImageUrl || '',
-            subtotal: (item.price || 0) * (item.quantity || 1),
+            subtotal: (item.price || 0) * quantity,
             bookType: item.bookType || '', // Store bookType to identify textbooks
           };
         });
@@ -89,19 +95,14 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
     }
   }, [cartItems]);
 
-  // Check if item is a textbook (mandatory/bundled item)
-  // Note: All items are stored in the "books" collection in Firebase.
-  // We distinguish textbooks from optional items (stationery, uniforms, etc.) 
-  // by checking the bookType field: 'TEXTBOOK' = mandatory, others = optional
-  const isTextbook = (item) => {
-    // If bookType is missing, we can't determine if it's a textbook
-    // In this case, we'll default to NOT being a textbook (show delete button)
-    // The backend should populate bookType automatically, but this is a safety check
+  // Check if item is mandatory (cannot remove; bundled with grade)
+  // Mandatory types: TEXTBOOK (Mandatory Textbook), MANDATORY_NOTEBOOK (Mandatory Notebook)
+  const isMandatory = (item) => {
     if (!item.bookType) {
       console.warn('Item missing bookType:', item.itemId, item.name);
-      return false; // Default to optional if bookType is missing
+      return false;
     }
-    return item.bookType === 'TEXTBOOK';
+    return item.bookType === 'TEXTBOOK' || item.bookType === 'MANDATORY_NOTEBOOK';
   };
 
   // Update quantity using API
@@ -110,13 +111,13 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
       const item = cartItems.find(i => i.itemId === itemId);
       if (!item) return;
 
-      // For textbooks, prevent quantity from going below 1
-      const minQuantity = isTextbook(item) ? 1 : 0;
+      // For mandatory items, prevent quantity from going below 1
+      const minQuantity = isMandatory(item) ? 1 : 0;
       const newQuantity = Math.max(minQuantity, item.quantity + change);
       
-      // For textbooks, don't allow removing by decreasing quantity
-      if (isTextbook(item) && newQuantity < 1) {
-        Alert.alert('Cannot Remove', 'Textbooks are mandatory items and cannot be removed from the cart.');
+      // For mandatory items, don't allow removing by decreasing quantity
+      if (isMandatory(item) && newQuantity < 1) {
+        Alert.alert('Cannot Remove', 'Mandatory items (textbooks & notebooks) cannot be removed from the cart.');
         return;
       }
       
@@ -148,9 +149,9 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
     // Find the item to check if it's a textbook
     const item = cartItems.find(i => i.itemId === itemId);
     
-    // Prevent removing textbooks
-    if (item && isTextbook(item)) {
-      Alert.alert('Cannot Remove', 'Textbooks are mandatory items and cannot be removed from the cart.');
+    // Prevent removing mandatory items
+    if (item && isMandatory(item)) {
+      Alert.alert('Cannot Remove', 'Mandatory items (textbooks & notebooks) cannot be removed from the cart.');
       return;
     }
 
@@ -211,17 +212,20 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   // Group cart items by category
   const groupItemsByCategory = () => {
     const textbooks = [];
+    const mandatoryNotebooks = [];
     const optionalByType = {};
     
     cartItems.forEach(item => {
-      if (isTextbook(item)) {
+      if (item.bookType === 'TEXTBOOK') {
         textbooks.push(item);
+      } else if (item.bookType === 'MANDATORY_NOTEBOOK') {
+        mandatoryNotebooks.push(item);
       } else {
         const type = item.bookType || 'OTHER';
         if (!optionalByType[type]) {
           optionalByType[type] = {
             type: type,
-            title: type.charAt(0) + type.slice(1).toLowerCase(),
+            title: getOptionalTypeTitle(type),
             items: [],
           };
         }
@@ -229,7 +233,7 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
       }
     });
     
-    return { textbooks, optionalByType };
+    return { textbooks, mandatoryNotebooks, optionalByType };
   };
 
   const toggleCategory = (category) => {
@@ -386,9 +390,79 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
               
               {/* Cart Items - Grouped by Category */}
               {(() => {
-                const { textbooks, optionalByType } = groupItemsByCategory();
+                const { textbooks, mandatoryNotebooks, optionalByType } = groupItemsByCategory();
+                const optionalGroups = Object.values(optionalByType);
+                const optionalFirst = getOptionalBundlesFirst(optionalGroups);
+                const optionalRest = getOptionalBundlesRest(optionalGroups);
                 return (
                   <>
+                    {/* Optional 1–4 (top when available) */}
+                    {optionalFirst.length > 0 && (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => toggleCategory('optionalFirst')}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingHorizontal: 16,
+                            paddingTop: 12,
+                            paddingBottom: 8,
+                          }}
+                        >
+                          <Text style={{ color: '#0e1b16', fontSize: 18, fontWeight: 'bold' }}>
+                            Optional 1–4 ({optionalFirst.reduce((s, g) => s + g.items.length, 0)})
+                          </Text>
+                          <Text style={{ fontSize: 16, color: '#06412c' }}>
+                            {(expandedCategories.optionalFirst ?? true) ? '▼' : '▶'}
+                          </Text>
+                        </TouchableOpacity>
+                        {(expandedCategories.optionalFirst ?? true) && optionalFirst.map((group) => (
+                          <View key={group.type} style={{ marginBottom: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => toggleBundleExpansion(group.type)}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingHorizontal: 16,
+                                paddingTop: 8,
+                                paddingBottom: 4,
+                              }}
+                            >
+                              <Text style={{ fontSize: 16, fontWeight: '600', color: '#06412c' }}>
+                                {group.title} ({group.items.length})
+                              </Text>
+                              <Text style={{ fontSize: 14, color: '#06412c' }}>
+                                {(expandedBundles[group.type] ?? true) ? '▼' : '▶'}
+                              </Text>
+                            </TouchableOpacity>
+                            {(expandedBundles[group.type] ?? true) && (
+                              <View style={styles.cartItemsContainer}>
+                                {group.items.map((item) => {
+                                  const imageUri = item.image && item.image.trim() !== '' ? item.image : null;
+                                  return (
+                                    <View key={item.itemId || item.id} style={styles.cartItem}>
+                                      <View style={{ width: 80, height: 80, borderRadius: 8, backgroundColor: '#e7f3ef', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginRight: 12 }}>
+                                        {imageUri ? <Image source={{ uri: imageUri }} style={{ width: 80, height: 80 }} resizeMode="cover" onError={() => {}} /> : <Text style={{ color: '#4d997e', fontSize: 32 }}>📦</Text>}
+                                      </View>
+                                      <View style={styles.itemDetails}>
+                                        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                                        <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                                          Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
+                                        </Text>
+                                        <Text style={styles.itemPrice}>₹{(item.price || 0).toFixed(2)}</Text>
+                                      </View>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </>
+                    )}
+
                     {/* Mandatory Textbooks Section */}
                     {textbooks.length > 0 && (
                       <>
@@ -450,35 +524,24 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                         <Text style={styles.itemName} numberOfLines={2}>
                           {item.name}
                         </Text>
-
+                        <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                          Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
+                        </Text>
                         <Text style={styles.itemPrice}>
                           ₹{(item.price || 0).toFixed(2)}
                         </Text>
                       </View>
                       <View style={styles.quantityControls}>
-                        {/* Show quantity as read-only for all items */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={{ 
-                            color: '#666', 
-                            fontSize: 14,
-                            fontWeight: '500',
-                            marginRight: 8,
-                          }}>
-                            Qty: {item.quantity}
-                          </Text>
-                          {isTextbook(item) && (
-                            <Text style={{ 
-                              color: '#4d997e', 
-                              fontSize: 12,
-                              backgroundColor: '#e7f3ef',
-                              paddingHorizontal: 8,
-                              paddingVertical: 4,
-                              borderRadius: 4,
-                            }}>
-                              Bundled
-                            </Text>
-                          )}
-                        </View>
+                        <Text style={{ 
+                          color: '#4d997e', 
+                          fontSize: 12,
+                          backgroundColor: '#e7f3ef',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 4,
+                        }}>
+                          Bundled
+                        </Text>
                       </View>
                     </View>
                   );
@@ -488,11 +551,11 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                       </>
                     )}
 
-                    {/* Optional Items by Type */}
-                    {Object.keys(optionalByType).length > 0 && (
+                    {/* Mandatory Notebooks Section */}
+                    {mandatoryNotebooks.length > 0 && (
                       <>
                         <TouchableOpacity
-                          onPress={() => toggleCategory('optionalItems')}
+                          onPress={() => toggleCategory('mandatoryNotebooks')}
                           style={{
                             flexDirection: 'row',
                             alignItems: 'center',
@@ -507,19 +570,106 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                             fontSize: 18,
                             fontWeight: 'bold',
                           }}>
-                            Optional Items ({Object.values(optionalByType).reduce((sum, group) => sum + group.items.length, 0)})
+                            Mandatory Notebooks ({mandatoryNotebooks.length})
                           </Text>
                           <Text style={{
                             fontSize: 16,
                             color: '#06412c',
                           }}>
-                            {expandedCategories.optionalItems ? '▼' : '▶'}
+                            {expandedCategories.mandatoryNotebooks ? '▼' : '▶'}
                           </Text>
                         </TouchableOpacity>
                         
-                        {expandedCategories.optionalItems && (
+                        {expandedCategories.mandatoryNotebooks && (
+                          <View style={styles.cartItemsContainer}>
+                            {mandatoryNotebooks.map((item) => {
+                              const imageUri = item.image && item.image.trim() !== '' ? item.image : null;
+                              return (
+                                <View key={item.itemId || item.id} style={styles.cartItem}>
+                                  <View style={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: 8,
+                                    backgroundColor: '#e7f3ef',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    overflow: 'hidden',
+                                    marginRight: 12,
+                                  }}>
+                                    {imageUri ? (
+                                      <Image 
+                                        source={{ uri: imageUri }} 
+                                        style={{ width: 80, height: 80 }}
+                                        resizeMode="cover"
+                                        onError={() => console.log('Image load error for:', item.name)}
+                                      />
+                                    ) : (
+                                      <Text style={{ color: '#4d997e', fontSize: 32 }}>📦</Text>
+                                    )}
+                                  </View>
+                                  <View style={styles.itemDetails}>
+                                    <Text style={styles.itemName} numberOfLines={2}>
+                                      {item.name}
+                                    </Text>
+                                    <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                                      Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
+                                    </Text>
+                                    <Text style={styles.itemPrice}>
+                                      ₹{(item.price || 0).toFixed(2)}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.quantityControls}>
+                                    <Text style={{ 
+                                      color: '#4d997e', 
+                                      fontSize: 12,
+                                      backgroundColor: '#e7f3ef',
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 4,
+                                      borderRadius: 4,
+                                    }}>
+                                      Bundled
+                                    </Text>
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+                      </>
+                    )}
+
+                    {/* Other optional (Notebook, Uniform, etc.) */}
+                    {optionalRest.length > 0 && (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => toggleCategory('optionalRest')}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingHorizontal: 16,
+                            paddingTop: (textbooks.length > 0 || mandatoryNotebooks.length > 0 || optionalFirst.length > 0) ? 16 : 12,
+                            paddingBottom: 8,
+                          }}
+                        >
+                          <Text style={{
+                            color: '#0e1b16',
+                            fontSize: 18,
+                            fontWeight: 'bold',
+                          }}>
+                            Other optional ({optionalRest.reduce((sum, group) => sum + group.items.length, 0)})
+                          </Text>
+                          <Text style={{
+                            fontSize: 16,
+                            color: '#06412c',
+                          }}>
+                            {expandedCategories.optionalRest ? '▼' : '▶'}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        {expandedCategories.optionalRest && (
                           <>
-                            {Object.values(optionalByType).map((group) => (
+                            {optionalRest.map((group) => (
                               <View key={group.type} style={{ marginBottom: 8 }}>
                                 <TouchableOpacity
                                   onPress={() => toggleBundleExpansion(group.type)}
@@ -579,21 +729,12 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                                           <Text style={styles.itemName} numberOfLines={2}>
                                             {item.name}
                                           </Text>
+                                          <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                                            Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
+                                          </Text>
                                           <Text style={styles.itemPrice}>
                                             ₹{(item.price || 0).toFixed(2)}
                                           </Text>
-                                        </View>
-                                        <View style={styles.quantityControls}>
-                                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Text style={{ 
-                                              color: '#666', 
-                                              fontSize: 14,
-                                              fontWeight: '500',
-                                              marginRight: 8,
-                                            }}>
-                                              Qty: {item.quantity}
-                                            </Text>
-                                          </View>
                                         </View>
                                       </View>
                                     );

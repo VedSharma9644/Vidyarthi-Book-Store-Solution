@@ -291,6 +291,20 @@ class ApiService {
     }
   }
 
+  /**
+   * Add multiple items to cart in one request (replaces cart). Use for fast add-from-grade.
+   * @param {Array<{ itemId: string, quantity: number }>} items
+   * @returns {Promise<{ success, data?, addedCount?, message? }>}
+   */
+  async addItemsToCart(items) {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.CART.ADD_ITEMS, { items });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async removeCartItem(itemId) {
     try {
       const response = await apiClient.delete(`${API_CONFIG.ENDPOINTS.CART.REMOVE}/${itemId}`);
@@ -377,6 +391,28 @@ class ApiService {
   }
 
   // Orders APIs
+  async validateCartForCheckout() {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.VALIDATE_CART);
+      return response.data;
+    } catch (error) {
+      if (error.response?.data) {
+        return {
+          success: false,
+          valid: false,
+          message: error.response.data.message || 'Cart validation failed',
+          code: error.response.data.code,
+          insufficientBundles: error.response.data.insufficientBundles ?? null,
+        };
+      }
+      return {
+        success: false,
+        valid: false,
+        message: error.request ? 'Cannot connect to server.' : (error.message || 'Failed to validate cart'),
+      };
+    }
+  }
+
   async createOrder(paymentData, shippingAddress = null) {
     try {
       // Get userId from storage as fallback (header is set by interceptor)
@@ -390,10 +426,12 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Create order API Error:', error.message);
-      if (error.response) {
+      if (error.response?.data) {
         return {
           success: false,
           message: error.response.data?.message || 'Failed to create order',
+          code: error.response.data?.code,
+          insufficientBundles: error.response.data?.insufficientBundles ?? null,
         };
       } else if (error.request) {
         return {
@@ -528,6 +566,21 @@ class ApiService {
     }
   }
 
+  async getSubgradesByGradeId(gradeId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.SUBGRADES.GET_ALL, {
+        params: { gradeId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get subgrades API Error:', error.message);
+      if (error.response) {
+        return { success: false, message: error.response?.data?.message || 'Failed to fetch sections', data: [] };
+      }
+      return { success: false, message: 'Failed to fetch sections.', data: [] };
+    }
+  }
+
   // Categories APIs
   async getCategoriesByGradeId(gradeId) {
     try {
@@ -556,6 +609,21 @@ class ApiService {
           data: [],
         };
       }
+    }
+  }
+
+  async getCategoriesBySubgradeId(subgradeId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.CATEGORIES.GET_ALL, {
+        params: { subgradeId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get categories by subgrade API Error:', error.message);
+      if (error.response) {
+        return { success: false, message: error.response?.data?.message || 'Failed to fetch categories', data: [] };
+      }
+      return { success: false, message: 'Failed to fetch categories.', data: [] };
     }
   }
 

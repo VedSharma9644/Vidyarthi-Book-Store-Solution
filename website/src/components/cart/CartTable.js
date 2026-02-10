@@ -1,22 +1,7 @@
 import React, { useState } from 'react';
 import { colors } from '../../css/theme';
 import { getProductImageByCategory, DEFAULT_IMAGES } from '../../config/imagePaths';
-
-// Helper function to format category name
-const getCategoryName = (bookType) => {
-  if (!bookType) return 'Other';
-  
-  const categoryMap = {
-    'TEXTBOOK': 'Textbooks',
-    'NOTEBOOK': 'Notebooks',
-    'UNIFORM': 'Uniforms',
-    'STATIONARY': 'Stationary',
-    'STATIONERY': 'Stationery',
-    'OTHER': 'Other',
-  };
-  
-  return categoryMap[bookType.toUpperCase()] || bookType.charAt(0) + bookType.slice(1).toLowerCase().replace(/_/g, ' ');
-};
+import { getCategoryDisplayName } from '../../utils/categoryNames';
 
 const CartTable = ({ items }) => {
   const [imageErrors, setImageErrors] = useState({});
@@ -86,7 +71,7 @@ const CartTable = ({ items }) => {
               fontWeight: '600',
               color: colors.textPrimary,
               width: '150px',
-            }}>Pieces in Bundle</th>
+            }}>Qty</th>
             <th style={{
               padding: '12px 16px',
               textAlign: 'right',
@@ -162,9 +147,9 @@ const CartTable = ({ items }) => {
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                   }}>
-                    {getCategoryName(item.bookType)}
+                    {getCategoryDisplayName(item.bookType)}
                   </span>
-                  {item.bookType === 'TEXTBOOK' && (
+                  {(item.bookType === 'TEXTBOOK' || item.bookType === 'MANDATORY_NOTEBOOK') && (
                     <span style={{
                       display: 'inline-block',
                       padding: '2px 8px',
@@ -193,14 +178,15 @@ const CartTable = ({ items }) => {
                 </div>
               </td>
               
-              {/* Pieces in Bundle (Read-only) */}
+              {/* Qty (bundles; show per-bundle when productQuantity > 1) */}
               <td style={{ padding: '12px 16px', textAlign: 'center', verticalAlign: 'middle' }}>
                 <div style={{
                   fontSize: '16px',
                   fontWeight: '600',
                   color: colors.textPrimary,
                 }}>
-                  {item.bundlePieceCount || item.quantity || 0}
+                  {item.quantity ?? item.bundlePieceCount ?? 0}
+                  {item.productQuantity != null && item.productQuantity > 1 ? ` (${item.productQuantity} per bundle)` : ''}
                 </div>
               </td>
               

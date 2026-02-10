@@ -53,6 +53,7 @@ const isRazorpayAvailable = () => {
 import { styles, colors } from '../css/styles';
 import ApiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { getOptionalTypeTitle, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
 
 const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   const { user } = useAuth();
@@ -218,19 +219,24 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
       const result = await ApiService.getCart();
       
       if (result.success && result.data) {
-        // Transform cart items to match component structure
-        const items = (result.data.items || []).map(item => ({
-          id: item.itemId,
-          itemId: item.itemId,
-          name: item.title || 'Unknown Item',
-          title: item.title || 'Unknown Item', // Keep for backward compatibility
-          author: item.author || '',
-          price: item.price || 0,
-          quantity: item.quantity || 1,
-          image: item.coverImageUrl || '',
-          subtotal: item.subtotal || (item.price * (item.quantity || 1)),
-          bookType: item.bookType || '', // Store bookType to identify textbooks
-        }));
+        // Transform cart items to match component structure (productQuantity = units per bundle)
+        const items = (result.data.items || []).map(item => {
+          const quantity = item.quantity || 1;
+          const productQuantity = item.productQuantity != null ? Number(item.productQuantity) : 1;
+          return {
+            id: item.itemId,
+            itemId: item.itemId,
+            name: item.title || 'Unknown Item',
+            title: item.title || 'Unknown Item', // Keep for backward compatibility
+            author: item.author || '',
+            price: item.price || 0,
+            quantity,
+            productQuantity,
+            image: item.coverImageUrl || '',
+            subtotal: item.subtotal || (item.price * quantity),
+            bookType: item.bookType || '', // Store bookType to identify textbooks
+          };
+        });
         
         setCartItems(items);
       } else {
@@ -263,25 +269,28 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
     return calculateSubtotal() + calculateDelivery();
   };
 
-  // Check if item is a textbook
-  const isTextbook = (item) => {
-    return item.bookType === 'TEXTBOOK';
+  // Check if item is mandatory (cannot remove; bundled with grade)
+  const isMandatory = (item) => {
+    return item.bookType === 'TEXTBOOK' || item.bookType === 'MANDATORY_NOTEBOOK';
   };
 
   // Group cart items by category
   const groupItemsByCategory = () => {
     const textbooks = [];
+    const mandatoryNotebooks = [];
     const optionalByType = {};
     
     cartItems.forEach(item => {
-      if (isTextbook(item)) {
+      if (item.bookType === 'TEXTBOOK') {
         textbooks.push(item);
+      } else if (item.bookType === 'MANDATORY_NOTEBOOK') {
+        mandatoryNotebooks.push(item);
       } else {
         const type = item.bookType || 'OTHER';
         if (!optionalByType[type]) {
           optionalByType[type] = {
             type: type,
-            title: type.charAt(0) + type.slice(1).toLowerCase(),
+            title: getOptionalTypeTitle(type),
             items: [],
           };
         }
@@ -289,7 +298,7 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
       }
     });
     
-    return { textbooks, optionalByType };
+    return { textbooks, mandatoryNotebooks, optionalByType };
   };
 
   const toggleCategory = (category) => {
@@ -337,6 +346,20 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
     }
 
     try {
+      // Validate cart inventory before opening payment
+      const validateResult = await ApiService.validateCartForCheckout();
+      if (!validateResult.success || validateResult.valid === false) {
+        const message =
+          validateResult.message ||
+          'Your cart could not be validated. Please try again.';
+        Alert.alert(
+          validateResult.code === 'INSUFFICIENT_STOCK' ? 'Insufficient Stock' : 'Cannot Place Order',
+          message,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       const totalAmount = calculateTotal();
       const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -656,10 +679,45 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                 
                 {/* Cart Items - Grouped by Category */}
                 {(() => {
-                  const { textbooks, optionalByType } = groupItemsByCategory();
+                  const { textbooks, mandatoryNotebooks, optionalByType } = groupItemsByCategory();
+                  const optionalGroups = Object.values(optionalByType);
+                  const optionalFirst = getOptionalBundlesFirst(optionalGroups);
+                  const optionalRest = getOptionalBundlesRest(optionalGroups);
+                  const bundleBlock = (group, marginTop = 12) => {
+                    const bundleTotal = group.items.reduce((sum, item) => sum + (item.subtotal || (item.price * item.quantity)), 0);
+                    return (
+                      <View
+                        key={group.type}
+                        style={{
+                          backgroundColor: '#f8f9fa',
+                          borderRadius: 8,
+                          padding: 16,
+                          marginHorizontal: 16,
+                          marginTop: marginTop,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: '#0e1b16', fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+                              {group.title} Bundle
+                            </Text>
+                            <Text style={{ color: '#666', fontSize: 14 }}>
+                              {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                            </Text>
+                          </View>
+                          <Text style={{ color: '#06412c', fontSize: 18, fontWeight: 'bold' }}>
+                            ₹{bundleTotal.toFixed(2)}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  };
                   return (
                     <>
-                      {/* Mandatory Textbooks Section - Bundle Summary Only */}
+                      {/* Optional 1–4 first (when available) */}
+                      {optionalFirst.map((group, i) => bundleBlock(group, i === 0 ? 12 : 12))}
+                      {/* Mandatory Textbooks */}
                       {textbooks.length > 0 && (
                         <View style={{
                           backgroundColor: '#f8f9fa',
@@ -671,79 +729,46 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                         }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flex: 1 }}>
-                              <Text style={{
-                                color: '#0e1b16',
-                                fontSize: 16,
-                                fontWeight: '600',
-                                marginBottom: 4,
-                              }}>
+                              <Text style={{ color: '#0e1b16', fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
                                 Mandatory Textbooks Bundle
                               </Text>
-                              <Text style={{
-                                color: '#666',
-                                fontSize: 14,
-                              }}>
+                              <Text style={{ color: '#666', fontSize: 14 }}>
                                 {textbooks.length} {textbooks.length === 1 ? 'item' : 'items'}
                               </Text>
                             </View>
-                            <Text style={{
-                              color: '#06412c',
-                              fontSize: 18,
-                              fontWeight: 'bold',
-                            }}>
+                            <Text style={{ color: '#06412c', fontSize: 18, fontWeight: 'bold' }}>
                               ₹{textbooks.reduce((sum, item) => sum + (item.subtotal || (item.price * item.quantity)), 0).toFixed(2)}
                             </Text>
                           </View>
                         </View>
                       )}
-
-                      {/* Optional Items by Type - Bundle Summary Only */}
-                      {Object.keys(optionalByType).length > 0 && (
-                        <>
-                          {Object.values(optionalByType).map((group) => {
-                            const bundleTotal = group.items.reduce((sum, item) => sum + (item.subtotal || (item.price * item.quantity)), 0);
-                            return (
-                              <View 
-                                key={group.type} 
-                                style={{
-                                  backgroundColor: '#f8f9fa',
-                                  borderRadius: 8,
-                                  padding: 16,
-                                  marginHorizontal: 16,
-                                  marginTop: textbooks.length > 0 ? 12 : 12,
-                                  marginBottom: 8,
-                                }}
-                              >
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={{
-                                      color: '#0e1b16',
-                                      fontSize: 16,
-                                      fontWeight: '600',
-                                      marginBottom: 4,
-                                    }}>
-                                      {group.title} Bundle
-                                    </Text>
-                                    <Text style={{
-                                      color: '#666',
-                                      fontSize: 14,
-                                    }}>
-                                      {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
-                                    </Text>
-                                  </View>
-                                  <Text style={{
-                                    color: '#06412c',
-                                    fontSize: 18,
-                                    fontWeight: 'bold',
-                                  }}>
-                                    ₹{bundleTotal.toFixed(2)}
-                                  </Text>
-                                </View>
-                              </View>
-                            );
-                          })}
-                        </>
+                      {/* Mandatory Notebooks */}
+                      {mandatoryNotebooks.length > 0 && (
+                        <View style={{
+                          backgroundColor: '#f8f9fa',
+                          borderRadius: 8,
+                          padding: 16,
+                          marginHorizontal: 16,
+                          marginTop: 12,
+                          marginBottom: 8,
+                        }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: '#0e1b16', fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+                                Mandatory Notebooks Bundle
+                              </Text>
+                              <Text style={{ color: '#666', fontSize: 14 }}>
+                                {mandatoryNotebooks.length} {mandatoryNotebooks.length === 1 ? 'item' : 'items'}
+                              </Text>
+                            </View>
+                            <Text style={{ color: '#06412c', fontSize: 18, fontWeight: 'bold' }}>
+                              ₹{mandatoryNotebooks.reduce((sum, item) => sum + (item.subtotal || (item.price * item.quantity)), 0).toFixed(2)}
+                            </Text>
+                          </View>
+                        </View>
                       )}
+                      {/* Other optional (Notebook, Uniform, etc.) */}
+                      {optionalRest.map((group) => bundleBlock(group, 12))}
                     </>
                   );
                 })()}
@@ -981,8 +1006,16 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                             },
                           ]
                         );
+                      } else if (orderResult.code === 'INSUFFICIENT_STOCK') {
+                        // Stock became insufficient between validate and order (e.g. another user ordered)
+                        Alert.alert(
+                          'Order Not Placed',
+                          (orderResult.message || 'Some items are no longer in stock. Your payment was successful; please contact support with your payment details for a refund.') +
+                            '\n\nYour cart has not been cleared—you can remove out-of-stock items and try again.',
+                          [{ text: 'OK' }]
+                        );
                       } else {
-                        // Payment verified but order creation failed
+                        // Payment verified but order creation failed (other reason)
                         Alert.alert(
                           'Payment Verified',
                           'Your payment was successful, but there was an issue saving your order. Please contact support with Order ID: ' + razorpay_order_id,

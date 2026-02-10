@@ -68,10 +68,24 @@ export const gradesAPI = {
   delete: (id) => api.delete(`/api/grades/${id}`),
 };
 
+// Subgrades API (sections under a grade)
+export const subgradesAPI = {
+  getAll: (gradeId) => {
+    const params = gradeId ? { gradeId } : {};
+    return api.get('/api/subgrades', { params });
+  },
+  getById: (id) => api.get(`/api/subgrades/${id}`),
+  create: (data) => api.post('/api/subgrades', data),
+  update: (id, data) => api.put(`/api/subgrades/${id}`, data),
+  delete: (id) => api.delete(`/api/subgrades/${id}`),
+};
+
 // Categories API
 export const categoriesAPI = {
-  getAll: (schoolId) => {
-    const params = schoolId ? { schoolId } : {};
+  getAll: (schoolId, subgradeId) => {
+    const params = {};
+    if (schoolId) params.schoolId = schoolId;
+    if (subgradeId) params.subgradeId = subgradeId;
     return api.get('/api/categories', { params });
   },
   getById: (id) => api.get(`/api/categories/${id}`),
@@ -84,6 +98,7 @@ export const categoriesAPI = {
 export const booksAPI = {
   getAll: () => api.get('/api/books'),
   getById: (id) => api.get(`/api/books/${id}`),
+  getLowInventory: (threshold = 5) => api.get('/api/books/inventory/low', { params: { threshold } }),
   create: (data) => api.post('/api/books', data),
   update: (id, data) => api.put(`/api/books/${id}`, data),
   delete: (id) => api.delete(`/api/books/${id}`),

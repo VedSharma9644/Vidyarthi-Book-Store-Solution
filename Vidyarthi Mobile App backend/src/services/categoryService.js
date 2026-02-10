@@ -6,16 +6,18 @@ class CategoryService {
     }
 
     /**
-     * Get all categories, optionally filtered by gradeId
+     * Get all categories, optionally filtered by gradeId or subgradeId
      * @param {string} gradeId - Optional grade ID to filter categories
+     * @param {string} subgradeId - Optional subgrade ID to filter categories (takes precedence if both provided)
      * @returns {Promise<Array>} - Array of categories
      */
-    async getAllCategories(gradeId = null) {
+    async getAllCategories(gradeId = null, subgradeId = null) {
         try {
             let query = this.categoriesRef.where('isActive', '==', true);
 
-            // Filter by gradeId if provided
-            if (gradeId) {
+            if (subgradeId) {
+                query = query.where('subgradeId', '==', subgradeId);
+            } else if (gradeId) {
                 query = query.where('gradeId', '==', gradeId);
             }
 

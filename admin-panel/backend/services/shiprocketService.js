@@ -245,10 +245,22 @@ class ShiprocketService {
 
   /**
    * Create order in Shiprocket
+   * API: POST https://apiv2.shiprocket.in/v1/external/orders/create/adhoc
+   * pickup_location must match a Pickup Address name in Shiprocket dashboard (Settings > Pickup Address).
    */
   async createOrder(orderData) {
     try {
       const token = await this.getAuthToken();
+
+      console.log('📦 Shiprocket create order request (sanitized):', {
+        order_id: orderData.order_id,
+        pickup_location: orderData.pickup_location,
+        billing_customer_name: orderData.billing_customer_name,
+        billing_pincode: orderData.billing_pincode ? '***' : '(empty)',
+        billing_phone: orderData.billing_phone ? '***' : '(empty)',
+        order_items_count: orderData.order_items?.length,
+        payment_method: orderData.payment_method,
+      });
 
       const response = await axios.post(
         `${this.baseURL}/orders/create/adhoc`,
@@ -261,11 +273,41 @@ class ShiprocketService {
         }
       );
 
-      return response.data;
+      const data = response.data;
+      // Shiprocket can return 200 with an error message (e.g. wrong pickup location) - treat as failure
+      const msg = data?.message || '';
+      if (msg && (msg.toLowerCase().includes('wrong pickup') || msg.toLowerCase().includes('pickup location'))) {
+        const locations = data?.data?.data || data?.data || [];
+        const names = Array.isArray(locations)
+          ? locations.map((l) => l.pickup_location || l.name || l.id).filter(Boolean)
+          : [];
+        console.error('📦 Shiprocket rejected: wrong pickup location. Valid names:', names);
+        throw new Error(
+          names.length
+            ? `${msg} Use one of: ${names.join(', ')}`
+            : msg
+        );
+      }
+      if (data?.order_id != null || data?.data?.order_id != null) {
+        console.log('📦 Shiprocket create order success:', {
+          order_id: data?.order_id ?? data?.data?.order_id,
+          shipment_id: data?.shipment_id ?? data?.data?.shipment_id,
+        });
+      }
+      return data;
     } catch (error) {
-      console.error('Shiprocket create order error:', error.response?.data || error.message);
+      const res = error.response;
+      const body = res?.data;
+      const msg = body?.message || body?.errors?.[0]?.message || body?.error || error.message;
+      console.error('Shiprocket create order error:', {
+        status: res?.status,
+        message: msg,
+        fullBody: body ? JSON.stringify(body) : undefined,
+      });
       throw new Error(
-        `Failed to create Shiprocket order: ${error.response?.data?.message || error.message}`
+        res?.status === 422
+          ? `Shiprocket validation: ${msg || JSON.stringify(body?.errors || body)}`
+          : `Failed to create Shiprocket order: ${msg}`
       );
     }
   }

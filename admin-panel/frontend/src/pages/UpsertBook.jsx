@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { schoolsAPI, categoriesAPI, booksAPI, gradesAPI, uploadAPI } from '../services/api';
+import { schoolsAPI, categoriesAPI, booksAPI, gradesAPI, subgradesAPI, uploadAPI } from '../services/api';
 import './UpsertBook.css';
 
 
@@ -23,6 +23,7 @@ const UpsertBook = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const bookId = searchParams.get('id');
+  const duplicateFromId = searchParams.get('duplicateFrom');
 
   const [formData, setFormData] = useState({
     Id: bookId || '0',
@@ -40,9 +41,8 @@ const UpsertBook = () => {
     otherBookType: '',
     SchoolId: '',
     GradeId: '',
+    SubgradeId: '',
     CategoryId: '',
-    
-
   });
 
   const [errors, setErrors] = useState({});
@@ -55,13 +55,21 @@ const UpsertBook = () => {
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [subgrades, setSubgrades] = useState([]);
+  const [loadingSubgrades, setLoadingSubgrades] = useState(false);
+  const [isRefreshingStock, setIsRefreshingStock] = useState(false);
 
   const bookTypeOptions = [
-    { value: 'TEXTBOOK', label: 'TEXTBOOK' },
-    { value: 'NOTEBOOK', label: 'NOTEBOOK' },
-    { value: 'STATIONARY', label: 'STATIONARY' },
-    { value: 'UNIFORM', label: 'UNIFORM' },
-    { value: 'OTHER', label: 'OTHER' },
+    { value: 'TEXTBOOK', label: 'Mandatory Textbook' },
+    { value: 'NOTEBOOK', label: 'Notebook' },
+    { value: 'MANDATORY_NOTEBOOK', label: 'Mandatory Notebook' },
+    { value: 'STATIONARY', label: 'Stationary' },
+    { value: 'UNIFORM', label: 'Uniform' },
+    { value: 'OPTIONAL_1', label: 'Optional 1' },
+    { value: 'OPTIONAL_2', label: 'Optional 2' },
+    { value: 'OPTIONAL_3', label: 'Optional 3' },
+    { value: 'OPTIONAL_4', label: 'Optional 4' },
+    { value: 'OTHER', label: 'Other' },
   ];
 
   // Load grades when school is selected
@@ -82,16 +90,48 @@ const UpsertBook = () => {
     }
   };
 
-  // Load categories when grade is selected
+  const loadSubgradesForGrade = async (gradeId) => {
+    try {
+      setLoadingSubgrades(true);
+      const response = await subgradesAPI.getAll(gradeId);
+      if (response.data.success) {
+        setSubgrades(response.data.data || []);
+      } else {
+        setSubgrades([]);
+      }
+    } catch (error) {
+      console.error('Error loading sections:', error);
+      setSubgrades([]);
+    } finally {
+      setLoadingSubgrades(false);
+    }
+  };
+
   const loadCategoriesForGrade = async (gradeId) => {
     try {
       setLoadingCategories(true);
       const response = await categoriesAPI.getAll();
       if (response.data.success) {
-        // Filter categories by gradeId
         const allCategories = response.data.data || [];
         const filteredCategories = allCategories.filter(cat => cat.gradeId === gradeId);
         setCategories(filteredCategories);
+      } else {
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const loadCategoriesForSubgrade = async (subgradeId) => {
+    try {
+      setLoadingCategories(true);
+      const response = await categoriesAPI.getAll(null, subgradeId);
+      if (response.data.success) {
+        setCategories(response.data.data || []);
       } else {
         setCategories([]);
       }
@@ -122,14 +162,18 @@ const UpsertBook = () => {
 
     loadSchools();
 
-    // If editing, fetch book data
-    if (bookId) {
+    // Source book: edit mode uses bookId, duplicate mode uses duplicateFromId
+    const sourceBookId = bookId || duplicateFromId;
+    const isDuplicateMode = !bookId && duplicateFromId;
+
+    // If editing or duplicating, fetch book data
+    if (sourceBookId) {
       const fetchBook = async () => {
         try {
-          const response = await booksAPI.getById(bookId);
+          const response = await booksAPI.getById(sourceBookId);
           if (response.data.success) {
             const book = response.data.data;
-            
+
             // If book has category, fetch school and grade from category
             let schoolId = '';
             let gradeId = '';
@@ -138,7 +182,6 @@ const UpsertBook = () => {
                 const categoryResponse = await categoriesAPI.getById(book.categoryId);
                 if (categoryResponse.data.success && categoryResponse.data.data.gradeId) {
                   gradeId = categoryResponse.data.data.gradeId;
-                  // Fetch grade to get schoolId
                   const gradeResponse = await gradesAPI.getById(gradeId);
                   if (gradeResponse.data.success && gradeResponse.data.data.schoolId) {
                     schoolId = gradeResponse.data.data.schoolId;
@@ -148,40 +191,35 @@ const UpsertBook = () => {
                 console.error('Error fetching category/grade:', error);
               }
             }
-            
-            // Use book's direct schoolId and gradeId if available
+
             schoolId = book.schoolId || schoolId;
             gradeId = book.gradeId || gradeId;
-            
+            const subgradeId = book.subgradeId || '';
+
             setFormData({
-              Id: book.id,
+              Id: isDuplicateMode ? '0' : book.id,
               ProductQuantity: book.productQuantity || '',
               PerProductPrice: book.perProductPrice?.toString() || '',
               CoverImageUrl: book.coverImageUrl || '',
-              Title: book.title || '',
+              Title: isDuplicateMode ? `${(book.title || '').trim()} (Copy)`.trim() : (book.title || ''),
               Author: book.author || '',
               Publisher: book.publisher || '',
-              ISBN: book.isbn || '',
+              ISBN: isDuplicateMode ? '' : (book.isbn || ''),
               Description: book.description || '',
               Price: book.price?.toString() || '0.00',
-              StockQuantity: book.stockQuantity?.toString() || '0',
+              StockQuantity: isDuplicateMode ? '0' : (book.stockQuantity?.toString() || '0'),
               BookType: book.bookType || '',
               otherBookType: '',
               SchoolId: schoolId,
               GradeId: gradeId,
+              SubgradeId: subgradeId,
               CategoryId: book.categoryId || '',
-
             });
-            
-            // Load grades for the school
-            if (schoolId) {
-              loadGradesForSchool(schoolId);
-            }
-            
-            // Load categories for the grade
-            if (gradeId) {
-              loadCategoriesForGrade(gradeId);
-            }
+
+            if (schoolId) loadGradesForSchool(schoolId);
+            if (gradeId) loadSubgradesForGrade(gradeId);
+            if (subgradeId) loadCategoriesForSubgrade(subgradeId);
+            else if (gradeId) loadCategoriesForGrade(gradeId);
           }
         } catch (error) {
           console.error('Error fetching book:', error);
@@ -190,34 +228,67 @@ const UpsertBook = () => {
       };
       fetchBook();
     }
-  }, [bookId]);
+  }, [bookId, duplicateFromId]);
+
+  // Refetch current stock from database (updated after each order)
+  const refreshStockFromDb = async () => {
+    if (!bookId) return;
+    try {
+      setIsRefreshingStock(true);
+      const response = await booksAPI.getById(bookId);
+      if (response.data.success && response.data.data) {
+        const book = response.data.data;
+        const currentStock = book.stockQuantity !== undefined && book.stockQuantity !== null
+          ? String(book.stockQuantity)
+          : '0';
+        setFormData((prev) => ({ ...prev, StockQuantity: currentStock }));
+      }
+    } catch (error) {
+      console.error('Error refreshing stock:', error);
+      alert('Failed to refresh stock. Please try again.');
+    } finally {
+      setIsRefreshingStock(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     
-    // Handle SchoolId change - reload grades and reset grade/category
     if (name === 'SchoolId') {
       setFormData(prev => ({
         ...prev,
         SchoolId: value,
-        GradeId: '', // Reset grade when school changes
-        CategoryId: '', // Reset category when school changes
+        GradeId: '',
+        SubgradeId: '',
+        CategoryId: '',
       }));
       setGrades([]);
+      setSubgrades([]);
       setCategories([]);
-      if (value) {
-        loadGradesForSchool(value);
-      }
-    }
-    // Handle GradeId change - reload categories
-    else if (name === 'GradeId') {
+      if (value) loadGradesForSchool(value);
+    } else if (name === 'GradeId') {
       setFormData(prev => ({
         ...prev,
         GradeId: value,
-        CategoryId: '', // Reset category when grade changes
+        SubgradeId: '',
+        CategoryId: '',
+      }));
+      setSubgrades([]);
+      setCategories([]);
+      if (value) {
+        loadSubgradesForGrade(value);
+        loadCategoriesForGrade(value);
+      }
+    } else if (name === 'SubgradeId') {
+      setFormData(prev => ({
+        ...prev,
+        SubgradeId: value,
+        CategoryId: '',
       }));
       if (value) {
-        loadCategoriesForGrade(value);
+        loadCategoriesForSubgrade(value);
+      } else if (formData.GradeId) {
+        loadCategoriesForGrade(formData.GradeId);
       } else {
         setCategories([]);
       }
@@ -238,10 +309,21 @@ const UpsertBook = () => {
         }));
       }
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+      setFormData(prev => {
+        const next = { ...prev, [name]: value };
+        // Auto-fill Total Price when Product Quantity or Per Product Price changes
+        if (name === 'ProductQuantity' || name === 'PerProductPrice') {
+          const qty = name === 'ProductQuantity' ? value : prev.ProductQuantity;
+          const perPrice = name === 'PerProductPrice' ? value : prev.PerProductPrice;
+          const qtyNum = parseFloat(qty);
+          const perPriceNum = parseFloat(perPrice);
+          if (!isNaN(qtyNum) && !isNaN(perPriceNum) && qtyNum >= 0 && perPriceNum >= 0) {
+            const total = qtyNum * perPriceNum;
+            next.Price = total.toFixed(2);
+          }
+        }
+        return next;
+      });
     }
     
     // Clear error when user starts typing
@@ -341,9 +423,7 @@ const UpsertBook = () => {
       newErrors.GradeId = 'Grade is required.';
     }
     
-    if (!formData.CategoryId) {
-      newErrors.CategoryId = 'Category is required.';
-    }
+    // Category is optional
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -373,6 +453,7 @@ const UpsertBook = () => {
         BookType: formData.BookType === 'OTHER' ? formData.otherBookType : formData.BookType,
         CategoryId: formData.CategoryId,
         GradeId: formData.GradeId,
+        SubgradeId: formData.SubgradeId || '',
         SchoolId: formData.SchoolId,
 
         // ⭐ Additional fields for product quantity and per product price
@@ -421,7 +502,7 @@ const UpsertBook = () => {
     <div className="container-fluid">
       <div className="card">
         <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-          <span>{bookId ? 'Edit Book' : 'Add New Book'}</span>
+          <span>{bookId ? 'Edit Book' : duplicateFromId ? 'Add New Book (from duplicate)' : 'Add New Book'}</span>
           <button
             type="button"
             className="btn btn-sm btn-light"
@@ -431,6 +512,11 @@ const UpsertBook = () => {
           </button>
         </div>
         <div className="card-body">
+          {duplicateFromId && (
+            <div className="alert alert-info mb-3" role="alert">
+              <strong>Creating a duplicate.</strong> This form was pre-filled from an existing product. Change only the fields you need (e.g. Title, ISBN) and save to create a new product. Stock is set to 0 for the new product.
+            </div>
+          )}
           <div className="row justify-content-center">
             <div className="col-lg-7 border border-2 py-4 px-4">
               <form id="submit-form" onSubmit={handleSubmit} encType="multipart/form-data" noValidate>
@@ -578,12 +664,15 @@ const UpsertBook = () => {
                   </div>
                 </div>
 
-                {/* Total Price */}
+                {/* Total Price (auto-calculated from Product Quantity × Per Product Price) */}
                 <div className="row">
                   <div className="col-md-12 mb-3">
                     <label className="form-label" htmlFor="Price">
                       Total Price <span className="text-danger">*</span>
                     </label>
+                    <small className="text-muted d-block mb-1">
+                      Auto-filled from Product Quantity × Per Product Price. You can override if needed.
+                    </small>
                     <input
                       className={`form-control ${errors.Price ? 'is-invalid' : ''}`}
                       type="text"
@@ -603,9 +692,31 @@ const UpsertBook = () => {
 
                 <div className="row">
                   <div className="col-md-12 mb-3">
-                    <label className="form-label" htmlFor="StockQuantity">
-                      Stock Quantity <span className="text-danger">*</span>
-                    </label>
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                      <label className="form-label mb-0" htmlFor="StockQuantity">
+                        Stock Quantity <span className="text-danger">*</span>
+                      </label>
+                      {bookId && (
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={refreshStockFromDb}
+                          disabled={isRefreshingStock}
+                        >
+                          {isRefreshingStock ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                              Refreshing…
+                            </>
+                          ) : (
+                            <>↻ Refresh stock from database</>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <small className="text-muted d-block mb-1">
+                      Stock is updated in the database after each order. {bookId ? 'Use “Refresh stock” to load the current value.' : ''}
+                    </small>
                     <input
                       className={`form-control ${errors.StockQuantity ? 'is-invalid' : ''}`}
                       type="number"
@@ -736,17 +847,43 @@ const UpsertBook = () => {
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label" htmlFor="CategoryId">
-                    Category <span className="text-danger">*</span>
+                  <label className="form-label" htmlFor="SubgradeId">
+                    Section (optional)
                   </label>
                   <select
-                    className={`form-control ${errors.CategoryId ? 'is-invalid' : ''}`}
+                    className="form-control"
+                    id="SubgradeId"
+                    name="SubgradeId"
+                    value={formData.SubgradeId}
+                    onChange={handleChange}
+                    disabled={!formData.GradeId || loadingSubgrades}
+                  >
+                    <option value="">
+                      {!formData.GradeId
+                        ? '-- Select Grade First --'
+                        : loadingSubgrades
+                        ? 'Loading sections...'
+                        : '-- Select Section (optional) --'}
+                    </option>
+                    {subgrades.map(sg => (
+                      <option key={sg.id} value={sg.id}>
+                        {sg.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="CategoryId">
+                    Category (optional)
+                  </label>
+                  <select
+                    className="form-control"
                     id="CategoryId"
                     name="CategoryId"
                     value={formData.CategoryId}
                     onChange={handleChange}
-                    required
-                    disabled={!formData.GradeId || loadingCategories}
+                    disabled={(!formData.GradeId && !formData.SubgradeId) || loadingCategories}
                   >
                     <option value="">
                       {!formData.GradeId 
@@ -754,8 +891,8 @@ const UpsertBook = () => {
                         : loadingCategories 
                         ? 'Loading categories...'
                         : categories.length === 0
-                        ? 'No categories found for this grade'
-                        : '-- Select Category --'}
+                        ? 'No categories found'
+                        : '-- Select Category (optional) --'}
                     </option>
                     {categories.map(category => (
                       <option key={category.id} value={category.id}>
@@ -765,9 +902,6 @@ const UpsertBook = () => {
                   </select>
                   {loadingCategories && (
                     <small className="form-text text-muted">Loading categories...</small>
-                  )}
-                  {errors.CategoryId && (
-                    <span className="text-danger">{errors.CategoryId}</span>
                   )}
                 </div>
 

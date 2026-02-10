@@ -29,6 +29,15 @@ router.get('/count', cartController.getCartCount);
 router.post('/update', cartController.updateCartItem);
 
 /**
+ * @route   POST /api/cart/add-items
+ * @desc    Add multiple items to cart (replaces cart). Single request for fast add.
+ * @access  Public (requires user-id header)
+ * @header  { user-id: string }
+ * @body    { items: [{ itemId: string, quantity: number }, ...] }
+ */
+router.post('/add-items', cartController.addItemsToCart);
+
+/**
  * @route   POST /api/cart/clear
  * @desc    Clear all items from cart
  * @access  Public (requires user-id header)

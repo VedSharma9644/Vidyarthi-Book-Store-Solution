@@ -45,6 +45,82 @@ const getCustomerName = async (data) => {
   return 'Unknown Customer';
 };
 
+/**
+ * Enrich order items with school, grade, and section names by looking up each item's book.
+ * @param {Array<{ itemId: string }>} items - Order items (must have itemId)
+ * @returns {Promise<Array>} Items with schoolName, gradeName, sectionName added
+ */
+const enrichOrderItemsWithSchoolGradeSection = async (items) => {
+  if (!items || items.length === 0) return items;
+  const enriched = [];
+  const schoolCache = {};
+  const gradeCache = {};
+  const subgradeCache = {};
+  const getSchoolName = async (schoolId) => {
+    if (!schoolId) return '';
+    if (schoolCache[schoolId] !== undefined) return schoolCache[schoolId];
+    try {
+      const doc = await db.collection('schools').doc(schoolId).get();
+      schoolCache[schoolId] = doc.exists ? (doc.data().name || doc.data().schoolName || '') : '';
+    } catch {
+      schoolCache[schoolId] = '';
+    }
+    return schoolCache[schoolId];
+  };
+  const getGradeName = async (gradeId) => {
+    if (!gradeId) return '';
+    if (gradeCache[gradeId] !== undefined) return gradeCache[gradeId];
+    try {
+      const doc = await db.collection('grades').doc(gradeId).get();
+      gradeCache[gradeId] = doc.exists ? (doc.data().name || '') : '';
+    } catch {
+      gradeCache[gradeId] = '';
+    }
+    return gradeCache[gradeId];
+  };
+  const getSubgradeName = async (subgradeId) => {
+    if (!subgradeId) return '';
+    if (subgradeCache[subgradeId] !== undefined) return subgradeCache[subgradeId];
+    try {
+      const doc = await db.collection('subgrades').doc(subgradeId).get();
+      subgradeCache[subgradeId] = doc.exists ? (doc.data().name || '') : '';
+    } catch {
+      subgradeCache[subgradeId] = '';
+    }
+    return subgradeCache[subgradeId];
+  };
+  for (const item of items) {
+    let schoolName = '';
+    let gradeName = '';
+    let sectionName = '';
+    if (item.itemId) {
+      try {
+        const bookDoc = await db.collection('books').doc(item.itemId).get();
+        if (bookDoc.exists) {
+          const book = bookDoc.data();
+          const schoolId = book.schoolId || '';
+          const gradeId = book.gradeId || '';
+          const subgradeId = book.subgradeId || '';
+          [schoolName, gradeName, sectionName] = await Promise.all([
+            getSchoolName(schoolId),
+            getGradeName(gradeId),
+            getSubgradeName(subgradeId),
+          ]);
+        }
+      } catch (err) {
+        console.warn('Enrich order item: could not resolve book', item.itemId, err.message);
+      }
+    }
+    enriched.push({
+      ...item,
+      schoolName: schoolName || '—',
+      gradeName: gradeName || '—',
+      sectionName: sectionName || '—',
+    });
+  }
+  return enriched;
+};
+
 // Get all orders
 const getAllOrders = async (req, res) => {
   try {
@@ -128,7 +204,9 @@ const getOrderById = async (req, res) => {
 
     const data = orderDoc.data();
     const customerName = await getCustomerName(data);
-    
+    const rawItems = data.items || [];
+    const enrichedItems = await enrichOrderItemsWithSchoolGradeSection(rawItems);
+    const firstItem = enrichedItems[0];
     const order = {
       id: orderDoc.id,
       orderId: orderDoc.id,
@@ -155,7 +233,7 @@ const getOrderById = async (req, res) => {
             hour12: true,
           }),
       userId: data.userId || '',
-      items: data.items || [],
+      items: enrichedItems,
       subtotal: data.subtotal || 0,
       deliveryCharge: data.deliveryCharge || 0,
       tax: data.tax || 0,
@@ -169,6 +247,9 @@ const getOrderById = async (req, res) => {
       shiprocketShipmentId: data.shiprocketShipmentId || null,
       shiprocketAWB: data.shiprocketAWB || null,
       shiprocketStatus: data.shiprocketStatus || null,
+      schoolName: firstItem?.schoolName || '',
+      gradeName: firstItem?.gradeName || '',
+      sectionName: firstItem?.sectionName || '',
     };
 
     res.json({
@@ -231,15 +312,23 @@ const updateOrderStatus = async (req, res) => {
 
 // Create Shiprocket order
 const createShiprocketOrder = async (req, res) => {
+  const orderId = req.params.id;
+  console.log('📦 [createShiprocketOrder] START orderId=', orderId);
   try {
     console.log('📦 Creating Shiprocket order...');
-    console.log('   Order ID:', req.params.id);
-    
-    // Debug: Log environment variables
-    console.log('🔍 Environment Variables Check:');
-    console.log(`   SHIPROCKET_EMAIL: ${process.env.SHIPROCKET_EMAIL ? '✅ Set (' + process.env.SHIPROCKET_EMAIL.substring(0, 5) + '...)' : '❌ Missing'}`);
-    console.log(`   SHIPROCKET_PASSWORD: ${process.env.SHIPROCKET_PASSWORD ? '✅ Set (***hidden***)' : '❌ Missing'}`);
-    
+    console.log('   Order ID:', orderId);
+
+    // Fail fast with clear message if Shiprocket credentials are not set (common on production)
+    if (!shiprocketService.hasApiKeyAuth() && !shiprocketService.hasEmailPasswordAuth()) {
+      console.error('❌ Shiprocket create failed: credentials not configured on this server.');
+      return res.status(503).json({
+        success: false,
+        message: 'Shiprocket is not configured on this server. Set SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD (or SHIPROCKET_API_KEY and SHIPROCKET_API_SECRET) in the server environment (e.g. Cloud Run environment variables).',
+      });
+    }
+
+    console.log('🔍 Shiprocket credentials: present');
+
     const { id } = req.params;
     const orderDoc = await db.collection('orders').doc(id).get();
 
@@ -270,39 +359,64 @@ const createShiprocketOrder = async (req, res) => {
       });
     }
 
-    // Prepare Shiprocket order request
+    // Shiprocket requires pincode and phone for India; use shipping + customerInfo fallbacks (app backend saves customerInfo, not top-level customerName)
+    const pincode = String(shippingAddress.postalCode ?? orderData.shippingAddress?.postalCode ?? '').trim();
+    const phone = String(shippingAddress.phone ?? orderData.customerInfo?.phoneNumber ?? '').trim();
+    if (!pincode || pincode.length < 4) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipping address must have a valid postal code (pincode) for Shiprocket.',
+      });
+    }
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipping address must have a phone number for Shiprocket.',
+      });
+    }
+
+    // pickup_location must match a Pickup Address name in Shiprocket (Settings > Pickup Address). Default 'warehouse-1' (or set SHIPROCKET_PICKUP_LOCATION to 'Home', 'warehouse-1', etc.).
+    const pickupLocation = (process.env.SHIPROCKET_PICKUP_LOCATION || 'warehouse-1').trim();
+    if (!pickupLocation) {
+      return res.status(400).json({
+        success: false,
+        message: 'SHIPROCKET_PICKUP_LOCATION is not set. Set it to the exact name of a Pickup Address in Shiprocket (Settings > Pickup Address).',
+      });
+    }
+
+    // Prepare Shiprocket order request (field names per Shiprocket API). Use customerInfo when present (app backend order shape).
     const shiprocketOrder = {
       order_id: orderData.orderNumber || `ORD-${id}`,
-      order_date: orderData.createdAt?.toDate 
+      order_date: orderData.createdAt?.toDate
         ? orderData.createdAt.toDate().toISOString().replace('T', ' ').substring(0, 19)
         : new Date().toISOString().replace('T', ' ').substring(0, 19),
-      pickup_location: process.env.SHIPROCKET_PICKUP_LOCATION || 'warehouse',
-      billing_customer_name: shippingAddress.name || orderData.customerName || 'Customer',
+      pickup_location: pickupLocation,
+      billing_customer_name: shippingAddress.name || orderData.customerInfo?.name || orderData.customerName || 'Customer',
       billing_last_name: '',
-      billing_address: shippingAddress.address || '',
+      billing_address: (shippingAddress.address || '').trim() || 'Address not provided',
       billing_address_2: '',
-      billing_city: shippingAddress.city || '',
-      billing_pincode: shippingAddress.postalCode || '',
-      billing_state: shippingAddress.state || '',
-      billing_country: shippingAddress.country || 'India',
-      billing_email: shippingAddress.email || orderData.customerInfo?.email || '',
-      billing_phone: shippingAddress.phone || orderData.customerInfo?.phoneNumber || '',
+      billing_city: (shippingAddress.city || '').trim() || 'City not provided',
+      billing_pincode: pincode,
+      billing_state: (shippingAddress.state || '').trim() || 'State not provided',
+      billing_country: (shippingAddress.country || '').trim() || 'India',
+      billing_email: (shippingAddress.email || orderData.customerInfo?.email || '').trim() || '',
+      billing_phone: phone,
       shipping_is_billing: true,
       order_items: items.map((item, index) => ({
-        name: item.title || `Product ${index + 1}`,
-        sku: item.itemId || `SKU-${Date.now()}-${index}`,
-        units: item.quantity || 1,
-        selling_price: Math.round(item.price || 0),
+        name: (item.title || `Product ${index + 1}`).toString().substring(0, 255),
+        sku: (item.itemId || `SKU-${Date.now()}-${index}`).toString().replace(/[^a-zA-Z0-9\-_]/g, '-').substring(0, 100),
+        units: Math.max(1, parseInt(item.quantity, 10) || 1),
+        selling_price: Math.round(Number(item.price) || 0),
         discount: 0,
         tax: 0,
         hsn: 0,
       })),
-      payment_method: orderData.paymentStatus === 'paid' ? 'PREPAID' : 'COD',
-      shipping_charges: Math.round(orderData.deliveryCharge || 0),
+      payment_method: orderData.paymentStatus === 'paid' ? 'prepaid' : 'cod',
+      shipping_charges: Math.round(Number(orderData.deliveryCharge) || 0),
       giftwrap_charges: 0,
       transaction_charges: 0,
       total_discount: 0,
-      sub_total: Math.round(orderData.subtotal || orderData.total || 0),
+      sub_total: Math.round(Number(orderData.subtotal) || Number(orderData.total) || 0),
       length: 10,
       breadth: 15,
       height: 20,
@@ -312,12 +426,21 @@ const createShiprocketOrder = async (req, res) => {
     // Create order in Shiprocket
     const shiprocketResponse = await shiprocketService.createOrder(shiprocketOrder);
 
-    // Update order in Firestore with Shiprocket tracking info
+    // Update order in Firestore with Shiprocket tracking info.
+    // Shiprocket may return { order_id, shipment_id } at top level or nested under .data
+    const data = shiprocketResponse?.data ?? shiprocketResponse;
+    const srOrderId = shiprocketResponse?.order_id ?? shiprocketResponse?.id
+      ?? data?.order_id ?? data?.id ?? data?.order?.id ?? null;
+    const shipmentId = shiprocketResponse?.shipment_id ?? data?.shipment_id
+      ?? data?.shipments?.[0]?.id ?? data?.shipments?.[0]?.shipment_id ?? data?.shipment?.id ?? null;
+    const awbCode = shiprocketResponse?.awb_code ?? shiprocketResponse?.awb
+      ?? data?.awb_code ?? data?.awb ?? null;
+    const status = shiprocketResponse?.status ?? data?.status ?? data?.order_status ?? 'created';
     const updateData = {
-      shiprocketOrderId: shiprocketResponse.order_id || shiprocketResponse.id,
-      shiprocketShipmentId: shiprocketResponse.shipment_id || null,
-      shiprocketAWB: shiprocketResponse.awb_code || null,
-      shiprocketStatus: shiprocketResponse.status || 'created',
+      shiprocketOrderId: srOrderId,
+      shiprocketShipmentId: shipmentId,
+      shiprocketAWB: awbCode,
+      shiprocketStatus: status,
       updatedAt: new Date(),
     };
 
@@ -334,10 +457,13 @@ const createShiprocketOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating Shiprocket order:', error);
+    console.error('Error stack:', error.stack);
+    // Always return the actual error message so admin can see why it failed (e.g. auth, validation)
+    const message = error.message || 'Failed to create Shiprocket order';
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to create Shiprocket order',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      message,
+      error: message,
     });
   }
 };
@@ -360,9 +486,19 @@ const getShiprocketStatus = async (req, res) => {
     const shiprocketShipmentId = orderData.shiprocketShipmentId;
 
     if (!shiprocketOrderId && !shiprocketShipmentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'This order does not have a Shiprocket order ID or shipment ID',
+      return res.status(200).json({
+        success: true,
+        data: {
+          hasShiprocket: false,
+          message: 'This order does not have a Shiprocket order ID or shipment ID',
+          status: null,
+          orderStatus: null,
+          orderId: null,
+          shipmentId: null,
+          awb: null,
+          trackingUrl: null,
+          fullData: null,
+        },
       });
     }
 
@@ -585,20 +721,18 @@ const handleShiprocketWebhook = async (req, res) => {
       });
     }
     
-    // Update order in Firebase
+    // Update order in Firebase. Firestore does not allow undefined; use null for missing values.
     const updateData = {
-      shiprocketStatus: status,
+      shiprocketStatus: status ?? null,
       shiprocketLastUpdated: new Date(),
       updatedAt: new Date(),
     };
     
-    // Update tracking number if provided
     if (trackingNumber) {
       updateData.shiprocketAWB = trackingNumber;
       updateData.trackingNumber = trackingNumber;
     }
     
-    // Update Shiprocket IDs if not already set
     if (shiprocketOrderId && !orderDoc.data().shiprocketOrderId) {
       updateData.shiprocketOrderId = shiprocketOrderId;
     }

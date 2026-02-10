@@ -4,12 +4,12 @@ const categoryService = require('../services/categoryService');
  * Get all categories
  * @route   GET /api/categories
  * @access  Public
- * @query   { gradeId?: string }
+ * @query   { gradeId?: string, subgradeId?: string }
  */
 const getAllCategories = async (req, res) => {
     try {
-        const { gradeId } = req.query;
-        const categories = await categoryService.getAllCategories(gradeId);
+        const { gradeId, subgradeId } = req.query;
+        const categories = await categoryService.getAllCategories(gradeId, subgradeId);
 
         res.json({
             success: true,

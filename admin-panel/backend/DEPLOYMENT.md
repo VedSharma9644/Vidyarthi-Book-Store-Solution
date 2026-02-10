@@ -39,6 +39,20 @@ gcloud run deploy admin-panel-backend \
 
 ## Set Environment Variables
 
+### Quick fix: Shiprocket credentials (required for Create Shiprocket Order)
+
+If you see **"Shiprocket authentication failed"** or **"Shiprocket credentials must be configured"** on the live admin panel, the backend has no Shiprocket credentials. Set them on Cloud Run:
+
+**Option 1 – Env vars (fast):** Replace with your real Shiprocket email and password.
+
+```powershell
+gcloud run services update admin-panel-backend --region us-central1 --set-env-vars "SHIPROCKET_EMAIL=your-shiprocket-email@example.com,SHIPROCKET_PASSWORD=your-shiprocket-password"
+```
+
+**Option 2 – Secrets (recommended):** See "Set Shiprocket Credentials (Using Secrets)" below.
+
+After updating, wait a few seconds for the new revision; then try "Create Shiprocket Order" again.
+
 ### Basic Environment Variables
 
 ```powershell

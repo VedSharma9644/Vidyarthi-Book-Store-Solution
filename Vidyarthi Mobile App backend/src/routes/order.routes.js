@@ -3,6 +3,13 @@ const router = express.Router();
 const orderController = require('../controllers/order.controller');
 
 /**
+ * @route   POST /api/orders/validate-cart
+ * @desc    Validate cart for checkout (inventory check only)
+ * @access  Private (requires user-id header)
+ */
+router.post('/validate-cart', orderController.validateCartForCheckout);
+
+/**
  * @route   POST /api/orders/create
  * @desc    Create order after payment
  * @access  Private (requires user-id header)

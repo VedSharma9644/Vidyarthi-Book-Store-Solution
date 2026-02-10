@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
-import { categoriesAPI, gradesAPI } from '../services/api';
+import { categoriesAPI, gradesAPI, subgradesAPI } from '../services/api';
 import './Categories.css';
 
 const Categories = () => {
@@ -18,25 +18,34 @@ const Categories = () => {
         if (response.data.success) {
           const categoriesData = response.data.data || [];
           
-          // Fetch all grades to map grade names
-          const gradesResponse = await gradesAPI.getAll();
+          const [gradesResponse, subgradesResponse] = await Promise.all([
+            gradesAPI.getAll(),
+            subgradesAPI.getAll(),
+          ]);
           const gradesMap = new Map();
           if (gradesResponse.data.success) {
             gradesResponse.data.data.forEach(grade => {
               gradesMap.set(grade.id, grade.name);
             });
           }
+          const subgradesMap = new Map();
+          if (subgradesResponse.data.success) {
+            subgradesResponse.data.data.forEach(sg => {
+              subgradesMap.set(sg.id, sg.name);
+            });
+          }
           
-          // Transform categories to include grade name for display
           const transformedCategories = categoriesData.map((category) => {
             const gradeName = category.gradeId ? (gradesMap.get(category.gradeId) || 'Unknown Grade') : 'No Grade';
-            
+            const subgradeName = category.subgradeId ? (subgradesMap.get(category.subgradeId) || '—') : '—';
             return {
               id: category.id,
               name: category.name,
               description: category.description || '',
               grade: gradeName,
               gradeId: category.gradeId,
+              subgrade: subgradeName,
+              subgradeId: category.subgradeId,
             };
           });
           
@@ -78,8 +87,9 @@ const Categories = () => {
     if (!filterText) return categories;
     return categories.filter(item =>
       item.name.toLowerCase().includes(filterText.toLowerCase()) ||
-      item.description.toLowerCase().includes(filterText.toLowerCase()) ||
-      item.grade.toLowerCase().includes(filterText.toLowerCase())
+      (item.description || '').toLowerCase().includes(filterText.toLowerCase()) ||
+      item.grade.toLowerCase().includes(filterText.toLowerCase()) ||
+      (item.subgrade || '').toLowerCase().includes(filterText.toLowerCase())
     );
   }, [categories, filterText]);
 
@@ -132,6 +142,12 @@ const Categories = () => {
       selector: row => row.grade,
       sortable: true,
       width: '150px',
+    },
+    {
+      name: 'Section',
+      selector: row => row.subgrade,
+      sortable: true,
+      width: '120px',
     },
     {
       name: 'Actions',

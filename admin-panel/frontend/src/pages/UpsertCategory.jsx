@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { schoolsAPI, gradesAPI, categoriesAPI } from '../services/api';
+import { schoolsAPI, gradesAPI, subgradesAPI, categoriesAPI } from '../services/api';
 import './UpsertCategory.css';
 
 const UpsertCategory = () => {
@@ -14,6 +14,7 @@ const UpsertCategory = () => {
     Description: '',
     SchoolId: '',
     GradeId: '',
+    SubgradeId: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -22,6 +23,8 @@ const UpsertCategory = () => {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [grades, setGrades] = useState([]);
   const [loadingGrades, setLoadingGrades] = useState(false);
+  const [subgrades, setSubgrades] = useState([]);
+  const [loadingSubgrades, setLoadingSubgrades] = useState(false);
 
   useEffect(() => {
     // Fetch schools on component mount
@@ -64,27 +67,22 @@ const UpsertCategory = () => {
 
   const handleChange = async (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
     
-    // If school is changed, fetch grades for that school
-    if (name === 'SchoolId' && value) {
-      await loadGradesForSchool(value);
-      // Clear grade selection when school changes
-      setFormData(prev => ({
-        ...prev,
-        GradeId: ''
-      }));
+    if (name === 'SchoolId') {
+      setFormData(prev => ({ ...prev, SchoolId: value, GradeId: '', SubgradeId: '' }));
+      setGrades([]);
+      setSubgrades([]);
+      if (value) await loadGradesForSchool(value);
+    } else if (name === 'GradeId') {
+      setFormData(prev => ({ ...prev, GradeId: value, SubgradeId: '' }));
+      setSubgrades([]);
+      if (value) await loadSubgradesForGrade(value);
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
     
-    // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -101,6 +99,23 @@ const UpsertCategory = () => {
       setGrades([]);
     } finally {
       setLoadingGrades(false);
+    }
+  };
+
+  const loadSubgradesForGrade = async (gradeId) => {
+    try {
+      setLoadingSubgrades(true);
+      const response = await subgradesAPI.getAll(gradeId);
+      if (response.data.success) {
+        setSubgrades(response.data.data || []);
+      } else {
+        setSubgrades([]);
+      }
+    } catch (error) {
+      console.error('Error loading sections:', error);
+      setSubgrades([]);
+    } finally {
+      setLoadingSubgrades(false);
     }
   };
 
@@ -138,6 +153,7 @@ const UpsertCategory = () => {
         name: formData.Name,
         description: formData.Description || '',
         gradeId: formData.GradeId,
+        subgradeId: formData.SubgradeId || undefined,
       };
 
       let response;
@@ -290,6 +306,33 @@ const UpsertCategory = () => {
                   {errors.GradeId && (
                     <span className="text-danger">{errors.GradeId}</span>
                   )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="SubgradeId">
+                    Section (optional)
+                  </label>
+                  <select
+                    className="form-select"
+                    id="SubgradeId"
+                    name="SubgradeId"
+                    value={formData.SubgradeId}
+                    onChange={handleChange}
+                    disabled={!formData.GradeId || loadingSubgrades}
+                  >
+                    <option value="">
+                      {!formData.GradeId
+                        ? '-- Select Grade First --'
+                        : loadingSubgrades
+                        ? 'Loading sections...'
+                        : '-- Select Section (optional) --'}
+                    </option>
+                    {subgrades.map(sg => (
+                      <option key={sg.id} value={sg.id}>
+                        {sg.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <button

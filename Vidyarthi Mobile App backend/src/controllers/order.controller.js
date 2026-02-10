@@ -1,6 +1,49 @@
 const orderService = require('../services/orderService');
 
 /**
+ * Validate cart for checkout (inventory check only).
+ * @route POST /api/orders/validate-cart
+ */
+const validateCartForCheckout = async (req, res) => {
+    try {
+        const userId = req.headers['user-id'] || req.body.userId;
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required',
+            });
+        }
+        await orderService.validateCartForCheckout(userId);
+        return res.json({
+            success: true,
+            valid: true,
+        });
+    } catch (error) {
+        if (error.code === 'INSUFFICIENT_STOCK') {
+            return res.status(400).json({
+                success: false,
+                valid: false,
+                message: error.message || 'Insufficient stock',
+                code: 'INSUFFICIENT_STOCK',
+                insufficientBundles: error.insufficientBundles || null,
+            });
+        }
+        if (error.message === 'Cart is empty') {
+            return res.status(400).json({
+                success: false,
+                valid: false,
+                message: error.message,
+            });
+        }
+        console.error('Error in validateCartForCheckout:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to validate cart',
+        });
+    }
+};
+
+/**
  * Create order after payment
  * @route POST /api/orders/create
  */
@@ -60,6 +103,14 @@ const createOrder = async (req, res) => {
             message: 'Order created successfully',
         });
     } catch (error) {
+        if (error.code === 'INSUFFICIENT_STOCK') {
+            return res.status(400).json({
+                success: false,
+                message: error.message || 'Insufficient stock',
+                code: 'INSUFFICIENT_STOCK',
+                insufficientBundles: error.insufficientBundles || null,
+            });
+        }
         console.error('❌ Error in createOrder controller:', error);
         console.error('Error stack:', error.stack);
         res.status(500).json({
@@ -131,6 +182,7 @@ const getOrderById = async (req, res) => {
 };
 
 module.exports = {
+    validateCartForCheckout,
     createOrder,
     getOrders,
     getOrderById,

@@ -8,22 +8,7 @@ import CartItem from './cart/CartItem';
 import CartTable from './cart/CartTable';
 import CartSummary from './cart/CartSummary';
 import { useModal } from '../contexts/ModalContext';
-
-// Helper function to format category name
-const getCategoryName = (bookType) => {
-  if (!bookType) return 'Other';
-  
-  const categoryMap = {
-    'TEXTBOOK': 'Textbooks',
-    'NOTEBOOK': 'Notebooks',
-    'UNIFORM': 'Uniforms',
-    'STATIONARY': 'Stationary',
-    'STATIONERY': 'Stationery',
-    'OTHER': 'Other',
-  };
-  
-  return categoryMap[bookType.toUpperCase()] || bookType.charAt(0) + bookType.slice(1).toLowerCase().replace(/_/g, ' ');
-};
+import { getCategoryDisplayName, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
 
 const CartPage = () => {
   const navigate = useNavigate();
@@ -53,7 +38,8 @@ const CartPage = () => {
           name: item.title || 'Unknown Item',
           price: item.price || 0,
           quantity: item.quantity || 1,
-          bundlePieceCount: item.bundlePieceCount || item.piecesInBundle || null, // Bundle piece count from database
+          bundlePieceCount: (item.bundlePieceCount || item.piecesInBundle || item.productQuantity) ?? null,
+          productQuantity: item.productQuantity ?? item.bundlePieceCount ?? item.piecesInBundle ?? null,
           image: item.coverImageUrl || '',
           subtotal: item.subtotal || (item.price || 0) * (item.quantity || 1),
           bookType: item.bookType || 'OTHER',
@@ -61,15 +47,14 @@ const CartPage = () => {
         
         setCartItems(items);
         
-        // Initialize expanded categories - expand all by default
         const categories = {};
         items.forEach(item => {
           const category = item.bookType || 'OTHER';
           if (categories[category] === undefined) {
-            categories[category] = true; // Expand by default
+            categories[category] = true;
           }
         });
-        setExpandedCategories(categories);
+        setExpandedCategories({ mandatoryTextbooks: true, mandatoryNotebooks: true, ...categories });
       } else {
         setCartItems([]);
         if (result.message) {
@@ -85,17 +70,25 @@ const CartPage = () => {
     }
   };
 
-  // Group items by category
+  // Group items: Mandatory Textbooks, Mandatory Notebooks, Optional by type
   const groupItemsByCategory = () => {
-    const grouped = {};
+    const textbooks = [];
+    const mandatoryNotebooks = [];
+    const optionalByType = {};
     cartItems.forEach(item => {
-      const category = item.bookType || 'OTHER';
-      if (!grouped[category]) {
-        grouped[category] = [];
+      if (item.bookType === 'TEXTBOOK') {
+        textbooks.push(item);
+      } else if (item.bookType === 'MANDATORY_NOTEBOOK') {
+        mandatoryNotebooks.push(item);
+      } else {
+        const type = item.bookType || 'OTHER';
+        if (!optionalByType[type]) {
+          optionalByType[type] = { type, title: getCategoryDisplayName(type), items: [] };
+        }
+        optionalByType[type].items.push(item);
       }
-      grouped[category].push(item);
     });
-    return grouped;
+    return { textbooks, mandatoryNotebooks, optionalByType };
   };
 
   const toggleCategory = (category) => {
@@ -232,24 +225,17 @@ const CartPage = () => {
               </button>
             </div>
 
-            {/* Category-wise grouped items */}
+            {/* Order: Optional 1–4 first, then Mandatory Textbooks, Mandatory Notebooks, then Other optional */}
             {(() => {
-              const groupedItems = groupItemsByCategory();
-              const categories = Object.keys(groupedItems).sort((a, b) => {
-                // Sort: TEXTBOOK first, then others alphabetically
-                if (a === 'TEXTBOOK') return -1;
-                if (b === 'TEXTBOOK') return 1;
-                return a.localeCompare(b);
-              });
-
-              return categories.map((category) => {
-                const items = groupedItems[category];
-                const isExpanded = expandedCategories[category] !== false; // Default to true
-                const categoryName = getCategoryName(category);
-
+              const { textbooks, mandatoryNotebooks, optionalByType } = groupItemsByCategory();
+              const optionalGroups = Object.values(optionalByType);
+              const optionalFirst = getOptionalBundlesFirst(optionalGroups);
+              const optionalRest = getOptionalBundlesRest(optionalGroups);
+              const renderSection = (sectionKey, title, items) => {
+                if (!items || items.length === 0) return null;
+                const isExpanded = expandedCategories[sectionKey] !== false;
                 return (
-                  <div key={category} style={{ marginBottom: '24px' }}>
-                    {/* Category Header */}
+                  <div key={sectionKey} style={{ marginBottom: '24px' }}>
                     <div
                       style={{
                         display: 'flex',
@@ -263,7 +249,7 @@ const CartPage = () => {
                         marginBottom: isExpanded ? '12px' : '0',
                         transition: 'background-color 0.2s ease',
                       }}
-                      onClick={() => toggleCategory(category)}
+                      onClick={() => toggleCategory(sectionKey)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = colors.gray100;
                       }}
@@ -285,7 +271,7 @@ const CartPage = () => {
                           color: colors.textPrimary,
                           margin: 0,
                         }}>
-                          {categoryName}
+                          {title}
                         </h3>
                         <span style={{
                           fontSize: '14px',
@@ -296,29 +282,133 @@ const CartPage = () => {
                         </span>
                       </div>
                     </div>
-
-                    {/* Category Items - Table on desktop, Cards on mobile */}
                     {isExpanded && (
                       <>
                         {isMobile ? (
                           <div>
                             {items.map((item) => (
-                              <CartItem
-                                key={item.id}
-                                item={item}
-                              />
+                              <CartItem key={item.id} item={item} />
                             ))}
                           </div>
                         ) : (
-                          <CartTable
-                            items={items}
-                          />
+                          <CartTable items={items} />
                         )}
                       </>
                     )}
                   </div>
                 );
-              });
+              };
+
+              const renderOptionalBlock = (sectionKey, title, groups) => {
+                if (!groups || groups.length === 0) return null;
+                const isSectionExpanded = expandedCategories[sectionKey] !== false;
+                const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
+                return (
+                  <div key={sectionKey} style={{ marginBottom: '24px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        backgroundColor: colors.gray50,
+                        borderRadius: '8px',
+                        border: `1px solid ${colors.borderLight}`,
+                        cursor: 'pointer',
+                        marginBottom: isSectionExpanded ? '12px' : '0',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                      onClick={() => toggleCategory(sectionKey)}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.gray100; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.gray50; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          fontSize: '20px',
+                          transition: 'transform 0.2s ease',
+                          transform: isSectionExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        }}>▶</span>
+                        <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>
+                          {title}
+                        </h3>
+                        <span style={{ fontSize: '14px', color: colors.textSecondary, marginLeft: '8px' }}>
+                          ({totalItems} item{totalItems !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                    </div>
+                    {isSectionExpanded && (
+                      <>
+                        {groups.map((group) => {
+                            const isTypeExpanded = expandedCategories[group.type] !== false;
+                            return (
+                              <div key={group.type} style={{ marginLeft: '16px', marginBottom: '16px' }}>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '12px 16px',
+                                    backgroundColor: colors.white,
+                                    borderRadius: '8px',
+                                    border: `1px solid ${colors.borderLight}`,
+                                    cursor: 'pointer',
+                                    marginBottom: isTypeExpanded ? '8px' : '0',
+                                  }}
+                                  onClick={() => toggleCategory(group.type)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = colors.gray50;
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = colors.white;
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{
+                                      fontSize: '16px',
+                                      transform: isTypeExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    }}>
+                                      ▶
+                                    </span>
+                                    <span style={{
+                                      fontSize: '16px',
+                                      fontWeight: '600',
+                                      color: colors.textPrimary,
+                                    }}>
+                                      {group.title}
+                                    </span>
+                                    <span style={{ fontSize: '14px', color: colors.textSecondary }}>
+                                      ({group.items.length})
+                                    </span>
+                                  </div>
+                                </div>
+                                {isTypeExpanded && (
+                                  isMobile ? (
+                                    <div>
+                                      {group.items.map((item) => (
+                                        <CartItem key={item.id} item={item} />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <CartTable items={group.items} />
+                                  )
+                                )}
+                              </div>
+                            );
+                        })}
+                      </>
+                    )}
+                  </div>
+                );
+              };
+
+              return (
+                <>
+                  {renderOptionalBlock('optionalFirst', 'Optional 1–4', optionalFirst)}
+                  {renderSection('mandatoryTextbooks', 'Mandatory Textbooks', textbooks)}
+                  {renderSection('mandatoryNotebooks', 'Mandatory Notebooks', mandatoryNotebooks)}
+                  {renderOptionalBlock('optionalRest', 'Other optional', optionalRest)}
+                </>
+              );
             })()}
           </div>
 

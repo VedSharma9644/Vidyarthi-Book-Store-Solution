@@ -79,13 +79,13 @@ const createBook = async (req, res) => {
       isFeatured: req.body.IsFeatured !== undefined ? req.body.IsFeatured : (req.body.isFeatured !== undefined ? req.body.isFeatured : false),
       categoryId: req.body.CategoryId || req.body.categoryId,
       gradeId: req.body.GradeId || req.body.gradeId || '',
+      subgradeId: req.body.SubgradeId || req.body.subgradeId || '',
       schoolId: req.body.SchoolId || req.body.schoolId || '',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    // If gradeId or schoolId are not provided, try to get them from the category
-    if (bookData.categoryId && (!bookData.gradeId || !bookData.schoolId)) {
+    if (bookData.categoryId && (!bookData.gradeId || !bookData.schoolId || !bookData.subgradeId)) {
       try {
         const categoryDoc = await db.collection('categories').doc(bookData.categoryId).get();
         if (categoryDoc.exists) {
@@ -93,8 +93,9 @@ const createBook = async (req, res) => {
           if (!bookData.gradeId && categoryData.gradeId) {
             bookData.gradeId = categoryData.gradeId;
           }
-          
-          // Get schoolId from grade if not provided
+          if (!bookData.subgradeId && categoryData.subgradeId) {
+            bookData.subgradeId = categoryData.subgradeId;
+          }
           if (!bookData.schoolId && bookData.gradeId) {
             const gradeDoc = await db.collection('grades').doc(bookData.gradeId).get();
             if (gradeDoc.exists) {
@@ -106,7 +107,7 @@ const createBook = async (req, res) => {
           }
         }
       } catch (error) {
-        console.warn('Warning: Could not fetch grade/school from category:', error.message);
+        console.warn('Warning: Could not fetch grade/school/subgrade from category:', error.message);
       }
     }
 
@@ -198,12 +199,12 @@ const updateBook = async (req, res) => {
       isFeatured: req.body.IsFeatured !== undefined ? req.body.IsFeatured : (req.body.isFeatured !== undefined ? req.body.isFeatured : existingBook.isFeatured),
       categoryId: req.body.CategoryId !== undefined ? req.body.CategoryId : (req.body.categoryId !== undefined ? req.body.categoryId : existingBook.categoryId),
       gradeId: req.body.GradeId !== undefined ? req.body.GradeId : (req.body.gradeId !== undefined ? req.body.gradeId : existingBook.gradeId || ''),
+      subgradeId: req.body.SubgradeId !== undefined ? req.body.SubgradeId : (req.body.subgradeId !== undefined ? req.body.subgradeId : existingBook.subgradeId || ''),
       schoolId: req.body.SchoolId !== undefined ? req.body.SchoolId : (req.body.schoolId !== undefined ? req.body.schoolId : existingBook.schoolId || ''),
       updatedAt: new Date(),
     };
 
-    // If categoryId changed or gradeId/schoolId are missing, try to get them from category
-    if (updatedData.categoryId && (!updatedData.gradeId || !updatedData.schoolId)) {
+    if (updatedData.categoryId && (!updatedData.gradeId || !updatedData.schoolId || !updatedData.subgradeId)) {
       try {
         const categoryDoc = await db.collection('categories').doc(updatedData.categoryId).get();
         if (categoryDoc.exists) {
@@ -211,8 +212,9 @@ const updateBook = async (req, res) => {
           if (!updatedData.gradeId && categoryData.gradeId) {
             updatedData.gradeId = categoryData.gradeId;
           }
-          
-          // Get schoolId from grade if not provided
+          if (!updatedData.subgradeId && categoryData.subgradeId) {
+            updatedData.subgradeId = categoryData.subgradeId;
+          }
           if (!updatedData.schoolId && updatedData.gradeId) {
             const gradeDoc = await db.collection('grades').doc(updatedData.gradeId).get();
             if (gradeDoc.exists) {
@@ -224,7 +226,7 @@ const updateBook = async (req, res) => {
           }
         }
       } catch (error) {
-        console.warn('Warning: Could not fetch grade/school from category:', error.message);
+        console.warn('Warning: Could not fetch grade/school/subgrade from category:', error.message);
       }
     }
 
@@ -335,11 +337,89 @@ const deleteBook = async (req, res) => {
   }
 };
 
+// Get books with low inventory (fewer than 5 orders left)
+// Orders left = floor(stockQuantity / productQuantity) per bundle
+const getLowInventoryBooks = async (req, res) => {
+  try {
+    const threshold = parseInt(req.query.threshold, 10) || 5;
+
+    const booksSnapshot = await db.collection('books')
+      .where('isActive', '==', true)
+      .get();
+
+    const lowInventory = [];
+    const gradeIds = new Set();
+    const schoolIds = new Set();
+
+    booksSnapshot.forEach((doc) => {
+      const book = Book.fromFirestore(doc);
+      const stock = parseInt(book.stockQuantity, 10) || 0;
+      const unitsPerBundle = parseInt(book.productQuantity, 10) || 1;
+      const ordersLeft = Math.floor(stock / unitsPerBundle);
+
+      if (ordersLeft < threshold) {
+        lowInventory.push({
+          id: book.id,
+          title: book.title,
+          author: book.author,
+          isbn: book.isbn,
+          bookType: book.bookType || '',
+          stockQuantity: stock,
+          productQuantity: unitsPerBundle,
+          ordersLeft,
+          gradeId: book.gradeId || '',
+          schoolId: book.schoolId || '',
+          categoryId: book.categoryId || '',
+        });
+        if (book.gradeId) gradeIds.add(book.gradeId);
+        if (book.schoolId) schoolIds.add(book.schoolId);
+      }
+    });
+
+    // Fetch grade and school names
+    const gradesMap = {};
+    const schoolsMap = {};
+    await Promise.all([
+      ...Array.from(gradeIds).map(async (id) => {
+        const doc = await db.collection('grades').doc(id).get();
+        if (doc.exists) gradesMap[id] = doc.data().name || '';
+      }),
+      ...Array.from(schoolIds).map(async (id) => {
+        const doc = await db.collection('schools').doc(id).get();
+        if (doc.exists) {
+          const d = doc.data();
+          schoolsMap[id] = d.name + (d.branchName ? ` - ${d.branchName}` : '') || '';
+        }
+      }),
+    ]);
+
+    const result = lowInventory.map((item) => ({
+      ...item,
+      gradeName: gradesMap[item.gradeId] || 'N/A',
+      schoolName: schoolsMap[item.schoolId] || 'N/A',
+    }));
+
+    res.json({
+      success: true,
+      data: result,
+      count: result.length,
+    });
+  } catch (error) {
+    console.error('Error fetching low inventory:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch low inventory',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllBooks,
   getBookById,
   createBook,
   updateBook,
   deleteBook,
+  getLowInventoryBooks,
 };
 

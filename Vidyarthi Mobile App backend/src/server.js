@@ -10,6 +10,7 @@ require('./config/firebase');
 const authRoutes = require('./routes/auth.routes');
 const schoolRoutes = require('./routes/school.routes');
 const gradeRoutes = require('./routes/grade.routes');
+const subgradeRoutes = require('./routes/subgrade.routes');
 const categoryRoutes = require('./routes/category.routes');
 const bookRoutes = require('./routes/book.routes');
 const cartRoutes = require('./routes/cart.routes');
@@ -50,6 +51,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/schools', schoolRoutes);
 app.use('/api/grades', gradeRoutes);
+app.use('/api/subgrades', subgradeRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/cart', cartRoutes);

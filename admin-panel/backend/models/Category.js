@@ -6,6 +6,7 @@ class Category {
     this.description = data.description || '';
     this.imageUrl = data.imageUrl || '';
     this.gradeId = data.gradeId || '';
+    this.subgradeId = data.subgradeId || '';
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
@@ -27,6 +28,7 @@ class Category {
       description: this.description,
       imageUrl: this.imageUrl,
       gradeId: this.gradeId,
+      subgradeId: this.subgradeId,
       isActive: this.isActive,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,

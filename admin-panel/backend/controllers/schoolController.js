@@ -1,5 +1,7 @@
 const { db } = require('../config/database');
 const School = require('../models/School');
+const Grade = require('../models/Grade');
+const { DEFAULT_GRADES } = require('../constants/defaultGrades');
 
 // Get all schools
 const getAllSchools = async (req, res) => {
@@ -86,13 +88,32 @@ const createSchool = async (req, res) => {
       });
     }
 
-    // Add to Firestore
+    // Add school to Firestore
     const docRef = await db.collection('schools').add(school.toFirestore());
-    const newSchool = await db.collection('schools').doc(docRef.id).get();
+    const schoolId = docRef.id;
+
+    // Create default grades for the new school (NURSERY, PP-1, PP-2, CLASS-1..12)
+    const now = new Date();
+    const batch = db.batch();
+    for (const { name, displayOrder } of DEFAULT_GRADES) {
+      const grade = new Grade({
+        name,
+        schoolId,
+        displayOrder,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const gradeRef = db.collection('grades').doc();
+      batch.set(gradeRef, grade.toFirestore());
+    }
+    await batch.commit();
+
+    const newSchool = await db.collection('schools').doc(schoolId).get();
 
     res.status(201).json({
       success: true,
-      message: 'School created successfully',
+      message: 'School created successfully with default grades',
       data: School.fromFirestore(newSchool),
     });
   } catch (error) {

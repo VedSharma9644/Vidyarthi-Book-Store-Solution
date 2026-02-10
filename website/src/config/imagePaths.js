@@ -64,12 +64,18 @@ export const getProductImageByCategory = (category) => {
     case 'MANDATORY':
       return PRODUCT_IMAGES.TEXTBOOK;
     case 'NOTEBOOK':
+    case 'MANDATORY_NOTEBOOK':
       return PRODUCT_IMAGES.NOTEBOOK;
     case 'STATIONARY':
     case 'STATIONERY':
       return PRODUCT_IMAGES.STATIONARY;
     case 'UNIFORM':
       return PRODUCT_IMAGES.UNIFORM;
+    case 'OPTIONAL_1':
+    case 'OPTIONAL_2':
+    case 'OPTIONAL_3':
+    case 'OPTIONAL_4':
+      return PRODUCT_IMAGES.NOTEBOOK;
     default:
       return PRODUCT_IMAGES.OTHER;
   }
@@ -82,6 +88,7 @@ export const getCategoryIcon = (category) => {
   switch (categoryUpper) {
     case 'TEXTBOOK':
     case 'MANDATORY':
+    case 'MANDATORY_NOTEBOOK':
       return CATEGORY_IMAGES.MANDATORY;
     case 'STATIONARY':
     case 'STATIONERY':

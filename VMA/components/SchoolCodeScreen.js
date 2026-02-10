@@ -157,7 +157,7 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
         <View style={styles.schoolCodeContainer}>
           <Text style={styles.schoolCodeTitle}>Enter your school code</Text>
           <Text style={styles.schoolCodeSubtitle}>
-            Please enter the code provided by your school to continue.
+          Enter Your School Name or code.
           </Text>
           
           <View style={styles.schoolCodeInputContainer}>

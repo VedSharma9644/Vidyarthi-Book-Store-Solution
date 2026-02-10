@@ -14,7 +14,7 @@ const OptionalBundleSection = ({
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const booksStyles = getResponsiveBooksStyles(isMobile, isTablet);
-  const [isExpanded, setIsExpanded] = useState(isSelected);
+  const [isExpanded, setIsExpanded] = useState(true); // Open by default so user can see contents; they can collapse if they want
 
   return (
     <div style={{ marginBottom: '40px' }}>

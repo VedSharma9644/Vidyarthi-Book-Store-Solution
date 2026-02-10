@@ -32,6 +32,7 @@ export const API_CONFIG = {
     CART: {
       GET: '/api/cart/getcart',
       UPDATE: '/api/cart/update',
+      ADD_ITEMS: '/api/cart/add-items',
       REMOVE: '/api/cart',
       COUNT: '/api/cart/count',
       CLEAR: '/api/cart/clear',
@@ -48,6 +49,11 @@ export const API_CONFIG = {
       GET_ALL: '/api/grades',
       GET_BY_ID: '/api/grades',
     },
+    // Subgrades (sections under a grade)
+    SUBGRADES: {
+      GET_ALL: '/api/subgrades',
+      GET_BY_ID: '/api/subgrades',
+    },
     // Categories
     CATEGORIES: {
       GET_ALL: '/api/categories',
@@ -61,6 +67,7 @@ export const API_CONFIG = {
     // Orders
     ORDERS: {
       CREATE: '/api/orders/create',
+      VALIDATE_CART: '/api/orders/validate-cart',
       GET_ALL: '/api/orders',
       GET_BY_ID: '/api/orders',
     },

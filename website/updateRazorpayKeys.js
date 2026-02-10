@@ -1,17 +1,21 @@
 /**
- * Script to update Razorpay Live API Keys in Firestore
- * 
- * IMPORTANT: This script must be run from the backend folder where firebase-admin is installed
- * 
+ * Script to update Razorpay API Keys in Firestore (Test or Live)
+ *
+ * IMPORTANT: Run from the backend folder where firebase-admin is installed.
+ *
  * Usage:
- * 1. Navigate to: "Vidyarthi Mobile App backend" folder
- * 2. Make sure serviceAccountKey.json exists in that folder
- * 3. Run: node ../website/updateRazorpayKeys.js
- * 
- * OR if firebase-admin is installed in website folder:
- * 1. cd website
- * 2. npm install firebase-admin
- * 3. node updateRazorpayKeys.js
+ *   From "Vidyarthi Mobile App backend" folder:
+ *     node ../website/updateRazorpayKeys.js [test|live]
+ *
+ *   Use "test" for Razorpay test keys (testing purchases).
+ *   Use "live" for Razorpay live keys (production).
+ *   If omitted, defaults to "live".
+ *
+ *   Example - set TEST keys:
+ *     node ../website/updateRazorpayKeys.js test
+ *
+ *   Example - set LIVE keys:
+ *     node ../website/updateRazorpayKeys.js live
  */
 
 const path = require('path');
@@ -71,60 +75,64 @@ try {
 
 const db = admin.firestore();
 
-// Live Razorpay Keys
-const LIVE_API_KEY = 'rzp_live_S5c1BFQpL8tS7m';
-const LIVE_SECRET_KEY = 'ozXuyD1GL3dxxnzbais9avww';
+// Razorpay Keys: Test (for testing purchases) and Live (production)
+const KEYS = {
+    test: {
+        apiKey: 'rzp_test_S68IxG9jhFN8bL',
+        secretKey: 'FIhfzgbtzRL7Wc5krcJSuFD1',
+    },
+    live: {
+        apiKey: 'rzp_live_S5c1BFQpL8tS7m',
+        secretKey: 'ozXuyD1GL3dxxnzbais9avww',
+    },
+};
+
+const mode = (process.argv[2] || 'live').toLowerCase();
+if (mode !== 'test' && mode !== 'live') {
+    console.error('Usage: node updateRazorpayKeys.js [test|live]');
+    process.exit(1);
+}
+const { apiKey, secretKey } = KEYS[mode];
 
 async function updateRazorpayKeys() {
     try {
-        console.log('🔄 Updating Razorpay Live Keys in Firestore...');
+        console.log(`🔄 Updating Razorpay ${mode.toUpperCase()} Keys in Firestore...`);
         
-        // Check if a Razorpay config already exists
         const existingConfigs = await db.collection('paymentGatewayConfigs')
             .where('gatewayName', '==', 'Razorpay')
             .get();
         
         if (!existingConfigs.empty) {
-            // Update existing configs - deactivate old ones and create/activate new live one
             const batch = db.batch();
-            
-            // Deactivate all existing Razorpay configs
             existingConfigs.forEach(doc => {
                 batch.update(doc.ref, { isActive: false });
             });
-            
-            // Create or update the live config
-            const liveConfigRef = db.collection('paymentGatewayConfigs').doc();
-            batch.set(liveConfigRef, {
+            const newConfigRef = db.collection('paymentGatewayConfigs').doc();
+            batch.set(newConfigRef, {
                 gatewayName: 'Razorpay',
-                apiKey: LIVE_API_KEY,
-                secretKey: LIVE_SECRET_KEY,
+                apiKey,
+                secretKey,
                 isActive: true,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-            
             await batch.commit();
-            console.log('✅ Successfully updated Razorpay Live Keys in Firestore');
-            console.log(`   API Key: ${LIVE_API_KEY}`);
-            console.log(`   Secret Key: ${LIVE_SECRET_KEY.substring(0, 10)}...`);
+            console.log(`✅ Successfully updated Razorpay ${mode.toUpperCase()} Keys in Firestore`);
         } else {
-            // Create new config if none exists
             await db.collection('paymentGatewayConfigs').add({
                 gatewayName: 'Razorpay',
-                apiKey: LIVE_API_KEY,
-                secretKey: LIVE_SECRET_KEY,
+                apiKey,
+                secretKey,
                 isActive: true,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-            console.log('✅ Successfully created Razorpay Live Keys in Firestore');
-            console.log(`   API Key: ${LIVE_API_KEY}`);
-            console.log(`   Secret Key: ${LIVE_SECRET_KEY.substring(0, 10)}...`);
+            console.log(`✅ Successfully created Razorpay ${mode.toUpperCase()} Keys in Firestore`);
         }
         
-        console.log('\n✅ Razorpay Live Keys have been updated successfully!');
-        console.log('   The backend will now use these keys for all payment operations.');
+        console.log(`   API Key: ${apiKey}`);
+        console.log(`   Secret Key: ${secretKey.substring(0, 10)}...`);
+        console.log('\n✅ Done. Backend will use these keys for payment operations.');
         
     } catch (error) {
         console.error('❌ Error updating Razorpay keys:', error);

@@ -96,6 +96,7 @@ const authenticate = (req, res, next) => {
     : req.cookies?.adminToken || req.headers['x-admin-token'];
 
   if (!token || !isValidSession(token)) {
+    console.log('[AUTH] 401 Unauthorized for path:', req.method, req.path);
     return res.status(401).json({
       success: false,
       message: 'Unauthorized. Please login to access the admin panel.',

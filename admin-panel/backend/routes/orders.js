@@ -9,7 +9,10 @@ router.get('/', orderController.getAllOrders);
 router.put('/:id/status', orderController.updateOrderStatus);
 
 // POST /api/orders/:id/shiprocket - Create Shiprocket order (must be before /:id route)
-router.post('/:id/shiprocket', orderController.createShiprocketOrder);
+router.post('/:id/shiprocket', (req, res, next) => {
+  console.log('[ORDERS] POST /api/orders/:id/shiprocket hit, orderId=', req.params.id);
+  next();
+}, orderController.createShiprocketOrder);
 
 // GET /api/orders/:id/shiprocket-status - Get Shiprocket order status (must be before /:id route)
 router.get('/:id/shiprocket-status', orderController.getShiprocketStatus);

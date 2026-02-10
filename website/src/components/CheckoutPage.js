@@ -10,22 +10,7 @@ import OrderSummary from './checkout/OrderSummary';
 import AddressSection from './checkout/AddressSection';
 import CartTable from './cart/CartTable';
 import CartItem from './cart/CartItem';
-
-// Helper function to format category name
-const getCategoryName = (bookType) => {
-  if (!bookType) return 'Other';
-  
-  const categoryMap = {
-    'TEXTBOOK': 'Textbooks',
-    'NOTEBOOK': 'Notebooks',
-    'UNIFORM': 'Uniforms',
-    'STATIONARY': 'Stationary',
-    'STATIONERY': 'Stationery',
-    'OTHER': 'Other',
-  };
-  
-  return categoryMap[bookType.toUpperCase()] || bookType.charAt(0) + bookType.slice(1).toLowerCase().replace(/_/g, ' ');
-};
+import { getCategoryDisplayName, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
 
 // Load Razorpay script
 const loadRazorpayScript = () => {
@@ -93,15 +78,18 @@ const CheckoutPage = () => {
         
         setCartItems(items);
         
-        // Initialize expanded categories - expand all by default
         const categories = {};
         items.forEach(item => {
           const category = item.bookType || 'OTHER';
           if (categories[category] === undefined) {
-            categories[category] = true; // Expand by default
+            categories[category] = true;
           }
         });
-        setExpandedCategories(categories);
+        setExpandedCategories({
+          mandatoryTextbooks: true,
+          mandatoryNotebooks: true,
+          ...categories,
+        });
       } else {
         setCartItems([]);
         if (result.message) {
@@ -129,17 +117,25 @@ const CheckoutPage = () => {
     return calculateSubtotal() + calculateDelivery();
   };
 
-  // Group items by category
+  // Group items: Mandatory Textbooks, Mandatory Notebooks, Optional by type
   const groupItemsByCategory = () => {
-    const grouped = {};
+    const textbooks = [];
+    const mandatoryNotebooks = [];
+    const optionalByType = {};
     cartItems.forEach(item => {
-      const category = item.bookType || 'OTHER';
-      if (!grouped[category]) {
-        grouped[category] = [];
+      if (item.bookType === 'TEXTBOOK') {
+        textbooks.push(item);
+      } else if (item.bookType === 'MANDATORY_NOTEBOOK') {
+        mandatoryNotebooks.push(item);
+      } else {
+        const type = item.bookType || 'OTHER';
+        if (!optionalByType[type]) {
+          optionalByType[type] = { type, title: getCategoryDisplayName(type), items: [] };
+        }
+        optionalByType[type].items.push(item);
       }
-      grouped[category].push(item);
     });
-    return grouped;
+    return { textbooks, mandatoryNotebooks, optionalByType };
   };
 
   const toggleCategory = (category) => {
@@ -163,6 +159,19 @@ const CheckoutPage = () => {
 
     try {
       setIsProcessing(true);
+
+      // Validate cart for checkout (inventory check): block if mandatory out of stock, or optional bundles need to be unchecked
+      const validateResult = await ApiService.validateCartForCheckout();
+      if (!validateResult.success || validateResult.valid === false) {
+        setIsProcessing(false);
+        const msg = validateResult.message || 'Your cart cannot be fulfilled at the moment.';
+        if (validateResult.code === 'INSUFFICIENT_STOCK') {
+          showWarning(msg, 'Cannot proceed to payment');
+        } else {
+          showError(msg);
+        }
+        return;
+      }
 
       const totalAmount = calculateTotal(); // Amount in rupees (backend will convert to paise)
       const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -237,10 +246,15 @@ const CheckoutPage = () => {
                 );
                 navigate('/');
               } else {
-                showWarning(
-                  `Your payment was successful, but there was an issue saving your order. Please contact support with Order ID: ${response.razorpay_order_id}`,
-                  'Payment Verified'
-                );
+                // Payment succeeded but order creation failed (e.g. INSUFFICIENT_STOCK race)
+                const isStockError = orderResult.code === 'INSUFFICIENT_STOCK';
+                const message = isStockError
+                  ? `Your payment was successful, but we couldn't fulfill your order due to insufficient stock. Please contact support with Payment ID: ${response.razorpay_payment_id} or Order ID: ${response.razorpay_order_id} for a refund.`
+                  : `Your payment was successful, but there was an issue saving your order. Please contact support with Order ID: ${response.razorpay_order_id}`;
+                showWarning(message, 'Payment Verified');
+                if (isStockError) {
+                  loadCart(); // Refresh cart so user can adjust and retry
+                }
                 navigate('/');
               }
             } else {
@@ -391,24 +405,18 @@ const CheckoutPage = () => {
           <div style={checkoutStyles.checkoutSection}>
             <h2 style={checkoutStyles.checkoutSectionTitle}>Order Items</h2>
             
-            {/* Category-wise grouped items */}
+            {/* Order Items: Optional 1–4 first, then Mandatory Textbooks, Mandatory Notebooks, then Other optional */}
             {(() => {
-              const groupedItems = groupItemsByCategory();
-              const categories = Object.keys(groupedItems).sort((a, b) => {
-                // Sort: TEXTBOOK first, then others alphabetically
-                if (a === 'TEXTBOOK') return -1;
-                if (b === 'TEXTBOOK') return 1;
-                return a.localeCompare(b);
-              });
-
-              return categories.map((category) => {
-                const items = groupedItems[category];
-                const isExpanded = expandedCategories[category] !== false; // Default to true
-                const categoryName = getCategoryName(category);
-
+              const { textbooks, mandatoryNotebooks, optionalByType } = groupItemsByCategory();
+              const optionalGroups = Object.values(optionalByType);
+              const optionalFirst = getOptionalBundlesFirst(optionalGroups);
+              const optionalRest = getOptionalBundlesRest(optionalGroups);
+              const renderSection = (sectionKey, title, items) => {
+                if (!items || items.length === 0) return null;
+                const isExpanded = expandedCategories[sectionKey] !== false;
+                const bundleTotal = items.reduce((sum, item) => sum + (item.subtotal || item.price * item.quantity), 0);
                 return (
-                  <div key={category} style={{ marginBottom: '24px' }}>
-                    {/* Category Header */}
+                  <div key={sectionKey} style={{ marginBottom: '24px' }}>
                     <div
                       style={{
                         display: 'flex',
@@ -422,7 +430,7 @@ const CheckoutPage = () => {
                         marginBottom: isExpanded ? '12px' : '0',
                         transition: 'background-color 0.2s ease',
                       }}
-                      onClick={() => toggleCategory(category)}
+                      onClick={() => toggleCategory(sectionKey)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = colors.gray100;
                       }}
@@ -444,7 +452,7 @@ const CheckoutPage = () => {
                           color: colors.textPrimary,
                           margin: 0,
                         }}>
-                          {categoryName}
+                          {title} Bundle
                         </h3>
                         <span style={{
                           fontSize: '14px',
@@ -454,30 +462,106 @@ const CheckoutPage = () => {
                           ({items.length} item{items.length !== 1 ? 's' : ''})
                         </span>
                       </div>
+                      <span style={{ fontSize: '16px', fontWeight: '600', color: colors.textPrimary }}>
+                        ₹{bundleTotal.toFixed(2)}
+                      </span>
                     </div>
-
-                    {/* Category Items - Table on desktop, Cards on mobile */}
                     {isExpanded && (
                       <>
                         {isMobile ? (
                           <div>
                             {items.map((item) => (
-                              <CartItem
-                                key={item.id}
-                                item={item}
-                              />
+                              <CartItem key={item.id} item={item} />
                             ))}
                           </div>
                         ) : (
-                          <CartTable
-                            items={items}
-                          />
+                          <CartTable items={items} />
                         )}
                       </>
                     )}
                   </div>
                 );
-              });
+              };
+
+              const renderOptionalBundleSection = (group) => {
+                    const isExpanded = expandedCategories[group.type] !== false;
+                    const bundleTotal = group.items.reduce((sum, item) => sum + (item.subtotal || item.price * item.quantity), 0);
+                    return (
+                      <div key={group.type} style={{ marginBottom: '24px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '16px',
+                            backgroundColor: colors.gray50,
+                            borderRadius: '8px',
+                            border: `1px solid ${colors.borderLight}`,
+                            cursor: 'pointer',
+                            marginBottom: isExpanded ? '12px' : '0',
+                            transition: 'background-color 0.2s ease',
+                          }}
+                          onClick={() => toggleCategory(group.type)}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = colors.gray100;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = colors.gray50;
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{
+                              fontSize: '20px',
+                              transition: 'transform 0.2s ease',
+                              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                            }}>
+                              ▶
+                            </span>
+                            <h3 style={{
+                              fontSize: '18px',
+                              fontWeight: 'bold',
+                              color: colors.textPrimary,
+                              margin: 0,
+                            }}>
+                              {group.title} Bundle
+                            </h3>
+                            <span style={{
+                              fontSize: '14px',
+                              color: colors.textSecondary,
+                              marginLeft: '8px',
+                            }}>
+                              ({group.items.length} item{group.items.length !== 1 ? 's' : ''})
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '16px', fontWeight: '600', color: colors.textPrimary }}>
+                            ₹{bundleTotal.toFixed(2)}
+                          </span>
+                        </div>
+                        {isExpanded && (
+                          <>
+                            {isMobile ? (
+                              <div>
+                                {group.items.map((item) => (
+                                  <CartItem key={item.id} item={item} />
+                                ))}
+                              </div>
+                            ) : (
+                              <CartTable items={group.items} />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+              };
+
+              return (
+                <>
+                  {optionalFirst.map((group) => renderOptionalBundleSection(group))}
+                  {renderSection('mandatoryTextbooks', 'Mandatory Textbooks', textbooks)}
+                  {renderSection('mandatoryNotebooks', 'Mandatory Notebooks', mandatoryNotebooks)}
+                  {optionalRest.map((group) => renderOptionalBundleSection(group))}
+                </>
+              );
             })()}
           </div>
         </div>

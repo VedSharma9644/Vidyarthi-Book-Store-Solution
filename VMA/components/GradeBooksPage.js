@@ -6,32 +6,40 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-  Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
+import { getCategoryDisplayName, getOptionalTypeTitle, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
 
 
 
-const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) => {
+const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName, schoolId, subgradeId, subgradeName }) => {
   const [textbooks, setTextbooks] = useState([]);
+  const [mandatoryNotebooks, setMandatoryNotebooks] = useState([]);
   const [optionalItems, setOptionalItems] = useState([]);
   const [optionalItemsByType, setOptionalItemsByType] = useState({});
 
 
   const [selectedBundles, setSelectedBundles] = useState({
-    NOTEBOOK: true,
-    UNIFORM: true,
-    STATIONARY: true,
-    OTHER: true,
+    NOTEBOOK: false,
+    UNIFORM: false,
+    STATIONARY: false,
+    OPTIONAL_1: false,
+    OPTIONAL_2: false,
+    OPTIONAL_3: false,
+    OPTIONAL_4: false,
+    OTHER: false,
   });
   
   // State for dropdown expansion (open by default)
   const [expandedSections, setExpandedSections] = useState({
+    optionalFirst: true,
     mandatoryTextbooks: true,
-    optionalItems: true,
+    mandatoryNotebooks: true,
+    optionalRest: true,
   });
   
   // State for individual optional bundle expansion (open by default)
@@ -42,9 +50,29 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
   const [error, setError] = useState(null);
   const [cartCount, setCartCount] = useState(0);
 
+  // Custom popup (consistent with app modal design)
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
+  const [popupOnOk, setPopupOnOk] = useState(null);
+
+  const showAppPopup = (title, message, onOk) => {
+    setPopupTitle(title || '');
+    setPopupMessage(message || '');
+    setPopupOnOk(() => onOk);
+    setShowPopup(true);
+  };
+
+  const closePopup = () => {
+    const callback = popupOnOk;
+    setShowPopup(false);
+    setPopupOnOk(null);
+    if (typeof callback === 'function') callback();
+  };
+
   useEffect(() => {
     loadBooks();
-  }, [gradeId]);
+  }, [gradeId, subgradeId]);
 
   useEffect(() => {
     // Load cart count on component mount and when component comes into focus
@@ -76,61 +104,61 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
       setIsLoading(true);
       setError(null);
 
-      // Fetch books for this grade
-      // Books are linked to categories, and categories are linked to grades
-      // Step 1: Get all categories for this grade
-      const categoriesResult = await ApiService.getCategoriesByGradeId(gradeId);
-      
-      if (!categoriesResult.success || !categoriesResult.data || categoriesResult.data.length === 0) {
-        setTextbooks([]);
-        setOptionalItems([]);
-        setOptionalItemsByType({});
-        setIsLoading(false);
-        return;
-      }
-      
+      const categoriesResult = subgradeId
+        ? await ApiService.getCategoriesBySubgradeId(subgradeId)
+        : await ApiService.getCategoriesByGradeId(gradeId);
 
-      const categoryIds = categoriesResult.data.map(cat => cat.id);
-      
-      // Step 2: Fetch books for these categories
-      // Fetch all books with pagination to ensure we get all products
+      const categoryIds = categoriesResult.success && categoriesResult.data
+        ? categoriesResult.data.map(cat => cat.id)
+        : [];
+
       let allBooks = [];
       let offset = 0;
-      const limit = 100; // Fetch in batches of 100
+      const limit = 100;
       let hasMore = true;
-      
-      // Fetch all books in batches until we get all of them
+
       while (hasMore) {
         const booksResult = await ApiService.getAllBooks({ offset, limit });
-        
+
         if (booksResult.success && booksResult.data && booksResult.data.length > 0) {
           allBooks = allBooks.concat(booksResult.data);
-          
-          // If we got fewer books than the limit, we've reached the end
-          if (booksResult.data.length < limit) {
-            hasMore = false;
-          } else {
-            offset += limit;
-          }
+          if (booksResult.data.length < limit) hasMore = false;
+          else offset += limit;
         } else {
           hasMore = false;
         }
       }
-      
-      if (allBooks.length > 0) {
-        // Filter books that belong to categories of this grade
-        const books = allBooks.filter(book => 
-          book.categoryId && categoryIds.includes(book.categoryId)
-        );
+
+      const books = allBooks.length > 0
+        ? allBooks.filter(book => {
+            // When a specific section (subgrade) is selected
+            if (subgradeId) {
+              return (
+                book.subgradeId === subgradeId ||
+                (book.categoryId && categoryIds.includes(book.categoryId))
+              );
+            }
+
+            // "View all books" (no section selected)
+            // Prefer category-based mapping when available
+            if (categoryIds.length > 0 && book.categoryId && categoryIds.includes(book.categoryId)) {
+              return true;
+            }
+
+            // Fallback: include books that are directly linked to this grade
+            // even if they don't have a category/section assigned
+            return book.gradeId === gradeId;
+          })
+        : [];
+
+      if (books.length > 0) {
         
-        // Separate textbooks from other items
+        // Separate mandatory textbooks, mandatory notebooks, and optional items
         const textbooksList = [];
+        const mandatoryNotebooksList = [];
         const optionalList = [];
         const optionalByType = {};
 
-
-
-        
         books.forEach(book => {
           // Filter out "N/A" values and treat them as empty
           // const cleanAuthor = book.author && book.author !== 'N/A' && book.author.trim() !== '' ? book.author : null;
@@ -187,20 +215,20 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
 
           };
 
-          // TEXTBOOK is mandatory, everything else is optional (combo)
+          // TEXTBOOK = mandatory textbooks, MANDATORY_NOTEBOOK = mandatory notebooks, rest = optional
           if (book.bookType === 'TEXTBOOK') {
             textbooksList.push(bookItem);
+          } else if (book.bookType === 'MANDATORY_NOTEBOOK') {
+            mandatoryNotebooksList.push(bookItem);
           } else {
             const typeKey = book.bookType || 'OTHER';
-          
             if (!optionalByType[typeKey]) {
               optionalByType[typeKey] = {
                 type: typeKey,
-                title: typeKey.charAt(0) + typeKey.slice(1).toLowerCase(),
+                title: getOptionalTypeTitle(typeKey),
                 items: [],
               };
             }
-          
             optionalList.push(bookItem);
             optionalByType[typeKey].items.push(bookItem);
           }
@@ -209,6 +237,7 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
         });
 
         setTextbooks(textbooksList);
+        setMandatoryNotebooks(mandatoryNotebooksList);
         setOptionalItems(optionalList);
         setOptionalItemsByType(optionalByType);
         
@@ -218,8 +247,13 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
           initialExpandedBundles[type] = true;
         });
         setExpandedBundles(initialExpandedBundles);
+        setError(null);
       } else {
-        setError(booksResult.message || 'Failed to load books');
+        setTextbooks([]);
+        setMandatoryNotebooks([]);
+        setOptionalItems([]);
+        setOptionalItemsByType({});
+        setError(subgradeId ? 'No books found for this section.' : 'No books found for this grade.');
       }
     } catch (error) {
       console.error('Error loading books:', error);
@@ -231,16 +265,23 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
 
   
 
-    // Calculate combo total price
+    // Calculate combo total price (selected optional bundles only)
     const calculateComboTotal = () => {
       return Object.entries(optionalItemsByType).reduce((sum, [type, group]) => {
         if (!selectedBundles[type]) return sum;
-    
         return (
           sum +
           group.items.reduce((itemSum, item) => itemSum + (item.price || 0), 0)
         );
       }, 0);
+    };
+
+    // Total price of current selection (mandatory + selected optional) — shown before Add to Cart
+    const calculateOrderTotal = () => {
+      const mandatoryTextbooksTotal = textbooks.reduce((sum, book) => sum + (book.price || 0), 0);
+      const mandatoryNotebooksTotal = mandatoryNotebooks.reduce((sum, book) => sum + (book.price || 0), 0);
+      const optionalTotal = calculateComboTotal();
+      return mandatoryTextbooksTotal + mandatoryNotebooksTotal + optionalTotal;
     };
   
     const toggleBundle = (type) => {
@@ -270,10 +311,13 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
     try {
       setIsAddingToCart(true);
 
-      // Get all items to add: all textbooks + optional items combo (if selected)
-      const itemsToAdd = [...textbooks.map(book => book.id)];
+      // Get all items to add: mandatory textbooks + mandatory notebooks + optional items (if selected)
+      const itemsToAdd = [
+        ...textbooks.map(book => book.id),
+        ...mandatoryNotebooks.map(book => book.id),
+      ];
       
-      // Add all optional items if combo is selected
+      // Add optional items for each bundle type if selected
       Object.entries(optionalItemsByType).forEach(([type, group]) => {
         if (selectedBundles[type]) {
           itemsToAdd.push(...group.items.map(item => item.id));
@@ -282,81 +326,49 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
       
 
       if (itemsToAdd.length === 0) {
-        Alert.alert('No Items', 'Please select at least one item to add to cart.');
+        showAppPopup('No Items', 'Please select at least one item to add to cart.');
         setIsAddingToCart(false);
         return;
       }
 
-      // Clear existing cart first before adding new items
-      // This ensures only one grade/order can be in the cart at a time
+      // Add all items in one request (backend replaces cart with these items)
+      const payload = itemsToAdd.map((id) => ({ itemId: id, quantity: 1 }));
+      let result;
       try {
-        console.log('Clearing existing cart before adding new items...');
-        const clearResult = await ApiService.clearCart();
-        
-        if (!clearResult.success) {
-          Alert.alert(
-            'Cart Clear Failed',
-            'Failed to clear existing cart. Please try again.',
-            [{ text: 'OK' }]
-          );
+        result = await ApiService.addItemsToCart(payload);
+      } catch (error) {
+        const data = error.response?.data;
+        if (data?.code === 'INSUFFICIENT_STOCK') {
+          const bookType = (data.bookType || 'OTHER').toUpperCase();
+          const bundleLabel = getCategoryDisplayName(bookType);
+          const isMandatory = bookType === 'TEXTBOOK' || bookType === 'MANDATORY_NOTEBOOK';
+          const message = isMandatory
+            ? 'This grade cannot be ordered at the moment due to insufficient stock for required items.'
+            : `Insufficient stock for some items in the ${bundleLabel} bundle. Please uncheck the ${bundleLabel} bundle to continue.`;
+          showAppPopup('Insufficient Stock', message);
           setIsAddingToCart(false);
           return;
         }
-        
-        console.log('Cart cleared successfully');
-        
-        // Wait a moment to ensure cart is fully cleared on backend
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (error) {
-        console.error('Error clearing cart:', error);
-        Alert.alert(
-          'Error',
-          'Failed to clear existing cart. Please try again.',
-          [{ text: 'OK' }]
-        );
+        console.error('Error adding to cart:', error);
+        showAppPopup('Error', 'Failed to add items to cart. Please try again.');
         setIsAddingToCart(false);
         return;
       }
 
-      // Add each item to cart
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const itemId of itemsToAdd) {
-        try {
-          const result = await ApiService.updateCartItem(itemId, 1);
-          if (result.success) {
-            successCount++;
-          } else {
-            failCount++;
-            console.error(`Failed to add item ${itemId}:`, result.message);
-          }
-        } catch (error) {
-          console.error(`Error adding item ${itemId} to cart:`, error);
-          failCount++;
-        }
-      }
-
-      if (successCount > 0) {
-        // Reload cart count after adding items
+      if (result?.success && result?.addedCount > 0) {
         await loadCartCount();
-        
-        // Show success message
-        Alert.alert(
+        showAppPopup(
           'Items Added',
-          `${successCount} item(s) added to cart successfully.${failCount > 0 ? ` ${failCount} item(s) failed to add.` : ''}`,
-          [{ text: 'OK' }]
+          `${result.addedCount} item(s) added to cart successfully.`,
+          () => onTabPress('cart')
         );
-        
-        // Automatically navigate to cart page
-        onTabPress('cart');
       } else {
-        Alert.alert('Error', 'Failed to add items to cart. Please try again.');
+        showAppPopup('Error', 'Failed to add items to cart. Please try again.');
         setIsAddingToCart(false);
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
-      Alert.alert('Error', 'Failed to add items to cart. Please try again.');
+      showAppPopup('Error', 'Failed to add items to cart. Please try again.');
     } finally {
       setIsAddingToCart(false);
     }
@@ -390,7 +402,7 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
               paddingVertical: 12,
               borderRadius: 8,
             }}
-            onPress={onBack}
+            onPress={onBackToSchool || onBack}
           >
             <Text style={{ color: '#f8fcfa', fontSize: 16, fontWeight: 'bold' }}>Go Back</Text>
           </TouchableOpacity>
@@ -475,6 +487,148 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Optional 1–4 Section (top when available) */}
+        {getOptionalBundlesFirst(Object.values(optionalItemsByType)).length > 0 && (
+          <>
+            <TouchableOpacity
+              onPress={() => toggleSection('optionalFirst')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingTop: 20,
+                paddingBottom: 12,
+              }}
+            >
+              <Text style={{
+                color: '#0e1b16',
+                fontSize: 22,
+                fontWeight: 'bold',
+              }}>
+                Optional 1–4
+              </Text>
+              <Text style={{
+                fontSize: 20,
+                color: '#06412c',
+              }}>
+                {(expandedSections.optionalFirst ?? true) ? '▼' : '▶'}
+              </Text>
+            </TouchableOpacity>
+            {(expandedSections.optionalFirst ?? true) &&
+              getOptionalBundlesFirst(Object.values(optionalItemsByType)).map((group) => (
+                <View key={group.type}>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    marginBottom: 8,
+                  }}>
+                    <TouchableOpacity
+                      onPress={() => toggleBundle(group.type)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        flex: 1,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 4,
+                          borderWidth: 2,
+                          borderColor: selectedBundles[group.type] ? '#06412c' : '#ccc',
+                          backgroundColor: selectedBundles[group.type] ? '#06412c' : 'transparent',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 10,
+                        }}
+                      >
+                        {selectedBundles[group.type] && (
+                          <Text style={{ color: '#fff', fontWeight: 'bold' }}>✓</Text>
+                        )}
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 'bold',
+                          color: '#0e1b16',
+                        }}
+                      >
+                        {group.title}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => toggleBundleExpansion(group.type)}
+                      style={{ padding: 4 }}
+                    >
+                      <Text style={{ fontSize: 16, color: '#06412c' }}>
+                        {(expandedBundles[group.type] ?? true) ? '▼' : '▶'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {(expandedBundles[group.type] ?? true) &&
+                    group.items.map((item) => {
+                      const imageUri = item.coverImageUrl && item.coverImageUrl.trim() !== '' ? item.coverImageUrl : null;
+                      return (
+                        <View
+                          key={item.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#f8fcfa',
+                            paddingHorizontal: 16,
+                            minHeight: 64,
+                            paddingVertical: 8,
+                            marginBottom: 4,
+                          }}
+                        >
+                          <View style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 8,
+                            backgroundColor: '#e7f3ef',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            overflow: 'hidden',
+                          }}>
+                            {imageUri ? (
+                              <Image source={{ uri: imageUri }} style={{ width: 48, height: 48 }} resizeMode="cover" />
+                            ) : (
+                              <Text style={{ fontSize: 18 }}>📦</Text>
+                            )}
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={{ color: '#0e1b16', fontSize: 15, fontWeight: '500' }} numberOfLines={1}>
+                              {item.title}
+                            </Text>
+                            <View style={{ marginTop: 6 }}>
+                              <View style={{ flexDirection: 'row' }}>
+                                <Text style={{ flex: 1, fontSize: 12, color: '#555' }}>Per Unit</Text>
+                                <Text style={{ flex: 1, fontSize: 12, color: '#555', textAlign: 'center' }}>Qty</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', marginTop: 2 }}>
+                                <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#06412c' }}>
+                                  ₹{item.perProductPrice || '-'}
+                                </Text>
+                                <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#06412c', textAlign: 'center' }}>
+                                  {item.productQuantity || '-'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <Text style={{ color: '#06412c', fontSize: 15, fontWeight: 'bold' }}>
+                            ₹{item.price.toFixed(2)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                </View>
+              ))}
+          </>
+        )}
+
         {/* Mandatory Textbooks Section */}
         {textbooks.length > 0 && (
           <>
@@ -585,11 +739,11 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
           </>
         )}
 
-        {/* Optional Items Combo Section */}
-        {Object.keys(optionalItemsByType).length > 0 && (
+        {/* Mandatory Notebooks Section */}
+        {mandatoryNotebooks.length > 0 && (
           <>
             <TouchableOpacity
-              onPress={() => toggleSection('optionalItems')}
+              onPress={() => toggleSection('mandatoryNotebooks')}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -604,21 +758,122 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
                 fontSize: 22,
                 fontWeight: 'bold',
               }}>
-                Optional Items Combo
+                Mandatory Notebooks
               </Text>
               <Text style={{
                 fontSize: 20,
                 color: '#06412c',
               }}>
-                {expandedSections.optionalItems ? '▼' : '▶'}
+                {expandedSections.mandatoryNotebooks ? '▼' : '▶'}
               </Text>
             </TouchableOpacity>
 
+            {expandedSections.mandatoryNotebooks && mandatoryNotebooks.map((book) => {
+              const imageUri = book.coverImageUrl && book.coverImageUrl.trim() !== '' 
+                ? book.coverImageUrl 
+                : null;
+              
+              return (
+              <View key={book.id} style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#f8fcfa',
+                paddingHorizontal: 16,
+                minHeight: 72,
+                paddingVertical: 8,
+                gap: 16,
+              }}>
+                <View style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 8,
+                  backgroundColor: '#e7f3ef',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  overflow: 'hidden',
+                }}>
+                  {imageUri ? (
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={{
+                        width: 56,
+                        height: 56,
+                      }}
+                      resizeMode="cover"
+                      onError={(error) => {
+                        console.log('Image load error:', error.nativeEvent.error);
+                      }}
+                    />
+                  ) : (
+                    <Text style={{ color: '#4d997e', fontSize: 20 }}>📦</Text>
+                  )}
+                </View>
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <Text
+                    style={{
+                      color: '#0e1b16',
+                      fontSize: 16,
+                      fontWeight: '500',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {book.title}
+                  </Text>
+                  <View style={{ marginTop: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ flex: 1, fontSize: 12, color: '#555' }}>Per Unit</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: '#555', textAlign: 'center' }}>Qty</Text>
+                      <Text style={{ flex: 1, fontSize: 12, color: '#555', textAlign: 'right' }}>Total</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#06412c' }}>
+                        ₹{book.perProductPrice || '-'}
+                      </Text>
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#06412c', textAlign: 'center' }}>
+                        {book.productQuantity || '-'}
+                      </Text>
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#06412c', textAlign: 'right' }}>
+                        ₹{book.price}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            );
+            })}
+          </>
+        )}
 
-
-            {/* Optional Items List (book-type wise) */}
-            {expandedSections.optionalItems && Object.values(selectedBundles).some(bundle => bundle) &&
-              Object.values(optionalItemsByType).map((group) => (
+        {/* Other Optional Section (after mandatory; Notebook, Uniform, etc.) */}
+        {getOptionalBundlesRest(Object.values(optionalItemsByType)).length > 0 && (
+          <>
+            <TouchableOpacity
+              onPress={() => toggleSection('optionalRest')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingTop: 20,
+                paddingBottom: 12,
+              }}
+            >
+              <Text style={{
+                color: '#0e1b16',
+                fontSize: 22,
+                fontWeight: 'bold',
+              }}>
+                Other optional
+              </Text>
+              <Text style={{
+                fontSize: 20,
+                color: '#06412c',
+              }}>
+                {expandedSections.optionalRest ? '▼' : '▶'}
+              </Text>
+            </TouchableOpacity>
+            {expandedSections.optionalRest &&
+              getOptionalBundlesRest(Object.values(optionalItemsByType)).map((group) => (
                 <View key={group.type}>
 
                   {/* Category Title with Checkbox and Expand/Collapse */}
@@ -681,7 +936,7 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
                   </View>
 
 
-                  {selectedBundles[group.type] && expandedBundles[group.type] &&
+                  {(expandedBundles[group.type] ?? true) &&
                     group.items.map((item) => {
 
                     const imageUri =
@@ -833,6 +1088,32 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
           shadowRadius: 4,
           elevation: 5,
         }}>
+          {/* Order total before adding to cart */}
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            backgroundColor: '#f8fcfa',
+            borderRadius: 8,
+          }}>
+            <Text style={{
+              color: '#0e1b16',
+              fontSize: 16,
+              fontWeight: '600',
+            }}>
+              Order total
+            </Text>
+            <Text style={{
+              color: '#06412c',
+              fontSize: 20,
+              fontWeight: 'bold',
+            }}>
+              ₹{calculateOrderTotal().toFixed(2)}
+            </Text>
+          </View>
           <TouchableOpacity
             style={{
               width: '100%',
@@ -889,6 +1170,39 @@ const GradeBooksPage = ({ onTabPress, onBack, gradeId, gradeName, schoolId }) =>
           </Text>
         </View>
       )}
+
+      {/* App-styled popup (consistent with address modals, etc.) */}
+      <Modal
+        visible={showPopup}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closePopup}
+      >
+        <View style={styles.modalOverlay}>
+          <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <View style={styles.modalContent}>
+              <View style={styles.addressModalHeader}>
+                <Text style={styles.addressModalTitle} numberOfLines={1}>{popupTitle}</Text>
+                <TouchableOpacity onPress={closePopup} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Text style={styles.modalCloseButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.addressModalBody}>
+                <Text style={{ fontSize: 16, color: colors.textPrimary, lineHeight: 24, marginBottom: 20 }}>
+                  {popupMessage}
+                </Text>
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={closePopup}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalOptionText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
 
       {/* Bottom Navigation */}
       <BottomNavigation activeTab="search" onTabPress={onTabPress} />

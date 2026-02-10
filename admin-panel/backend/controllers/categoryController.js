@@ -4,12 +4,19 @@ const Category = require('../models/Category');
 // Get all categories
 const getAllCategories = async (req, res) => {
   try {
-    const { schoolId } = req.query;
+    const { schoolId, subgradeId } = req.query;
     let categories = [];
 
-    if (schoolId) {
+    if (subgradeId) {
+      const categoriesSnapshot = await db.collection('categories')
+        .where('isActive', '==', true)
+        .where('subgradeId', '==', subgradeId)
+        .get();
+      categoriesSnapshot.forEach((doc) => {
+        categories.push(Category.fromFirestore(doc));
+      });
+    } else if (schoolId) {
       // Filter categories by schoolId through grades
-      // First, get all grades for this school
       const gradesSnapshot = await db.collection('grades')
         .where('schoolId', '==', schoolId)
         .where('isActive', '==', true)
@@ -21,8 +28,6 @@ const getAllCategories = async (req, res) => {
       });
 
       if (gradeIds.length > 0) {
-        // Get all categories for these grades
-        // Firestore doesn't support 'in' queries with more than 10 items, so we'll batch if needed
         const batchSize = 10;
         for (let i = 0; i < gradeIds.length; i += batchSize) {
           const batch = gradeIds.slice(i, i + batchSize);
@@ -37,11 +42,9 @@ const getAllCategories = async (req, res) => {
         }
       }
     } else {
-      // Get all active categories
       const categoriesSnapshot = await db.collection('categories')
         .where('isActive', '==', true)
         .get();
-      
       categoriesSnapshot.forEach((doc) => {
         categories.push(Category.fromFirestore(doc));
       });
@@ -121,6 +124,17 @@ const createCategory = async (req, res) => {
       }
     }
 
+    if (category.subgradeId) {
+      const subgradeDoc = await db.collection('subgrades').doc(category.subgradeId).get();
+      if (!subgradeDoc.exists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Subgrade not found',
+          errors: ['The specified subgrade does not exist'],
+        });
+      }
+    }
+
     // Add to Firestore
     const docRef = await db.collection('categories').add(category.toFirestore());
     const newCategory = await db.collection('categories').doc(docRef.id).get();
@@ -185,6 +199,17 @@ const updateCategory = async (req, res) => {
           success: false,
           message: 'Grade not found',
           errors: ['The specified grade does not exist'],
+        });
+      }
+    }
+
+    if (category.subgradeId && category.subgradeId !== existingCategory.subgradeId) {
+      const subgradeDoc = await db.collection('subgrades').doc(category.subgradeId).get();
+      if (!subgradeDoc.exists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Subgrade not found',
+          errors: ['The specified subgrade does not exist'],
         });
       }
     }

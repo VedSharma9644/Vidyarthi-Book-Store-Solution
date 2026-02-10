@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { StyleSheetManager } from 'styled-components';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -7,9 +8,11 @@ import Categories from './pages/Categories';
 import UpsertCategory from './pages/UpsertCategory';
 import Books from './pages/Books';
 import UpsertBook from './pages/UpsertBook';
+import Inventory from './pages/Inventory';
 import Schools from './pages/Schools';
 import UpsertSchool from './pages/UpsertSchool';
 import Grades from './pages/Grades';
+import Subgrades from './pages/Subgrades';
 import UpsertGrade from './pages/UpsertGrade';
 import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
@@ -76,8 +79,12 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+// Prevent styled-components from forwarding 'align' to the DOM (fixes react-data-table-component warning)
+const shouldForwardProp = (prop) => prop !== 'align';
+
 function App() {
   return (
+    <StyleSheetManager shouldForwardProp={shouldForwardProp}>
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -94,9 +101,11 @@ function App() {
                   <Route path="/upsert-category" element={<UpsertCategory />} />
                   <Route path="/get-all-books" element={<Books />} />
                   <Route path="/upsert-book" element={<UpsertBook />} />
+                  <Route path="/inventory" element={<Inventory />} />
                   <Route path="/get-all-schools" element={<Schools />} />
                   <Route path="/upsert-school" element={<UpsertSchool />} />
                   <Route path="/get-all-grades" element={<Grades />} />
+                  <Route path="/subgrades" element={<Subgrades />} />
                   <Route path="/upsert-grade" element={<UpsertGrade />} />
                   <Route path="/get-all-orders" element={<Orders />} />
                   <Route path="/get-order-details" element={<OrderDetails />} />
@@ -109,6 +118,7 @@ function App() {
         />
       </Routes>
     </Router>
+    </StyleSheetManager>
   );
 }
 

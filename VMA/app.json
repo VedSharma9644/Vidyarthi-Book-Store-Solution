@@ -2,7 +2,7 @@
   "expo": {
     "name": "Vidyarthi Kart",
     "slug": "vidyarthi-mobile-app",
-    "version": "1.0.5",
+    "version": "1.0.11",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -11,7 +11,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.creayaa.vidyarthikart",
-      "buildNumber": "7",
+      "buildNumber": "11",
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app allows you to upload a book image or profile picture.",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.creayaa.vidyarthikart",
-      "versionCode": 7,
+      "versionCode": 11,
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]

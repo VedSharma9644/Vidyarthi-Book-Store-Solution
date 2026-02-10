@@ -5,6 +5,8 @@ yarn.lock
 
 # Environment variables
 .env
+.env.cloudrun-shiprocket
+.env.cloudrun-shiprocket.yaml
 .env.local
 .env.development.local
 .env.test.local

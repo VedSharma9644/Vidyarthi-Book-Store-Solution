@@ -6,6 +6,7 @@ import RegisterScreen from '../components/auth/RegisterScreen';
 import HomeScreen from '../components/HomeScreen';
 import SearchScreen from '../components/SearchScreen';
 import SchoolPage from '../components/SchoolPage';
+import GradeSectionsPage from '../components/GradeSectionsPage';
 import GradeBooksPage from '../components/GradeBooksPage';
 import CartPage from '../components/CartPage';
 import CheckoutPage from '../components/CheckoutPage';
@@ -81,6 +82,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <SchoolPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/grade/:gradeId/sections"
+        element={
+          <ProtectedRoute>
+            <GradeSectionsPage />
           </ProtectedRoute>
         }
       />

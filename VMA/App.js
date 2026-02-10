@@ -32,6 +32,7 @@ function AppContent() {
   const [upsertGradeId, setUpsertGradeId] = useState(null);
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedGrade, setSelectedGrade] = useState(null);
+  const [selectedSubgrade, setSelectedSubgrade] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   // Set initial screen based on auth status
@@ -140,7 +141,7 @@ function AppContent() {
 
   const goBack = () => {
     if (currentScreen === 'gradeBooks') {
-      setSelectedGrade(null);
+      setSelectedSubgrade(null);
       setCurrentScreen('schoolPage');
     } else if (currentScreen === 'schoolPage') {
       setSelectedSchool(null);
@@ -157,9 +158,15 @@ function AppContent() {
     setCurrentScreen('schoolPage');
   };
 
-  const goToGradeBooks = (grade) => {
+  const goToGradeBooks = (grade, skipSections) => {
     setSelectedGrade(grade);
+    setSelectedSubgrade(null);
     setCurrentScreen('gradeBooks');
+  };
+
+  const goBackToSchoolFromGradeBooks = () => {
+    setSelectedSubgrade(null);
+    setCurrentScreen('schoolPage');
   };
 
   const goToLogin = () => {
@@ -231,15 +238,27 @@ function AppContent() {
             onBack={goBack} 
             schoolId={selectedSchool?.id}
             schoolCode={selectedSchool?.code}
-            onViewBooks={goToGradeBooks}
+            onSelectSection={(grade, section) => {
+              setSelectedGrade(grade);
+              setSelectedSubgrade(section);
+              setCurrentScreen('gradeBooks');
+            }}
+            onViewAllBooks={(grade) => {
+              setSelectedGrade(grade);
+              setSelectedSubgrade(null);
+              setCurrentScreen('gradeBooks');
+            }}
           />
         ) : currentScreen === 'gradeBooks' ? (
           <GradeBooksPage
             onTabPress={handleTabPress}
             onBack={goBack}
+            onBackToSchool={goBackToSchoolFromGradeBooks}
             gradeId={selectedGrade?.id}
-            gradeName={selectedGrade?.name}
+            gradeName={selectedSubgrade ? `${selectedGrade?.name} - ${selectedSubgrade?.name}` : selectedGrade?.name}
             schoolId={selectedSchool?.id}
+            subgradeId={selectedSubgrade?.id}
+            subgradeName={selectedSubgrade?.name}
           />
         ) : currentScreen === 'cart' ? (
           <CartScreen onTabPress={handleTabPress} onBack={goBack} onGoToCheckout={goToCheckout} />

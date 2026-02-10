@@ -1,22 +1,7 @@
 import React, { useState } from 'react';
 import { cartStyles, colors } from '../../css/cartStyles';
 import { getProductImageByCategory } from '../../config/imagePaths';
-
-// Helper function to format category name
-const getCategoryName = (bookType) => {
-  if (!bookType) return 'Other';
-  
-  const categoryMap = {
-    'TEXTBOOK': 'Textbook',
-    'NOTEBOOK': 'Notebook',
-    'UNIFORM': 'Uniform',
-    'STATIONARY': 'Stationary',
-    'STATIONERY': 'Stationery', // Handle both spellings
-    'OTHER': 'Other',
-  };
-  
-  return categoryMap[bookType.toUpperCase()] || bookType.charAt(0) + bookType.slice(1).toLowerCase().replace(/_/g, ' ');
-};
+import { getCategoryDisplayName } from '../../utils/categoryNames';
 
 const CartItem = ({ item }) => {
   const [imageError, setImageError] = useState(false);
@@ -24,7 +9,7 @@ const CartItem = ({ item }) => {
 
   const imageUri = item.image && item.image.trim() !== '' ? item.image : null;
   const fallbackImage = getProductImageByCategory(item.bookType);
-  const categoryName = getCategoryName(item.bookType);
+  const categoryName = getCategoryDisplayName(item.bookType);
 
   return (
     <div style={cartStyles.cartItem}>
@@ -60,7 +45,7 @@ const CartItem = ({ item }) => {
             <span style={cartStyles.cartItemCategoryBadge}>
               {categoryName}
             </span>
-            {item.bookType === 'TEXTBOOK' && (
+            {(item.bookType === 'TEXTBOOK' || item.bookType === 'MANDATORY_NOTEBOOK') && (
               <span style={{
                 display: 'inline-block',
                 padding: '4px 10px',
@@ -87,8 +72,11 @@ const CartItem = ({ item }) => {
             <span style={cartStyles.cartItemPriceValue}>₹{item.price || 0}</span>
           </div>
           <div style={cartStyles.cartItemPriceRow}>
-            <span style={cartStyles.cartItemPriceLabel}>Pieces in Bundle:</span>
-            <span style={cartStyles.cartItemPriceValue}>{item.bundlePieceCount || item.quantity || 0}</span>
+            <span style={cartStyles.cartItemPriceLabel}>Qty:</span>
+            <span style={cartStyles.cartItemPriceValue}>
+              {item.quantity ?? item.bundlePieceCount ?? 0}
+              {item.productQuantity != null && item.productQuantity > 1 ? ` (${item.productQuantity} per bundle)` : ''}
+            </span>
           </div>
           <div style={{
             ...cartStyles.cartItemPriceRow,

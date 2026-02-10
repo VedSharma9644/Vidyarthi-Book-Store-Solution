@@ -70,6 +70,14 @@ const updateCartItem = async (req, res) => {
             data: cart,
         });
     } catch (error) {
+        if (error.code === 'INSUFFICIENT_STOCK') {
+            return res.status(400).json({
+                success: false,
+                message: error.message || 'Insufficient stock',
+                code: 'INSUFFICIENT_STOCK',
+                bookType: error.bookType || 'OTHER',
+            });
+        }
         console.error('Error in updateCartItem controller:', error);
         res.status(500).json({
             success: false,
@@ -152,6 +160,55 @@ const getCartCount = async (req, res) => {
 };
 
 /**
+ * Add multiple items to cart (replaces cart contents). Single request for fast add.
+ * @route POST /api/cart/add-items
+ */
+const addItemsToCart = async (req, res) => {
+    try {
+        const userId = req.headers['user-id'] || req.body.userId;
+        const { items } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required',
+            });
+        }
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Items array is required and must not be empty',
+            });
+        }
+
+        const { cart, addedCount } = await cartService.addItemsToCart(userId, items);
+
+        res.json({
+            success: true,
+            message: 'Items added to cart',
+            data: cart,
+            addedCount,
+        });
+    } catch (error) {
+        if (error.code === 'INSUFFICIENT_STOCK') {
+            return res.status(400).json({
+                success: false,
+                message: error.message || 'Insufficient stock',
+                code: 'INSUFFICIENT_STOCK',
+                bookType: error.bookType || 'OTHER',
+            });
+        }
+        console.error('Error in addItemsToCart controller:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to add items to cart',
+            error: error.message,
+        });
+    }
+};
+
+/**
  * Clear cart (remove all items)
  * @route POST /api/cart/clear
  */
@@ -186,6 +243,7 @@ const clearCart = async (req, res) => {
 module.exports = {
     getCart,
     updateCartItem,
+    addItemsToCart,
     removeCartItem,
     getCartCount,
     clearCart,

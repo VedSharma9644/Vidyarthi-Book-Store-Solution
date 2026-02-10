@@ -1,0 +1,35 @@
+# Cloud Build: build and deploy Vidyarthi Mobile App Backend to Cloud Run
+# Deploy to project vidyarthi-mobile-app only (vidyarthi-backend-594708558503.us-central1.run.app)
+
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/vidyarthi-backend', '.']
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/vidyarthi-backend']
+  # Deploy to Cloud Run (us-central1)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'vidyarthi-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/vidyarthi-backend'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '512Mi'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+
+images:
+  - 'gcr.io/$PROJECT_ID/vidyarthi-backend'

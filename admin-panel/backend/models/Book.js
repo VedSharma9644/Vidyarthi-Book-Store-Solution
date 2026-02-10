@@ -20,6 +20,7 @@ class Book {
     this.isFeatured = data.isFeatured !== undefined ? data.isFeatured : false;
     this.categoryId = data.categoryId || '';
     this.gradeId = data.gradeId || '';
+    this.subgradeId = data.subgradeId || '';
     this.schoolId = data.schoolId || '';
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || new Date();
@@ -53,6 +54,7 @@ class Book {
       isFeatured: this.isFeatured,
       categoryId: this.categoryId,
       gradeId: this.gradeId,
+      subgradeId: this.subgradeId,
       schoolId: this.schoolId,
       isActive: this.isActive,
       createdAt: this.createdAt,
@@ -125,9 +127,7 @@ class Book {
       errors.push('Book type cannot exceed 50 characters.');
     }
 
-    if (!this.categoryId || this.categoryId.trim().length === 0) {
-      errors.push('Category ID is required.');
-    }
+    // Category is optional
 
     return errors;
   }

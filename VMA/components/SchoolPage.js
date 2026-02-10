@@ -19,6 +19,39 @@ import ApiService from '../services/apiService';
 const GRADE_BACKGROUND_IMAGE = require('../assets/images/Select-Class-Image.jpeg');
 
 // Fallback to old URLs if local image doesn't exist (for backward compatibility)
+/** Hardcoded grade display order: always show in this sequence */
+const GRADE_DISPLAY_ORDER = [
+  'NURSERY',
+  'PP-1',
+  'PP-2',
+  'CLASS-1',
+  'CLASS-2',
+  'CLASS-3',
+  'CLASS-4',
+  'CLASS-5',
+  'CLASS-6',
+  'CLASS-7',
+  'CLASS-8',
+  'CLASS-9',
+  'CLASS-10',
+  'CLASS-11',
+  'CLASS-12',
+];
+
+const getGradeOrderIndex = (name) => {
+  const n = (name || '').trim().toUpperCase();
+  const exact = GRADE_DISPLAY_ORDER.findIndex((o) => o.toUpperCase() === n);
+  if (exact >= 0) return exact;
+  for (let i = GRADE_DISPLAY_ORDER.length - 1; i >= 0; i--) {
+    if (n.startsWith(GRADE_DISPLAY_ORDER[i].toUpperCase())) return i;
+  }
+  return 999;
+};
+
+const sortGrades = (grades) => {
+  return [...grades].sort((a, b) => getGradeOrderIndex(a.name) - getGradeOrderIndex(b.name));
+};
+
 const GRADE_IMAGES_FALLBACK = {
   9: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB5lNrDizC9IkVT9WBpy8yqmaUVkdVnV9If6m-FGZwQwPO1lWy3sMd_KiBYbC7Gws_rnK4YcR0YIsLQ7n5xHyYq3L6cIpHuToeZaXS6u67ZMgnCsJ6ozEIZFqoVkTvYmQJ3N6N-3xr7bHARdS8cIBR5ueBsTv1mPSM53xBSqn7Tvq2VcuO5Tqn8E89FpGK_B-wWULft-Bykd5O4Mjpbht8tE6XVXEQRRyo0CVnSvJOoPFQWNiKbn5HAJUT0HuUmx_T3rTQ_BwYC520',
   10: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMmvmZcjuXIsKvwA08IJF8Sm-VsaYpQxPygsBx94mA3ydNVklWTdKaAP3QygwC4ruqj4AVBy-uVK_A7WnqXN23IhtLtYEx7zhThBfh7Glxcp6bL6rWh0hKBIDeYxuA_taEx-WLJld_2NNlbM5ccxBs3OC1tgv-GwG18VoI9gQT-aHd-RyJdyyfAOj20fKrXZJkmLt3-5Avf6ZahYvJdxQAy4PHvKspShZcLaCb6xfQzWKUicf4uEPUG78g9O8dxua-uq4sFf5agWI',
@@ -26,9 +59,10 @@ const GRADE_IMAGES_FALLBACK = {
   12: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCHndnGiUw1THvCQy3z6p6RpoYytWan7u1m97HwZ83pDtzdLveJ9Y6HGKEMWEZauvk5AOthIctNpFBhdD62k-Pha2BtfPZNWCx8csvY36CgmYSEp13jJCeZzkg90FCY4ijjyDssxtVr7LeiLYixmE_eRwsXIpJMtQPaPcWAiUl7f3Z3AUbUkJFx7FGvjPfyMzgiI7tyIhUy4FzRhPlU4kVcN2e8SObwtUs-HXUoLuYcuRBmINpBnCBuG4wXYokNNJel4h13KsyebxA',
 };
 
-const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onViewBooks }) => {
+const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection, onViewAllBooks }) => {
   const [school, setSchool] = useState(null);
   const [grades, setGrades] = useState([]);
+  const [sectionsByGradeId, setSectionsByGradeId] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -40,10 +74,11 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onViewBooks }) =
     try {
       setIsLoading(true);
       setError(null);
+      setSectionsByGradeId({});
 
       let result;
       let loadedSchoolId = null;
-      
+
       if (schoolId) {
         result = await ApiService.getSchoolById(schoolId);
         loadedSchoolId = schoolId;
@@ -60,19 +95,44 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onViewBooks }) =
 
       if (result.success && result.data) {
         setSchool(result.data);
-        
-        // Fetch grades for this school
+
         if (loadedSchoolId) {
           const gradesResult = await ApiService.getGradesBySchoolId(loadedSchoolId);
           if (gradesResult.success && gradesResult.data) {
-            // Transform grades data to match the component's expected format
             const transformedGrades = gradesResult.data.map(grade => ({
               id: grade.id,
               name: grade.name,
             }));
-            setGrades(transformedGrades);
+
+            // Optionally hide grades that have no products/books
+            let finalGrades = transformedGrades;
+            try {
+              const booksResult = await ApiService.getAllBooks({ offset: 0, limit: 500 });
+              if (booksResult.success && Array.isArray(booksResult.data)) {
+                const gradesWithBooks = new Set(
+                  booksResult.data
+                    .filter((book) => book.schoolId === loadedSchoolId && book.gradeId)
+                    .map((book) => book.gradeId)
+                );
+                if (gradesWithBooks.size > 0) {
+                  finalGrades = transformedGrades.filter((grade) => gradesWithBooks.has(grade.id));
+                }
+              }
+            } catch (filterError) {
+              console.warn('Failed to filter grades by books; showing all grades instead.', filterError);
+            }
+
+            setGrades(sortGrades(finalGrades));
+            // Fetch sections (subgrades) for each grade
+            const byGrade = {};
+            await Promise.all(
+              finalGrades.map(async (grade) => {
+                const res = await ApiService.getSubgradesByGradeId(grade.id);
+                byGrade[grade.id] = (res.success && res.data) ? res.data : [];
+              })
+            );
+            setSectionsByGradeId(byGrade);
           } else {
-            // If grades fetch fails, show empty list
             setGrades([]);
             console.warn('Failed to load grades:', gradesResult.message);
           }
@@ -82,19 +142,20 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onViewBooks }) =
       } else {
         setError(result.message || 'School not found');
       }
-    } catch (error) {
-      console.error('Error loading school:', error);
+    } catch (err) {
+      console.error('Error loading school:', err);
       setError('Failed to load school information. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleViewBooks = (grade) => {
-    // Navigate to grade books page
-    if (onViewBooks) {
-      onViewBooks(grade);
-    }
+  const handleSelectSection = (grade, section) => {
+    if (onSelectSection) onSelectSection(grade, section);
+  };
+
+  const handleViewAllBooks = (grade) => {
+    if (onViewAllBooks) onViewAllBooks(grade);
   };
 
   const getSchoolAddress = () => {
@@ -232,100 +293,104 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onViewBooks }) =
           {getSchoolAddress() || 'Address not available'}
         </Text>
 
-        {/* Available Grades Heading */}
-        <Text style={{
-          color: '#0e1b16',
-          fontSize: 22,
-          fontWeight: 'bold',
-          paddingHorizontal: 16,
-          paddingTop: 20,
-          paddingBottom: 12,
-        }}>
-          Available Grades
-        </Text>
-
-        {/* Grade Cards */}
+        {/* Grades and sections (one grade card per row on mobile) */}
         {grades.length === 0 ? (
           <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-            <Text style={{
-              color: '#666',
-              fontSize: 16,
-              textAlign: 'center',
-              paddingVertical: 20,
-            }}>
+            <Text
+              style={{
+                color: '#666',
+                fontSize: 16,
+                textAlign: 'center',
+                paddingVertical: 20,
+              }}
+            >
               No grades available for this school
             </Text>
           </View>
         ) : (
-          grades.map((grade) => (
-          <View key={grade.id} style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-            <ImageBackground
-              source={GRADE_BACKGROUND_IMAGE}
-              style={{
-                height: 180,
-                borderRadius: 8,
-                overflow: 'hidden',
-                justifyContent: 'flex-end',
-              }}
-              resizeMode="cover"
-            >
-              {/* Gradient Overlay */}
-              <View style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                bottom: 0,
-                top: 0,
-              }}>
-                <View style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: '100%',
-                  backgroundColor: 'rgba(0,0,0,0.4)',
-                }} />
-              </View>
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                justifyContent: 'space-between',
-                padding: 16,
-                gap: 16,
-              }}>
-                <Text style={{
-                  flex: 1,
-                  color: '#FFFFFF',
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  lineHeight: 28,
-                }}>
+          grades.map((grade) => {
+            const sections = sectionsByGradeId[grade.id] || [];
+            return (
+              <View
+                key={grade.id}
+                style={{
+                  marginHorizontal: 16,
+                  marginBottom: 20,
+                  backgroundColor: '#d2f7ff',
+                  borderRadius: 12,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#a8e8f0',
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: 'bold',
+                    marginBottom: 12,
+                  }}
+                >
                   {grade.name}
                 </Text>
-                <TouchableOpacity
+                <Text
                   style={{
-                    minWidth: 84,
-                    height: 40,
-                    backgroundColor: '#06412c',
-                    borderRadius: 8,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 16,
+                    color: colors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: '600',
+                    marginBottom: 10,
                   }}
-                  onPress={() => handleViewBooks(grade)}
                 >
-                  <Text style={{
-                    color: '#f8fcfa',
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                  }}>
-                    View Books
-                  </Text>
-                </TouchableOpacity>
+                  Select Language
+                </Text>
+                {sections.length === 0 ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleViewAllBooks(grade)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: colors.white,
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.borderLight || '#e5e7eb',
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, color: colors.textPrimary }}>View all books</Text>
+                    <Text style={{ fontSize: 18, color: colors.textSecondary || '#6b7280' }}>→</Text>
+                  </TouchableOpacity>
+                ) : (
+                  sections.map((section) => (
+                    <TouchableOpacity
+                      key={section.id}
+                      activeOpacity={0.7}
+                      onPress={() => handleSelectSection(grade, section)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: colors.white,
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: colors.borderLight || '#e5e7eb',
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: colors.textPrimary }}>
+                        {section.name}
+                      </Text>
+                      <Text style={{ fontSize: 18, color: colors.textSecondary || '#6b7280' }}>→</Text>
+                    </TouchableOpacity>
+                  ))
+                )}
               </View>
-            </ImageBackground>
-          </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 

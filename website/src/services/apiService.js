@@ -452,6 +452,22 @@ class ApiService {
     }
   }
 
+  // Subgrades (sections) APIs
+  async getSubgradesByGradeId(gradeId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.SUBGRADES.GET_ALL, {
+        params: { gradeId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get subgrades API Error:', error.message);
+      if (error.response) {
+        return { success: false, message: error.response?.data?.message || 'Failed to fetch sections', data: [] };
+      }
+      return { success: false, message: 'Failed to fetch sections.', data: [] };
+    }
+  }
+
   // Categories APIs
   async getCategoriesByGradeId(gradeId) {
     try {
@@ -480,6 +496,21 @@ class ApiService {
           data: [],
         };
       }
+    }
+  }
+
+  async getCategoriesBySubgradeId(subgradeId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.CATEGORIES.GET_ALL, {
+        params: { subgradeId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get categories by subgrade API Error:', error.message);
+      if (error.response) {
+        return { success: false, message: error.response?.data?.message || 'Failed to fetch categories', data: [] };
+      }
+      return { success: false, message: 'Failed to fetch categories.', data: [] };
     }
   }
 
@@ -540,9 +571,12 @@ class ApiService {
     } catch (error) {
       console.error('Update cart item API Error:', error.message);
       if (error.response) {
+        const data = error.response.data || {};
         return {
           success: false,
-          message: error.response.data?.message || 'Failed to update cart',
+          message: data.message || 'Failed to update cart',
+          code: data.code,
+          bookType: data.bookType,
         };
       } else if (error.request) {
         return {
@@ -555,6 +589,20 @@ class ApiService {
           message: 'Failed to update cart. Please try again.',
         };
       }
+    }
+  }
+
+  /**
+   * Add multiple items to cart in one request (replaces cart). Use for fast add-from-grade.
+   * @param {Array<{ itemId: string, quantity: number }>} items
+   * @returns {Promise<{ success, data?, addedCount?, message? }>}
+   */
+  async addItemsToCart(items) {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.CART.ADD_ITEMS, { items });
+      return response.data;
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -779,6 +827,48 @@ class ApiService {
     }
   }
 
+  /**
+   * Validate cart for checkout (inventory check only). Call before opening payment.
+   * On INSUFFICIENT_STOCK: mandatory = whole grade blocked; optional = user should uncheck those bundles.
+   */
+  async validateCartForCheckout() {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.VALIDATE_CART, {});
+      return response.data;
+    } catch (error) {
+      console.error('Validate cart API Error:', error.message);
+      if (error.response && error.response.status === 400) {
+        const data = error.response.data || {};
+        return {
+          success: false,
+          valid: false,
+          message: data.message || 'Cart cannot be fulfilled',
+          code: data.code,
+          insufficientBundles: data.insufficientBundles || null,
+        };
+      }
+      if (error.response) {
+        return {
+          success: false,
+          valid: false,
+          message: error.response.data?.message || 'Failed to validate cart',
+        };
+      }
+      if (error.request) {
+        return {
+          success: false,
+          valid: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+        };
+      }
+      return {
+        success: false,
+        valid: false,
+        message: 'Failed to validate cart. Please try again.',
+      };
+    }
+  }
+
   async createOrder(paymentData, shippingAddress = null) {
     try {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, {
@@ -789,21 +879,24 @@ class ApiService {
     } catch (error) {
       console.error('Create order API Error:', error.message);
       if (error.response) {
+        const data = error.response.data || {};
         return {
           success: false,
-          message: error.response.data?.message || 'Failed to create order',
+          message: data.message || 'Failed to create order',
+          code: data.code,
+          insufficientBundles: data.insufficientBundles || null,
         };
-      } else if (error.request) {
+      }
+      if (error.request) {
         return {
           success: false,
           message: 'Cannot connect to server. Make sure backend is running.',
         };
-      } else {
-        return {
-          success: false,
-          message: 'Failed to create order. Please try again.',
-        };
       }
+      return {
+        success: false,
+        message: 'Failed to create order. Please try again.',
+      };
     }
   }
 

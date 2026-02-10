@@ -8,6 +8,8 @@ export { colors };
 export const getResponsiveBooksStyles = (isMobile, isTablet) => ({
   booksPageContainer: {
     paddingTop: isMobile ? '60px' : isTablet ? '80px' : '70px', // Account for fixed top navigation
+    // Extra bottom padding so content doesn't hide behind fixed footer bar
+    paddingBottom: isMobile ? '120px' : '140px',
     minHeight: '100vh',
     backgroundColor: colors.backgroundLight,
   },

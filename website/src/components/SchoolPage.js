@@ -1,11 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { styles, colors } from '../css/styles';
-import { GRADE_IMAGES } from '../config/imagePaths';
+import { getSchoolPageStyles } from '../css/schoolPageStyles';
 import { useHeaderHeight } from '../hooks/useHeaderHeight';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
+
+/** Hardcoded grade display order: always show in this sequence */
+const GRADE_DISPLAY_ORDER = [
+  'NURSERY',
+  'PP-1',
+  'PP-2',
+  'CLASS-1',
+  'CLASS-2',
+  'CLASS-3',
+  'CLASS-4',
+  'CLASS-5',
+  'CLASS-6',
+  'CLASS-7',
+  'CLASS-8',
+  'CLASS-9',
+  'CLASS-10',
+  'CLASS-11',
+  'CLASS-12',
+];
+
+const getGradeOrderIndex = (name) => {
+  const n = (name || '').trim().toUpperCase();
+  const exact = GRADE_DISPLAY_ORDER.findIndex((o) => o.toUpperCase() === n);
+  if (exact >= 0) return exact;
+  // Match prefix (e.g. "NURSERY (EY1)" -> NURSERY); use longest match so CLASS-10 beats CLASS-1
+  for (let i = GRADE_DISPLAY_ORDER.length - 1; i >= 0; i--) {
+    if (n.startsWith(GRADE_DISPLAY_ORDER[i].toUpperCase())) return i;
+  }
+  return 999;
+};
+
+const sortGrades = (grades) => {
+  return [...grades].sort((a, b) => getGradeOrderIndex(a.name) - getGradeOrderIndex(b.name));
+};
 
 const SchoolPage = () => {
   const { schoolId } = useParams();
@@ -14,6 +48,7 @@ const SchoolPage = () => {
   const isMobile = useIsMobile();
   const [school, setSchool] = useState(null);
   const [grades, setGrades] = useState([]);
+  const [sectionsByGradeId, setSectionsByGradeId] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -25,6 +60,7 @@ const SchoolPage = () => {
     try {
       setIsLoading(true);
       setError(null);
+      setSectionsByGradeId({});
 
       if (!schoolId) {
         setError('No school identifier provided');
@@ -33,19 +69,45 @@ const SchoolPage = () => {
       }
 
       const result = await ApiService.getSchoolById(schoolId);
-      
+
       if (result.success && result.data) {
         setSchool(result.data);
-        
-        // Fetch grades for this school
+
         const gradesResult = await ApiService.getGradesBySchoolId(schoolId);
         if (gradesResult.success && gradesResult.data) {
           const transformedGrades = gradesResult.data.map(grade => ({
             id: grade.id,
             name: grade.name,
           }));
-          setGrades(transformedGrades);
-          console.log('Loaded grades:', transformedGrades);
+
+          // Optionally hide grades that have no products/books
+          let finalGrades = transformedGrades;
+          try {
+            const booksResult = await ApiService.getAllBooks({ offset: 0, limit: 500 });
+            if (booksResult.success && Array.isArray(booksResult.data)) {
+              const gradesWithBooks = new Set(
+                booksResult.data
+                  .filter((book) => book.schoolId === schoolId && book.gradeId)
+                  .map((book) => book.gradeId)
+              );
+              if (gradesWithBooks.size > 0) {
+                finalGrades = transformedGrades.filter((grade) => gradesWithBooks.has(grade.id));
+              }
+            }
+          } catch (filterError) {
+            console.warn('Failed to filter grades by books; showing all grades instead.', filterError);
+          }
+
+          setGrades(sortGrades(finalGrades));
+
+          const byGrade = {};
+          await Promise.all(
+            finalGrades.map(async (grade) => {
+              const res = await ApiService.getSubgradesByGradeId(grade.id);
+              byGrade[grade.id] = (res.success && res.data) ? res.data : [];
+            })
+          );
+          setSectionsByGradeId(byGrade);
         } else {
           setGrades([]);
           console.warn('Failed to load grades:', gradesResult.message);
@@ -53,20 +115,31 @@ const SchoolPage = () => {
       } else {
         setError(result.message || 'School not found');
       }
-    } catch (error) {
-      console.error('Error loading school:', error);
+    } catch (err) {
+      console.error('Error loading school:', err);
       setError('Failed to load school information. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleViewBooks = (grade) => {
-    navigate(`/grade/${grade.id}`, { 
-      state: { 
+  const handleSelectSection = (grade, section) => {
+    navigate(`/grade/${grade.id}`, {
+      state: {
         gradeName: grade.name,
-        schoolId: schoolId 
-      } 
+        schoolId,
+        subgradeId: section?.id || null,
+        subgradeName: section?.name || null,
+      },
+    });
+  };
+
+  const handleViewAllBooks = (grade) => {
+    navigate(`/grade/${grade.id}`, {
+      state: {
+        gradeName: grade.name,
+        schoolId,
+      },
     });
   };
 
@@ -126,26 +199,13 @@ const SchoolPage = () => {
     );
   }
 
+  const schoolPageStyles = getSchoolPageStyles(headerHeight);
+
   return (
-    <div style={{
-      ...styles.container,
-      paddingTop: headerHeight, // Account for fixed top navigation
-    }}>
-      <div style={{
-        ...styles.mainContent,
-        justifyContent: 'flex-start',
-        flexDirection: 'column',
-        maxWidth: '1200px',
-        margin: '0 auto',
-        width: '100%',
-        paddingTop: '20px',
-        paddingBottom: '40px',
-      }}>
-        {/* School Banner */}
-        <div style={{
-          padding: '0 16px',
-          marginBottom: '20px',
-        }}>
+    <div style={schoolPageStyles.pageContainer}>
+      <div style={schoolPageStyles.pageContent}>
+        {/* School Banner - no top margin/padding so it touches the header */}
+        <div style={schoolPageStyles.bannerWrap}>
           <img
             src={getSchoolBannerImage()}
             alt={school.name}
@@ -153,7 +213,7 @@ const SchoolPage = () => {
               width: '100%',
               height: '218px',
               borderRadius: '8px',
-              objectFit: 'cover',
+              objectFit: 'contain',
               backgroundColor: colors.gray100,
               display: 'block',
             }}
@@ -166,10 +226,12 @@ const SchoolPage = () => {
 
         {/* School Name */}
         <h1 style={{
+          ...schoolPageStyles.sectionPadding,
           color: colors.textPrimary,
           fontSize: '28px',
           fontWeight: 'bold',
-          padding: '0 16px',
+          paddingTop: 0,
+          paddingBottom: 0,
           margin: '12px 0',
         }}>
           {school.name}
@@ -177,28 +239,19 @@ const SchoolPage = () => {
 
         {/* School Address */}
         <p style={{
+          ...schoolPageStyles.sectionPadding,
           color: colors.textPrimary,
           fontSize: '16px',
-          padding: '0 16px',
+          paddingTop: 0,
+          paddingBottom: 0,
           marginBottom: '12px',
         }}>
           {getSchoolAddress() || 'Address not available'}
         </p>
 
-        {/* Available Grades Heading */}
-        <h2 style={{
-          color: colors.textPrimary,
-          fontSize: '22px',
-          fontWeight: 'bold',
-          padding: '20px 16px 12px',
-          margin: 0,
-        }}>
-          Available Grades
-        </h2>
-
-        {/* Grade Cards */}
+        {/* Grades and sections on school page */}
         {grades.length === 0 ? (
-          <div style={{ padding: '16px' }}>
+          <div style={{ ...schoolPageStyles.sectionPadding, padding: '16px' }}>
             <p style={{
               color: colors.textSecondary,
               fontSize: '16px',
@@ -209,123 +262,114 @@ const SchoolPage = () => {
             </p>
           </div>
         ) : (
-          <div style={{ 
-            padding: '0 16px 16px', 
+          <div style={{
+            ...schoolPageStyles.sectionPadding,
+            paddingTop: '20px',
+            paddingBottom: '16px',
             width: '100%',
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-            gap: '16px',
+            // On mobile: 1 grade per row, on larger screens: 3 per row
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: '20px',
           }}>
             {grades.map((grade) => {
-              // Use the default grade image for all grades
-              const gradeImage = GRADE_IMAGES.DEFAULT;
+              const sections = sectionsByGradeId[grade.id] || [];
               return (
-                <div key={grade.id} style={{ width: '100%' }}>
-                  <div style={{
-                    width: '100%',
-                    height: '180px',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    position: 'relative',
-                    backgroundColor: colors.gray100,
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                <div
+                  key={grade.id}
+                  style={{
+                    backgroundColor: '#d2f7ff',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid #a8e8f0',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                  onClick={() => handleViewBooks(grade)}
-                  >
-                    {/* Background Image */}
-                    <img
-                      src={gradeImage}
-                      alt={grade.name}
+                >
+                  <h3 style={{
+                    color: colors.textPrimary,
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    margin: '0 0 12px 0',
+                  }}>
+                    {grade.name}
+                  </h3>
+                  <p style={{
+                    color: colors.textPrimary,
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    margin: '0 0 10px 0',
+                  }}>
+                    Select Language
+                  </p>
+                  {sections.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => handleViewAllBooks(grade)}
                       style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                         width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        objectPosition: 'center 20%',
-                        zIndex: 0,
+                        padding: '14px 16px',
+                        backgroundColor: colors.white || '#ffffff',
+                        border: `1px solid ${colors.borderLight || colors.gray200 || '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: '16px',
+                        color: colors.textPrimary,
+                        fontWeight: '500',
+                        transition: 'background-color 0.2s, box-shadow 0.2s',
                       }}
-                      onError={(e) => {
-                        console.log('Grade image failed to load:', gradeImage);
-                        e.target.style.display = 'none';
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = colors.gray50 || '#f9fafb';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
                       }}
-                    />
-                    {/* Dark Overlay */}
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                      zIndex: 1,
-                    }} />
-                    
-                    {/* Grade Info */}
-                    <div style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      display: 'flex',
-                      flexDirection: 'row',
-                      alignItems: 'flex-end',
-                      justifyContent: 'space-between',
-                      padding: '12px',
-                      gap: '8px',
-                      zIndex: 2,
-                    }}>
-                      <h3 style={{
-                        flex: 1,
-                        color: colors.white,
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        lineHeight: '22px',
-                        margin: 0,
-                        textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                      }}>
-                        {grade.name}
-                      </h3>
-                      <button
-                        style={{
-                          minWidth: '80px',
-                          height: '32px',
-                          backgroundColor: '#000000',
-                          borderRadius: '6px',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '0 12px',
-                          color: colors.white,
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          flexShrink: 0,
-                          transition: 'background-color 0.2s ease',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewBooks(grade);
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#333333';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#000000';
-                        }}
-                      >
-                        View Books
-                      </button>
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = colors.white || '#ffffff';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <span>View all books</span>
+                      <span style={{ color: colors.textSecondary || '#6b7280', fontSize: '18px' }}>→</span>
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {sections.map((section) => (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => handleSelectSection(grade, section)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            padding: '14px 16px',
+                            backgroundColor: colors.white || '#ffffff',
+                            border: `1px solid ${colors.borderLight || colors.gray200 || '#e5e7eb'}`,
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontSize: '16px',
+                            color: colors.textPrimary,
+                            fontWeight: '500',
+                            transition: 'background-color 0.2s, box-shadow 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = colors.gray50 || '#f9fafb';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = colors.white || '#ffffff';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <span>{section.name}</span>
+                          <span style={{ color: colors.textSecondary || '#6b7280', fontSize: '18px' }}>→</span>
+                        </button>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}

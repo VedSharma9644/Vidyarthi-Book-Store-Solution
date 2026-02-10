@@ -1,15 +1,87 @@
 const { db } = require('../config/firebase');
-const { Timestamp } = require('firebase-admin/firestore');
+const { Timestamp, FieldValue } = require('firebase-admin/firestore');
 const cartService = require('./cartService');
 const userService = require('./userService');
+
+/** Book types that are mandatory: if out of stock, entire grade order is blocked */
+const MANDATORY_BOOK_TYPES = ['TEXTBOOK', 'MANDATORY_NOTEBOOK'];
+
+/**
+ * Throws an inventory error for order creation (mandatory vs optional bundles).
+ * @param {Array<{ itemId: string, bookType: string }>} insufficientItems - Items with insufficient stock
+ */
+function throwInventoryError(insufficientItems) {
+    const hasMandatory = insufficientItems.some(
+        (item) => MANDATORY_BOOK_TYPES.includes((item.bookType || '').toUpperCase())
+    );
+    const optionalBundles = [
+        ...new Set(
+            insufficientItems
+                .filter((item) => !MANDATORY_BOOK_TYPES.includes((item.bookType || '').toUpperCase()))
+                .map((item) => item.bookType || 'OTHER')
+        ),
+    ];
+
+    const err = new Error();
+    err.code = 'INSUFFICIENT_STOCK';
+    if (hasMandatory) {
+        err.message =
+            'This grade cannot be ordered at the moment due to insufficient stock for required items.';
+        err.insufficientBundles = null; // whole grade blocked
+    } else {
+        err.message =
+            optionalBundles.length > 0
+                ? `Insufficient stock. Please uncheck: ${optionalBundles.join(', ')}.`
+                : 'Insufficient stock for some items.';
+        err.insufficientBundles = optionalBundles;
+    }
+    throw err;
+}
 
 class OrderService {
     constructor() {
         this.ordersRef = db.collection('orders');
+        this.booksRef = db.collection('books');
+        this.cartsRef = db.collection('carts');
     }
 
     /**
-     * Create a new order from cart
+     * Validate cart for checkout (inventory check only; does not create order or modify data).
+     * @param {string} userId - User ID
+     * @returns {Promise<{ valid: boolean }>} { valid: true } or throws INSUFFICIENT_STOCK
+     */
+    async validateCartForCheckout(userId) {
+        const cart = await cartService.getOrCreateCart(userId);
+        if (!cart.items || cart.items.length === 0) {
+            throw new Error('Cart is empty');
+        }
+        const insufficientItems = [];
+        for (const item of cart.items) {
+            const bookDoc = await this.booksRef.doc(item.itemId).get();
+            if (!bookDoc.exists) {
+                insufficientItems.push({ itemId: item.itemId, bookType: 'OTHER' });
+                continue;
+            }
+            const bookData = bookDoc.data();
+            const stockQuantity = parseInt(bookData.stockQuantity, 10) || 0;
+            const cartQty = parseInt(item.quantity, 10) || 1;
+            const unitsPerOrder = parseInt(bookData.productQuantity, 10) || 1;
+            const requiredUnits = cartQty * unitsPerOrder;
+            if (stockQuantity < requiredUnits) {
+                insufficientItems.push({
+                    itemId: item.itemId,
+                    bookType: bookData.bookType || 'OTHER',
+                });
+            }
+        }
+        if (insufficientItems.length > 0) {
+            throwInventoryError(insufficientItems);
+        }
+        return { valid: true };
+    }
+
+    /**
+     * Create a new order from cart (validates inventory, then runs transaction: create order, decrement stock, clear cart).
      * @param {string} userId - User ID
      * @param {object} paymentData - Payment information
      * @param {object} shippingAddress - Shipping address (optional)
@@ -25,29 +97,54 @@ class OrderService {
 
             // Get cart items
             const cart = await cartService.getOrCreateCart(userId);
-            
+
             if (!cart.items || cart.items.length === 0) {
                 throw new Error('Cart is empty');
             }
 
-            // Calculate totals
+            // Pre-validate inventory (before transaction). Each cart item consumes (quantity * productQuantity) units.
+            const insufficientItems = [];
+            for (const item of cart.items) {
+                const bookDoc = await this.booksRef.doc(item.itemId).get();
+                if (!bookDoc.exists) {
+                    insufficientItems.push({
+                        itemId: item.itemId,
+                        bookType: 'OTHER',
+                    });
+                    continue;
+                }
+                const bookData = bookDoc.data();
+                const stockQuantity = parseInt(bookData.stockQuantity, 10) || 0;
+                const cartQty = parseInt(item.quantity, 10) || 1;
+                const unitsPerOrder = parseInt(bookData.productQuantity, 10) || 1;
+                const requiredUnits = cartQty * unitsPerOrder;
+                if (stockQuantity < requiredUnits) {
+                    insufficientItems.push({
+                        itemId: item.itemId,
+                        bookType: bookData.bookType || 'OTHER',
+                    });
+                }
+            }
+            if (insufficientItems.length > 0) {
+                throwInventoryError(insufficientItems);
+            }
+
+            // Calculate totals (subtotal + delivery only; no tax — matches amount customer pays via Razorpay)
             const subtotal = cart.items.reduce((sum, item) => {
                 return sum + (item.price * item.quantity);
             }, 0);
 
             const deliveryCharge = 300; // Fixed delivery charge
-            const tax = Math.round(subtotal * 0.10); // 10% tax
-            const total = subtotal + deliveryCharge + tax;
+            const tax = 0; // No tax applied; order total = amount paid
+            const total = subtotal + deliveryCharge;
 
-            // Generate order number
             const orderNumber = this.generateOrderNumber();
 
-            // Prepare shipping address - use provided address or fallback to user's default address
+            // Prepare shipping address
             let finalShippingAddress = null;
             if (shippingAddress) {
-                // Use the provided shipping address
                 finalShippingAddress = {
-                    name: shippingAddress.name || (user.firstName && user.lastName 
+                    name: shippingAddress.name || (user.firstName && user.lastName
                         ? `${user.firstName} ${user.lastName}`.trim()
                         : user.firstName || user.userName || 'Customer'),
                     phone: shippingAddress.phone || user.phoneNumber || null,
@@ -59,9 +156,8 @@ class OrderService {
                 };
                 console.log(`✅ Using provided shipping address: ${finalShippingAddress.name}, ${finalShippingAddress.city}`);
             } else if (user.address && (user.address.address || user.address.city)) {
-                // Fallback to user's default address
                 finalShippingAddress = {
-                    name: user.firstName && user.lastName 
+                    name: user.firstName && user.lastName
                         ? `${user.firstName} ${user.lastName}`.trim()
                         : user.firstName || user.userName || 'Customer',
                     phone: user.phoneNumber || null,
@@ -76,13 +172,11 @@ class OrderService {
                 console.warn(`⚠️ No shipping address available for order ${orderNumber}`);
             }
 
-            // Create order document
             const orderData = {
                 orderNumber: orderNumber,
                 userId: userId,
-                // Customer information
                 customerInfo: {
-                    name: user.firstName && user.lastName 
+                    name: user.firstName && user.lastName
                         ? `${user.firstName} ${user.lastName}`.trim()
                         : user.firstName || user.userName || 'Customer',
                     email: user.email || null,
@@ -90,8 +184,7 @@ class OrderService {
                     schoolName: user.schoolName || null,
                     classStandard: user.classStandard || null,
                 },
-                // Order items
-                items: cart.items.map(item => ({
+                items: cart.items.map((item) => ({
                     itemId: item.itemId,
                     title: item.title,
                     author: item.author,
@@ -101,61 +194,102 @@ class OrderService {
                     subtotal: item.subtotal || (item.price * item.quantity),
                     bookType: item.bookType || '',
                 })),
-                // Pricing breakdown
                 subtotal: subtotal,
                 deliveryCharge: deliveryCharge,
                 tax: tax,
                 total: total,
-                // Order status
                 paymentStatus: 'paid',
                 orderStatus: 'confirmed',
-                deliveryStatus: 'pending', // pending, processing, shipped, delivered, cancelled
-                // Payment information
+                deliveryStatus: 'pending',
                 razorpayOrderId: paymentData.razorpayOrderId,
                 razorpayPaymentId: paymentData.razorpayPaymentId,
                 razorpaySignature: paymentData.razorpaySignature,
-                // Shipping information - now includes complete address with name and phone
                 shippingAddress: finalShippingAddress,
-                // Tracking (can be added later when shipped)
                 trackingNumber: null,
-                // Timestamps
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
             };
 
-            // Save order to Firestore
-            console.log(`💾 Saving order to Firestore: ${orderNumber}`);
-            console.log(`📊 Order data:`, {
-                userId,
-                itemCount: orderData.items.length,
-                total: orderData.total,
-                orderNumber,
-                hasShippingAddress: !!orderData.shippingAddress,
-                shippingAddressName: orderData.shippingAddress?.name || 'N/A',
-                shippingAddressCity: orderData.shippingAddress?.city || 'N/A',
+            // Run transaction: re-validate stock, create order, decrement stock, clear cart
+            const result = await db.runTransaction(async (transaction) => {
+                // Re-read cart inside transaction
+                const cartSnap = await transaction.get(this.cartsRef.doc(cart.id));
+                if (!cartSnap.exists) {
+                    throw new Error('Cart not found');
+                }
+                const cartItems = cartSnap.data().items || [];
+                if (cartItems.length === 0) {
+                    throw new Error('Cart is empty');
+                }
+
+                // Re-validate stock inside transaction; compute units to decrement per item (quantity * productQuantity)
+                const insufficientInTx = [];
+                const decrements = []; // { bookRef, unitsToDecrement }
+                for (const item of cartItems) {
+                    const bookSnap = await transaction.get(this.booksRef.doc(item.itemId));
+                    if (!bookSnap.exists) {
+                        insufficientInTx.push({ itemId: item.itemId, bookType: 'OTHER' });
+                        continue;
+                    }
+                    const bookData = bookSnap.data();
+                    const stockQty = parseInt(bookData.stockQuantity, 10) || 0;
+                    const cartQty = parseInt(item.quantity, 10) || 1;
+                    const unitsPerOrder = parseInt(bookData.productQuantity, 10) || 1;
+                    const requiredUnits = cartQty * unitsPerOrder;
+                    if (stockQty < requiredUnits) {
+                        insufficientInTx.push({
+                            itemId: item.itemId,
+                            bookType: bookData.bookType || 'OTHER',
+                        });
+                    } else {
+                        decrements.push({
+                            bookRef: this.booksRef.doc(item.itemId),
+                            unitsToDecrement: requiredUnits,
+                        });
+                    }
+                }
+                if (insufficientInTx.length > 0) {
+                    throwInventoryError(insufficientInTx);
+                }
+
+                // Create order
+                const orderRef = this.ordersRef.doc();
+                transaction.set(orderRef, orderData);
+
+                // Decrement stock by (quantity * productQuantity) for each item
+                for (const { bookRef, unitsToDecrement } of decrements) {
+                    transaction.update(bookRef, {
+                        stockQuantity: FieldValue.increment(-unitsToDecrement),
+                        updatedAt: new Date(),
+                    });
+                }
+
+                // Clear cart
+                transaction.update(this.cartsRef.doc(cart.id), {
+                    items: [],
+                    totalAmount: 0,
+                    updatedAt: new Date(),
+                });
+
+                return { orderId: orderRef.id, orderData };
             });
-            
-            const orderRef = await this.ordersRef.add(orderData);
-            const orderDoc = await orderRef.get();
-            
-            if (!orderDoc.exists) {
-                throw new Error('Failed to save order to Firestore');
-            }
 
-            console.log(`✅ Order saved to Firestore with ID: ${orderRef.id}`);
+            const orderId = result.orderId;
+            const orderDataResult = result.orderData;
 
-            // Clear cart after order is created
-            console.log(`🛒 Clearing cart for user: ${userId}`);
-            await cartService.clearCart(userId);
-            console.log(`✅ Cart cleared`);
-
-            console.log(`✅ Order created successfully: ${orderNumber} (${orderRef.id})`);
+            console.log(`✅ Order saved to Firestore with ID: ${orderId}`);
+            console.log(`✅ Stock decremented for ${orderDataResult.items.length} item(s)`);
+            console.log(`🛒 Cart cleared for user: ${userId}`);
+            console.log(`✅ Order created successfully: ${orderNumber} (${orderId})`);
 
             return {
-                id: orderRef.id,
-                ...orderDoc.data(),
+                id: orderId,
+                ...orderDataResult,
             };
         } catch (error) {
+            if (error.code === 'INSUFFICIENT_STOCK') {
+                throw error;
+            }
             console.error('❌ Error creating order:', error);
             console.error('Error details:', {
                 message: error.message,

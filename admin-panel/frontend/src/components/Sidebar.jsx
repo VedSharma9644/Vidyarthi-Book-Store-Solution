@@ -68,11 +68,11 @@ const Sidebar = ({ isOpen }) => {
             </ul>
           </li>
 
-          {/* Books Management */}
+          {/* Product Management */}
           <li className="sidebar-item">
             <a onClick={(e) => { e.preventDefault(); toggleMenu('books'); }} className={`sidebar-link ${!openMenus.books ? 'collapsed' : ''}`} style={{ cursor: 'pointer' }}>
               <i className="align-middle me-2 fas fa-fw fa-book"></i>
-              <span className="align-middle">Books Management</span>
+              <span className="align-middle">Product Management</span>
             </a>
             <ul id="books" className={`sidebar-dropdown list-unstyled ${openMenus.books ? 'show' : 'collapse'}`}>
               <li className={`sidebar-item ${isActive('/get-all-categories') ? 'active' : ''}`}>
@@ -82,7 +82,12 @@ const Sidebar = ({ isOpen }) => {
               </li>
               <li className={`sidebar-item ${isActive('/get-all-books') ? 'active' : ''}`}>
                 <Link to="/get-all-books" className="sidebar-link">
-                  <i className="fas fa-book-open me-2"></i>Books
+                  <i className="fas fa-book-open me-2"></i>Products
+                </Link>
+              </li>
+              <li className={`sidebar-item ${isActive('/inventory') ? 'active' : ''}`}>
+                <Link to="/inventory" className="sidebar-link">
+                  <i className="fas fa-boxes me-2"></i>Inventory
                 </Link>
               </li>
             </ul>

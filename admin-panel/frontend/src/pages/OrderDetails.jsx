@@ -57,6 +57,9 @@ const OrderDetails = () => {
             totalAmount: orderData.orderTotal || 0,
             status: orderData.status || 'Pending',
             paymentStatus: orderData.paymentStatus || 'Pending',
+            schoolName: orderData.schoolName || '',
+            gradeName: orderData.gradeName || '',
+            sectionName: orderData.sectionName || '',
             items: (orderData.items || []).map((item, index) => ({
               id: item.itemId || index + 1,
               product: item.title || 'Unknown Product',
@@ -102,16 +105,16 @@ const OrderDetails = () => {
     setIsFetchingShiprocketStatus(true);
     try {
       const response = await ordersAPI.getShiprocketStatus(orderId);
-      console.log('📦 Shiprocket status response:', response.data);
-      if (response.data.success) {
+      if (response.data.success && response.data.data) {
         const statusData = response.data.data;
-        console.log('📦 Shiprocket status data:', statusData);
         setShiprocketStatus(statusData);
+        if (statusData.hasShiprocket === false) {
+          // Order has no Shiprocket IDs; UI will show "Not created" instead of error
+          return;
+        }
       }
     } catch (error) {
       console.error('Error fetching Shiprocket status:', error);
-      console.error('Error details:', error.response?.data);
-      // Don't show error if order doesn't have Shiprocket ID yet
       if (error.response?.status !== 400) {
         console.warn('Could not fetch Shiprocket status:', error.response?.data?.message || error.message);
       }
@@ -160,7 +163,8 @@ const OrderDetails = () => {
 
   const handleCreateShiprocketOrder = async (e) => {
     e.preventDefault();
-    
+    console.log('[OrderDetails] Create Shiprocket Order clicked, orderId=', orderId);
+
     if (!orderId) {
       alert('Order ID is missing');
       return;
@@ -171,8 +175,11 @@ const OrderDetails = () => {
     }
 
     setIsCreatingShiprocket(true);
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://admin-panel-backend-594708558503.us-central1.run.app';
+    console.log('[OrderDetails] Calling POST', `${apiBase}/api/orders/${orderId}/shiprocket`);
     try {
       const response = await ordersAPI.createShiprocketOrder(orderId);
+      console.log('[OrderDetails] Create Shiprocket response:', response?.data);
       
       if (response.data.success) {
         const data = response.data.data || {};
@@ -200,7 +207,8 @@ const OrderDetails = () => {
         alert(response.data.message || 'Failed to create Shiprocket order');
       }
     } catch (error) {
-      console.error('Error creating Shiprocket order:', error);
+      console.error('[OrderDetails] Create Shiprocket order error:', error);
+      console.error('[OrderDetails] Error response:', error.response?.status, error.response?.data);
       alert(error.response?.data?.message || 'Failed to create Shiprocket order. Please check your Shiprocket credentials.');
     } finally {
       setIsCreatingShiprocket(false);
@@ -349,14 +357,16 @@ const OrderDetails = () => {
               </p>
               {(order.shiprocketOrderId || order.shiprocketShipmentId) && (
                 <p>
-                  <strong>Shiprocket Status:</strong> {getStatusBadge(
-                    shiprocketStatus?.status 
-                    || shiprocketStatus?.orderStatus 
-                    || shiprocketStatus?.shipment_status
-                    || shiprocketStatus?.current_status
-                    || order.shiprocketStatus // Fallback to stored status from Firebase
-                    || 'Not Available'
-                  )}
+                  <strong>Shiprocket Status:</strong> {shiprocketStatus?.hasShiprocket === false
+                    ? getStatusBadge('Not created')
+                    : getStatusBadge(
+                        shiprocketStatus?.status 
+                        || shiprocketStatus?.orderStatus 
+                        || shiprocketStatus?.shipment_status
+                        || shiprocketStatus?.current_status
+                        || order.shiprocketStatus // Fallback to stored status from Firebase
+                        || 'Not Available'
+                      )}
                   <button
                     className="btn btn-sm btn-outline-secondary ms-2"
                     onClick={fetchShiprocketStatus}
@@ -385,6 +395,19 @@ const OrderDetails = () => {
               <p>
                 <strong>Total Amount:</strong> {formatCurrency(order.totalAmount)}
               </p>
+              {(order.schoolName || order.gradeName || order.sectionName) && (
+                <>
+                  <p className="mb-1">
+                    <strong>School:</strong> {order.schoolName || '—'}
+                  </p>
+                  <p className="mb-1">
+                    <strong>Grade:</strong> {order.gradeName || '—'}
+                  </p>
+                  <p>
+                    <strong>Section:</strong> {order.sectionName || '—'}
+                  </p>
+                </>
+              )}
               {order.razorpayOrderId && (
                 <p>
                   <strong>Razorpay Order ID:</strong> <small>{order.razorpayOrderId}</small>
