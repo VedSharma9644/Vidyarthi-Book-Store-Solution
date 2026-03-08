@@ -6,40 +6,7 @@ import { useHeaderHeight } from '../hooks/useHeaderHeight';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
-
-/** Hardcoded grade display order: always show in this sequence */
-const GRADE_DISPLAY_ORDER = [
-  'NURSERY',
-  'PP-1',
-  'PP-2',
-  'CLASS-1',
-  'CLASS-2',
-  'CLASS-3',
-  'CLASS-4',
-  'CLASS-5',
-  'CLASS-6',
-  'CLASS-7',
-  'CLASS-8',
-  'CLASS-9',
-  'CLASS-10',
-  'CLASS-11',
-  'CLASS-12',
-];
-
-const getGradeOrderIndex = (name) => {
-  const n = (name || '').trim().toUpperCase();
-  const exact = GRADE_DISPLAY_ORDER.findIndex((o) => o.toUpperCase() === n);
-  if (exact >= 0) return exact;
-  // Match prefix (e.g. "NURSERY (EY1)" -> NURSERY); use longest match so CLASS-10 beats CLASS-1
-  for (let i = GRADE_DISPLAY_ORDER.length - 1; i >= 0; i--) {
-    if (n.startsWith(GRADE_DISPLAY_ORDER[i].toUpperCase())) return i;
-  }
-  return 999;
-};
-
-const sortGrades = (grades) => {
-  return [...grades].sort((a, b) => getGradeOrderIndex(a.name) - getGradeOrderIndex(b.name));
-};
+import { sortGrades } from '../utils/gradeUtils';
 
 const SchoolPage = () => {
   const { schoolId } = useParams();
@@ -75,27 +42,76 @@ const SchoolPage = () => {
 
         const gradesResult = await ApiService.getGradesBySchoolId(schoolId);
         if (gradesResult.success && gradesResult.data) {
+          // Preserve displayOrder from API for correct sorting
           const transformedGrades = gradesResult.data.map(grade => ({
             id: grade.id,
             name: grade.name,
+            displayOrder: grade.displayOrder,
           }));
 
-          // Optionally hide grades that have no products/books
+          // Filter out grades that have no products/books
+          // This ensures users only see grades with actual content
           let finalGrades = transformedGrades;
           try {
-            const booksResult = await ApiService.getAllBooks({ offset: 0, limit: 500 });
+            // Fetch more books to ensure we don't miss any (increased limit)
+            const booksResult = await ApiService.getAllBooks({ offset: 0, limit: 2000 });
             if (booksResult.success && Array.isArray(booksResult.data)) {
-              const gradesWithBooks = new Set(
-                booksResult.data
-                  .filter((book) => book.schoolId === schoolId && book.gradeId)
-                  .map((book) => book.gradeId)
+              // Get all books for this school
+              const schoolBooks = booksResult.data.filter(
+                (book) => book.schoolId === schoolId && book.isActive !== false
               );
-              if (gradesWithBooks.size > 0) {
-                finalGrades = transformedGrades.filter((grade) => gradesWithBooks.has(grade.id));
+              
+              // Collect grade IDs that have products
+              const gradesWithBooks = new Set();
+              
+              schoolBooks.forEach((book) => {
+                // Add gradeId if directly assigned
+                if (book.gradeId) {
+                  gradesWithBooks.add(book.gradeId);
+                }
+              });
+              
+              // Also check if any grades have products via their subgrades
+              // Fetch subgrades for grades that don't have direct books
+              const gradesWithoutDirectBooks = transformedGrades.filter(
+                (grade) => !gradesWithBooks.has(grade.id)
+              );
+              
+              if (gradesWithoutDirectBooks.length > 0) {
+                // Check each grade's subgrades for books
+                await Promise.all(
+                  gradesWithoutDirectBooks.map(async (grade) => {
+                    try {
+                      const subgradesRes = await ApiService.getSubgradesByGradeId(grade.id);
+                      if (subgradesRes.success && subgradesRes.data) {
+                        const subgradeIds = subgradesRes.data.map((sg) => sg.id);
+                        // Check if any book belongs to these subgrades
+                        const hasBookViaSubgrade = schoolBooks.some(
+                          (book) => book.subgradeId && subgradeIds.includes(book.subgradeId)
+                        );
+                        if (hasBookViaSubgrade) {
+                          gradesWithBooks.add(grade.id);
+                        }
+                      }
+                    } catch (subgradeError) {
+                      console.warn(`Failed to check subgrades for grade ${grade.id}:`, subgradeError);
+                    }
+                  })
+                );
+              }
+              
+              // Strictly filter - only show grades that have products
+              // Do NOT fallback to showing all grades if none have books
+              finalGrades = transformedGrades.filter((grade) => gradesWithBooks.has(grade.id));
+              
+              if (finalGrades.length === 0 && transformedGrades.length > 0) {
+                console.log('No grades with products found for school:', schoolId);
               }
             }
           } catch (filterError) {
-            console.warn('Failed to filter grades by books; showing all grades instead.', filterError);
+            console.warn('Failed to filter grades by books:', filterError);
+            // On error, still try to show grades but log the issue
+            // This is a fallback only for API errors, not for "no products" case
           }
 
           setGrades(sortGrades(finalGrades));

@@ -27,6 +27,22 @@ const Customers = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this customer?')) return;
+    try {
+      const response = await customersAPI.delete(id);
+      if (response.data.success) {
+        alert('Customer deleted successfully');
+        fetchCustomers();
+      } else {
+        alert(response.data.message || 'Failed to delete customer');
+      }
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || 'Failed to delete customer. Please try again.';
+      alert(msg);
+    }
+  };
+
   const filteredItems = useMemo(() => {
     if (!filterText) return customers;
     return customers.filter(item =>
@@ -133,6 +149,22 @@ const Customers = () => {
       sortable: true,
       wrap: true,
       cell: row => formatDate(row.createdAt),
+    },
+    {
+      name: 'Actions',
+      cell: (row) => (
+        <div className="d-flex gap-1">
+          <button
+            type="button"
+            className="btn btn-sm btn-danger"
+            onClick={() => handleDelete(row.id)}
+          >
+            <i className="bi bi-trash"></i> Delete
+          </button>
+        </div>
+      ),
+      ignoreRowClick: true,
+      width: '120px',
     },
   ];
 

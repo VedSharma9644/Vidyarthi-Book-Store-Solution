@@ -8,5 +8,8 @@ router.get('/', customerController.getAllCustomers);
 // GET /api/customers/:id - Get customer by ID
 router.get('/:id', customerController.getCustomerById);
 
+// DELETE /api/customers/:id - Delete customer
+router.delete('/:id', customerController.deleteCustomer);
+
 module.exports = router;
 

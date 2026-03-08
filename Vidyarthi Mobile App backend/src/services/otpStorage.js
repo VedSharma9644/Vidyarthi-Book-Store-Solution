@@ -67,10 +67,11 @@ class OTPStorage {
             const expiryDateTime = new Date();
             expiryDateTime.setMinutes(expiryDateTime.getMinutes() + OTP_EXPIRY_MINUTES);
 
-            // Save new OTP to Firestore
+            // Save new OTP to Firestore (always string so verify query matches)
+            const otpStr = String(otp).trim();
             await this.otpsRef.add({
-                mobileNumber: phoneNumber,
-                otp: otp,
+                mobileNumber: String(phoneNumber).trim(),
+                otp: otpStr,
                 expiryDateTime: Timestamp.fromDate(expiryDateTime),
                 createdAt: Timestamp.now(),
             });
@@ -87,39 +88,43 @@ class OTPStorage {
      * Verify OTP for phone number from Firestore
      * @param {string} phoneNumber - Phone number in +91XXXXXXXXXX format
      * @param {string} otp - OTP code to verify
+     * @param {object} options - { consume: true } to delete OTP after verify (default). Use consume: false when login returns "user not found" so the same OTP can be used for register.
      * @returns {Promise<boolean>} - true if valid, false otherwise
      */
-    async verifyOtp(phoneNumber, otp) {
+    async verifyOtp(phoneNumber, otp, options = {}) {
+        const consume = options.consume !== false;
+        const phoneStr = String(phoneNumber).trim();
+        const otpStr = String(otp).trim();
         try {
-            // Find OTP in Firestore
             const snapshot = await this.otpsRef
-                .where('mobileNumber', '==', phoneNumber)
-                .where('otp', '==', otp)
+                .where('mobileNumber', '==', phoneStr)
+                .where('otp', '==', otpStr)
                 .limit(1)
                 .get();
 
             if (snapshot.empty) {
-                console.log(`❌ No OTP found for ${phoneNumber}`);
+                console.log(`❌ No OTP found for ${phoneStr} (otp length ${otpStr.length})`);
                 return false;
             }
 
             const otpDoc = snapshot.docs[0];
             const otpData = otpDoc.data();
 
-            // Check expiry
             const now = Timestamp.now();
             const expiryTime = otpData.expiryDateTime;
 
             if (expiryTime.toMillis() < now.toMillis()) {
-                console.log(`❌ OTP expired for ${phoneNumber}`);
-                // Delete expired OTP
+                console.log(`❌ OTP expired for ${phoneStr}`);
                 await otpDoc.ref.delete();
                 return false;
             }
 
-            // OTP verified, delete it
-            await otpDoc.ref.delete();
-            console.log(`✅ OTP verified successfully for ${phoneNumber}`);
+            if (consume) {
+                await otpDoc.ref.delete();
+                console.log(`✅ OTP verified and consumed for ${phoneStr}`);
+            } else {
+                console.log(`✅ OTP verified (not consumed) for ${phoneStr}`);
+            }
             return true;
         } catch (error) {
             console.error('Error verifying OTP from Firestore:', error);

@@ -3,6 +3,9 @@ import ApiService from '../services/apiService';
 
 const AuthContext = createContext();
 
+// Persists across remounts (e.g. Strict Mode). When true, we never show full-screen loading again.
+let authReadyPersisted = false;
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -13,23 +16,21 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Only false until first auth check completes; then true forever. Initial value from module so remounts don't flash loading.
+  const [authReady, setAuthReady] = useState(() => authReadyPersisted);
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      setIsLoading(true);
-      
-      // Check if localStorage is available (handles SSR or restricted environments)
       if (typeof window === 'undefined' || !window.localStorage) {
         setUser(null);
         setIsLoggedIn(false);
+        authReadyPersisted = true;
+        setAuthReady(true);
         return;
       }
-      
       const loggedIn = await ApiService.isLoggedIn();
       const userData = await ApiService.getUserData();
-      
       if (loggedIn && userData) {
         setUser(userData);
         setIsLoggedIn(true);
@@ -38,16 +39,16 @@ export const AuthProvider = ({ children }) => {
         setIsLoggedIn(false);
       }
     } catch (error) {
-      // Only log actual errors, not expected failures
-      if (error && error.message && !error.message.includes('localStorage')) {
+      if (error?.message && !String(error.message).includes('localStorage')) {
         console.error('Error checking auth status:', error);
       }
       setUser(null);
       setIsLoggedIn(false);
     } finally {
-      setIsLoading(false);
+      authReadyPersisted = true;
+      setAuthReady(true);
     }
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
   useEffect(() => {
     checkAuthStatus();
@@ -55,113 +56,98 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      setIsLoading(true);
       const response = await ApiService.login(email, password);
-      
-      if (response.success) {
+      if (response?.success) {
         setUser(response.user);
         setIsLoggedIn(true);
         return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message };
       }
+      return { success: false, message: response?.message || 'Login failed' };
     } catch (error) {
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Login failed' 
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Login failed',
       };
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const loginMobile = async (mobileNumber, otp) => {
     try {
-      setIsLoading(true);
       const response = await ApiService.loginMobile(mobileNumber, otp);
-      
-      if (response.success) {
+      if (!response || typeof response !== 'object') {
+        return { success: false, message: 'Login failed', userNotFound: false };
+      }
+      if (response.success === true && response.user) {
         setUser(response.user);
         setIsLoggedIn(true);
         return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message };
       }
-    } catch (error) {
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Login failed' 
+      const msg = response.message != null ? String(response.message) : '';
+      const userNotFound = response.userNotFound === true || /not found|register first/i.test(msg);
+      return {
+        success: false,
+        message: response.message || 'Login failed',
+        userNotFound: !!userNotFound,
       };
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      const errMsg =
+        error.response?.data?.message != null
+          ? String(error.response.data.message)
+          : String(error.message || '');
+      const userNotFound =
+        /not found|register first/i.test(errMsg) || error.response?.status === 404;
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Login failed',
+        userNotFound: !!userNotFound,
+      };
     }
   };
 
   const register = async (userData) => {
     try {
-      setIsLoading(true);
       const response = await ApiService.register(userData);
-      
-      if (response.success) {
+      if (response?.success) {
         setUser(response.user);
         setIsLoggedIn(true);
         return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message };
       }
+      return { success: false, message: response?.message || 'Registration failed' };
     } catch (error) {
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Registration failed' 
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Registration failed',
       };
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const registerMobile = async (userData) => {
     try {
-      setIsLoading(true);
       const response = await ApiService.registerMobile(userData);
-      
-      if (response.success) {
+      if (response?.success) {
         setUser(response.user);
         setIsLoggedIn(true);
         return { success: true, message: response.message };
-      } else {
-        return { success: false, message: response.message };
       }
+      return { success: false, message: response?.message || 'Registration failed' };
     } catch (error) {
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Registration failed' 
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Registration failed',
       };
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const sendOtp = async (mobileNumber) => {
     try {
-      console.log('AuthContext: Sending OTP to', mobileNumber);
       const response = await ApiService.sendOtp(mobileNumber);
-      console.log('AuthContext: OTP Response', response);
-      
-      // Ensure we always return an object with success property
-      if (response && typeof response === 'object') {
-        return response;
-      }
-      
-      // If response is not in expected format, wrap it
+      if (response && typeof response === 'object') return response;
+      return { success: false, message: 'Unexpected response from server' };
+    } catch (error) {
       return {
         success: false,
-        message: 'Unexpected response from server',
-      };
-    } catch (error) {
-      console.error('AuthContext: Send OTP Error', error);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || error.message || 'Failed to send OTP. Please check your connection.' 
+        message:
+          error.response?.data?.message || error.message || 'Failed to send OTP. Please try again.',
       };
     }
   };
@@ -179,8 +165,8 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
-    isLoading,
     isLoggedIn,
+    authReady,
     login,
     loginMobile,
     register,
@@ -190,10 +176,5 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

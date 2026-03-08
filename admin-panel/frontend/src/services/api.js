@@ -54,6 +54,7 @@ export const schoolsAPI = {
 export const customersAPI = {
   getAll: () => api.get('/api/customers'),
   getById: (id) => api.get(`/api/customers/${id}`),
+  delete: (id) => api.delete(`/api/customers/${id}`),
 };
 
 // Grades API

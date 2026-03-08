@@ -64,8 +64,47 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+// Delete customer
+const deleteCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer ID is required',
+      });
+    }
+
+    const customerRef = db.collection('users').doc(id);
+    const customerDoc = await customerRef.get();
+
+    if (!customerDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found',
+      });
+    }
+
+    await customerRef.delete();
+
+    res.json({
+      success: true,
+      message: 'Customer deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting customer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete customer',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllCustomers,
   getCustomerById,
+  deleteCustomer,
 };
 

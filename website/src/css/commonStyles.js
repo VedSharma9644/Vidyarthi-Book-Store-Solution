@@ -57,9 +57,7 @@ export const commonStyles = {
     boxSizing: 'border-box',
   },
   inputFocused: {
-    borderWidth: '2px',
-    borderStyle: 'solid',
-    borderColor: colors.primary,
+    border: `2px solid ${colors.primary}`,
   },
   // Buttons
   button: {

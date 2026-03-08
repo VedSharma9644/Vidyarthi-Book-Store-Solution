@@ -48,8 +48,8 @@ const sendOtp = async (req, res) => {
             });
         }
 
-        // Save OTP to Firestore
-        const saved = await otpStorage.saveOtp(formattedNumber, result.otp);
+        // Save OTP to Firestore (ensure string for consistent Firestore query)
+        const saved = await otpStorage.saveOtp(formattedNumber, String(result.otp || '').trim());
         if (!saved) {
             return res.status(429).json({
                 success: false,
@@ -107,8 +107,9 @@ const registerMobile = async (req, res) => {
         // Format phone number
         const formattedNumber = smsService.formatPhoneNumber(mobileNumber);
 
-        // Verify OTP from Firestore
-        const isValidOtp = await otpStorage.verifyOtp(formattedNumber, otp.trim());
+        // Verify OTP from Firestore (same OTP used for login attempt when new user)
+        const otpTrimmed = String(otp || '').trim();
+        const isValidOtp = await otpStorage.verifyOtp(formattedNumber, otpTrimmed);
         
         if (!isValidOtp) {
             return res.status(400).json({
@@ -200,8 +201,9 @@ const loginMobile = async (req, res) => {
         // Format phone number
         const formattedNumber = smsService.formatPhoneNumber(mobileNumber);
 
-        // Verify OTP from Firestore
-        const isValidOtp = await otpStorage.verifyOtp(formattedNumber, otp.trim());
+        // Verify OTP but do not consume when user not found, so same OTP can be used for register
+        const otpTrimmed = String(otp || '').trim();
+        const isValidOtp = await otpStorage.verifyOtp(formattedNumber, otpTrimmed, { consume: false });
         
         if (!isValidOtp) {
             return res.status(400).json({
@@ -214,11 +216,16 @@ const loginMobile = async (req, res) => {
         const user = await userService.getUserByPhoneNumber(formattedNumber);
         
         if (!user) {
-            return res.status(404).json({
+            // User not found: OTP was not consumed, so client can use same OTP for register-mobile
+            return res.status(200).json({
                 success: false,
+                isNewUser: true,
                 message: 'User not found. Please register first.',
             });
         }
+
+        // User exists: consume OTP now (one-time use for this login)
+        await otpStorage.verifyOtp(formattedNumber, otpTrimmed, { consume: true });
 
         // TODO: Generate JWT token (next phase)
         const token = 'temp_token_will_be_replaced_with_jwt';
