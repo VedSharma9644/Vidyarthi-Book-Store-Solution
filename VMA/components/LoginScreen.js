@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,174 +16,170 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import { useAuth } from '../contexts/AuthContext';
 
-const LoginScreen = ({ onSwitchToRegister, onGoToSearch, onGoToApiTest }) => {
+const STEP = { MOBILE: 'mobile', OTP: 'otp', NEW_USER: 'new_user' };
+
+const LoginScreen = ({ onGoToSearch }) => {
+  const scrollRef = useRef(null);
+  const [step, setStep] = useState(STEP.MOBILE);
   const [mobileNumber, setMobileNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginMethod, setLoginMethod] = useState('email'); // 'mobile' or 'email' - Default to 'email' for Google Play reviewers
+  const [school, setSchool] = useState('');
   const [isMobileFocused, setIsMobileFocused] = useState(false);
   const [isOtpFocused, setIsOtpFocused] = useState(false);
-  const [isEmailFocused, setIsEmailFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
+  const [otpMessage, setOtpMessage] = useState('');
+  const [error, setError] = useState('');
 
-  const { loginMobile, sendOtp, login } = useAuth();
+  const { loginMobile, sendOtp, registerMobile } = useAuth();
 
   const handleSendOtp = async () => {
-    if (!mobileNumber.trim()) {
+    setError('');
+    const mobile = mobileNumber.trim();
+    if (!mobile) {
       Alert.alert('Error', 'Please enter your mobile number');
       return;
     }
-
-    // Validate mobile number format (10 digits)
-    const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(mobileNumber.trim())) {
+    if (!/^[0-9]{10}$/.test(mobile)) {
       Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
       return;
     }
-
+    setIsLoading(true);
+    setOtp('');
+    setOtpMessage('');
     try {
-      setIsLoading(true);
-      const result = await sendOtp(mobileNumber.trim());
-      
-      if (result.success) {
-        setOtpSent(true);
-        Alert.alert('Success', 'OTP sent to your mobile number');
+      const result = await sendOtp(mobile);
+      if (result && result.success) {
+        setStep(STEP.OTP);
+        setOtpMessage('OTP sent. Enter the code below.');
       } else {
-        Alert.alert('Error', result.message);
+        Alert.alert('Error', result?.message || 'Failed to send OTP');
       }
-    } catch (error) {
+    } catch (err) {
       Alert.alert('Error', 'Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLogin = async () => {
-    if (!mobileNumber.trim() || !otp.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const handleResendOtp = async () => {
+    setOtp('');
+    setOtpMessage('');
+    const mobile = mobileNumber.trim();
+    if (!mobile) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const result = await sendOtp(mobile);
+      if (result && result.success) {
+        setOtpMessage('New OTP sent. Enter the new code below.');
+      } else {
+        Alert.alert('Error', result?.message || 'Failed to resend OTP');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    setError('');
+    const mobile = mobileNumber.trim();
+    const code = otp.trim();
+    if (!mobile || !code) {
+      Alert.alert('Error', 'Please enter mobile number and OTP');
       return;
     }
-
-    // Validate mobile number format
-    const phoneRegex = /^[0-9]{10}$/;
-    if (!phoneRegex.test(mobileNumber.trim())) {
+    if (!/^[0-9]{10}$/.test(mobile)) {
       Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
       return;
     }
-
-    // Validate OTP format (6 digits)
-    const otpRegex = /^[0-9]{6}$/;
-    if (!otpRegex.test(otp.trim())) {
+    if (!/^[0-9]{6}$/.test(code)) {
       Alert.alert('Error', 'Please enter a valid 6-digit OTP');
       return;
     }
-    
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const result = await loginMobile(mobileNumber.trim(), otp.trim());
-      
-      if (result.success) {
-        Alert.alert('Success', result.message, [
-          { text: 'OK', onPress: () => onGoToSearch && onGoToSearch() }
+      const result = await loginMobile(mobile, code);
+      if (result && result.success) {
+        Alert.alert('Success', result.message || 'Login successful', [
+          { text: 'OK', onPress: () => onGoToSearch && onGoToSearch() },
         ]);
-      } else {
-        Alert.alert('Error', result.message);
+        return;
       }
-    } catch (error) {
-      Alert.alert('Error', 'Login failed. Please try again.');
+      const isNewUser =
+        result?.userNotFound === true ||
+        (result?.message && /not found|register first/i.test(String(result.message)));
+      if (isNewUser) {
+        setStep(STEP.NEW_USER);
+        setError('');
+      } else {
+        Alert.alert('Error', result?.message || 'Login failed');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.message ?? err?.message ?? '';
+      const isNewUser = /not found|register first/i.test(String(msg)) || err?.response?.status === 404;
+      if (isNewUser) {
+        setStep(STEP.NEW_USER);
+        setError('');
+      } else {
+        Alert.alert('Error', 'Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-
-  const handleSignUp = () => {
-    if (onSwitchToRegister) {
-      onSwitchToRegister();
-    } else {
-      console.error('onSwitchToRegister prop not received!');
-      Alert.alert('Sign Up', 'Sign up functionality will be implemented');
-    }
-  };
-
-  const handleGoToSearch = () => {
-    if (onGoToSearch) {
-      onGoToSearch();
-    } else {
-      Alert.alert('Search', 'Search functionality will be implemented');
-    }
-  };
-
-  const handleEmailLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+  const handleCreateAccount = async () => {
+    setError('');
+    if (!fullName.trim() || !email.trim() || !school.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
-
+    const nameParts = fullName.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const result = await login(email.trim(), password.trim());
-      
-      if (result.success) {
-        Alert.alert('Success', result.message, [
-          { text: 'OK', onPress: () => onGoToSearch && onGoToSearch() }
+      const result = await registerMobile({
+        mobileNumber: mobileNumber.trim(),
+        otp: otp.trim(),
+        firstName,
+        lastName,
+        schoolName: school.trim(),
+        email: email.trim(),
+      });
+      if (result && result.success) {
+        Alert.alert('Success', result.message || 'Account created', [
+          { text: 'OK', onPress: () => onGoToSearch && onGoToSearch() },
         ]);
       } else {
-        Alert.alert('Error', result.message);
+        Alert.alert('Error', result?.message || 'Registration failed. Please try again.');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Login failed. Please try again.');
+    } catch (err) {
+      Alert.alert('Error', err?.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDemoLogin = async () => {
-    const demoEmail = 'demo@vidyakart.com';
-    const demoPassword = '123456';
-    
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setLoginMethod('email');
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(demoEmail)) {
-      Alert.alert('Error', 'Invalid demo email format');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const result = await login(demoEmail, demoPassword);
-      
-      if (result.success) {
-        Alert.alert('Success', result.message, [
-          { text: 'OK', onPress: () => onGoToSearch && onGoToSearch() }
-        ]);
-      } else {
-        Alert.alert('Error', result.message);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Demo login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleBackToOtp = () => {
+    setStep(STEP.OTP);
+    setError('');
   };
+
+  const showMobile = step === STEP.MOBILE;
+  const showOtp = step === STEP.OTP;
+  const showNewUser = step === STEP.NEW_USER;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Image
           source={require('../assets/images/logo.png')}
@@ -192,214 +188,168 @@ const LoginScreen = ({ onSwitchToRegister, onGoToSearch, onGoToApiTest }) => {
         />
       </View>
 
-      {/* Main Content */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, ...styles.mainContent }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.loginContainer}>
-          {/* Login Method Toggle */}
-          <View style={styles.loginMethodToggle}>
-            <TouchableOpacity 
-              style={[styles.toggleButton, loginMethod === 'mobile' && styles.toggleButtonActive]}
-              onPress={() => {
-                setLoginMethod('mobile');
-                setOtpSent(false);
-                setEmail('');
-                setPassword('');
-              }}
-            >
-              <Text style={[styles.toggleButtonText, loginMethod === 'mobile' && styles.toggleButtonTextActive]}>
-                Mobile OTP
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.toggleButton, loginMethod === 'email' && styles.toggleButtonActive]}
-              onPress={() => {
-                setLoginMethod('email');
-                setOtpSent(false);
-                setMobileNumber('');
-                setOtp('');
-              }}
-            >
-              <Text style={[styles.toggleButtonText, loginMethod === 'email' && styles.toggleButtonTextActive]}>
-                Email/Password
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.formContainer}>
-            {loginMethod === 'mobile' ? (
-              <>
-                {/* Mobile Number Input */}
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      isMobileFocused && styles.inputFocused,
-                    ]}
-                    placeholder="Mobile Number (10 digits)"
-                    placeholderTextColor={`${colors.textLight}80`}
-                    value={mobileNumber}
-                    onChangeText={setMobileNumber}
-                    onFocus={() => setIsMobileFocused(true)}
-                    onBlur={() => setIsMobileFocused(false)}
-                    keyboardType="numeric"
-                    maxLength={10}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
+            <Text style={styles.loginTitle}>Login or create account</Text>
 
-                {/* Send OTP Button */}
-                {!otpSent && (
-                  <TouchableOpacity 
-                    style={[
-                      styles.sendOtpButton, 
-                      mobileNumber.trim().length === 10 && { backgroundColor: colors.primary, shadowColor: colors.primary },
-                      isLoading && styles.sendOtpButtonDisabled
-                    ]} 
-                    onPress={handleSendOtp}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color={colors.white} size="small" />
-                    ) : (
-                      <Text style={styles.sendOtpButtonText}>Send OTP</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
+            <View style={styles.formContainer}>
+              {/* Mobile number */}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={[styles.input, isMobileFocused && styles.inputFocused]}
+                  placeholder="Mobile Number (10 digits)"
+                  placeholderTextColor={`${colors.textLight}80`}
+                  value={mobileNumber}
+                  onChangeText={(t) => setMobileNumber(t.replace(/\D/g, '').slice(0, 10))}
+                  onFocus={() => setIsMobileFocused(true)}
+                  onBlur={() => setIsMobileFocused(false)}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  editable={!showNewUser}
+                />
+              </View>
 
-                {/* OTP Input - Only show after OTP is sent */}
-                {otpSent && (
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        isOtpFocused && styles.inputFocused,
-                      ]}
-                      placeholder="Enter 6-digit OTP"
-                      placeholderTextColor={`${colors.textLight}80`}
-                      value={otp}
-                      onChangeText={setOtp}
-                      onFocus={() => setIsOtpFocused(true)}
-                      onBlur={() => setIsOtpFocused(false)}
-                      keyboardType="numeric"
-                      maxLength={6}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                )}
-
-                {/* Login Button - Only show after OTP is sent */}
-                {otpSent && (
-                  <TouchableOpacity 
-                    style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
-                    onPress={handleLogin}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color={colors.white} size="small" />
-                    ) : (
-                      <Text style={styles.loginButtonText}>Login with OTP</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {/* Resend OTP Button */}
-                {otpSent && (
-                  <TouchableOpacity 
-                    style={styles.resendButton} 
-                    onPress={handleSendOtp}
-                    disabled={isLoading}
-                  >
-                    <Text style={styles.resendButtonText}>Resend OTP</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Email Input */}
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      isEmailFocused && styles.inputFocused,
-                    ]}
-                    placeholder="Email"
-                    placeholderTextColor={`${colors.textLight}80`}
-                    value={email}
-                    onChangeText={setEmail}
-                    onFocus={() => setIsEmailFocused(true)}
-                    onBlur={() => setIsEmailFocused(false)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-
-                {/* Password Input */}
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      isPasswordFocused && styles.inputFocused,
-                    ]}
-                    placeholder="Password"
-                    placeholderTextColor={`${colors.textLight}80`}
-                    value={password}
-                    onChangeText={setPassword}
-                    onFocus={() => setIsPasswordFocused(true)}
-                    onBlur={() => setIsPasswordFocused(false)}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-
-                {/* Email Login Button */}
-                <TouchableOpacity 
-                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
-                  onPress={handleEmailLogin}
+              {showMobile && (
+                <TouchableOpacity
+                  style={[
+                    styles.sendOtpButton,
+                    mobileNumber.trim().length === 10 && { backgroundColor: colors.primary },
+                    isLoading && styles.sendOtpButtonDisabled,
+                  ]}
+                  onPress={handleSendOtp}
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <ActivityIndicator color={colors.white} size="small" />
                   ) : (
-                    <Text style={styles.loginButtonText}>Login</Text>
+                    <Text style={styles.sendOtpButtonText}>Send OTP</Text>
                   )}
                 </TouchableOpacity>
-              </>
+              )}
+
+              {showOtp && (
+                <>
+                  {otpMessage ? (
+                    <Text style={localStyles.otpMessage}>{otpMessage}</Text>
+                  ) : null}
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={[styles.input, isOtpFocused && styles.inputFocused]}
+                      placeholder="Enter 6-digit OTP"
+                      placeholderTextColor={`${colors.textLight}80`}
+                      value={otp}
+                      onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 6))}
+                      onFocus={() => setIsOtpFocused(true)}
+                      onBlur={() => setIsOtpFocused(false)}
+                      keyboardType="numeric"
+                      maxLength={6}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+                    onPress={handleContinue}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <Text style={styles.loginButtonText}>Continue</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.resendButton} onPress={handleResendOtp} disabled={isLoading}>
+                    <Text style={styles.resendButtonText}>Resend OTP</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {showNewUser && (
+                <>
+                  <Text style={localStyles.newUserTitle}>This number isn't registered. Create an account.</Text>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={[styles.registerInput, styles.input]}
+                      placeholder="Full Name"
+                      placeholderTextColor={`${colors.textLight}80`}
+                      value={fullName}
+                      onChangeText={setFullName}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={[styles.registerInput, styles.input]}
+                      placeholder="Email"
+                      placeholderTextColor={`${colors.textLight}80`}
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={[styles.registerInput, styles.input]}
+                      placeholder="School"
+                      placeholderTextColor={`${colors.textLight}80`}
+                      value={school}
+                      onChangeText={setSchool}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
+                    onPress={handleCreateAccount}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <Text style={styles.registerButtonText}>Create account</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.resendButton} onPress={handleBackToOtp} disabled={isLoading}>
+                    <Text style={styles.resendButtonText}>Back to OTP</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+
+            {showMobile && (
+              <TouchableOpacity style={styles.searchButton} onPress={() => onGoToSearch && onGoToSearch()}>
+                <Text style={styles.searchButtonText}>Search Schools</Text>
+              </TouchableOpacity>
             )}
           </View>
-
-          {/* Search Button */}
-          <TouchableOpacity style={styles.searchButton} onPress={handleGoToSearch}>
-            <Text style={styles.searchButtonText}>Search Schools</Text>
-          </TouchableOpacity>
-
-          {/* Sign Up Link */}
-          <View style={styles.signUpContainer}>
-            <Text style={styles.signUpText}>
-              Don't have an account?{' '}
-              <Text style={styles.signUpLink} onPress={handleSignUp}>
-                Sign Up
-              </Text>
-            </Text>
-          </View>
-        </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
+
+const localStyles = StyleSheet.create({
+  otpMessage: {
+    fontSize: 14,
+    color: '#059669',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  newUserTitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+});
 
 export default LoginScreen;

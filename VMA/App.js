@@ -3,7 +3,6 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginScreen from './components/LoginScreen';
-import RegisterScreen from './components/RegisterScreen';
 import HomeScreen from './components/HomeScreen';
 import SchoolSearchScreen from './components/SchoolSearchScreen';
 import SchoolCodeScreen from './components/SchoolCodeScreen';
@@ -16,7 +15,6 @@ import OrderDetailsScreen from './components/OrderDetailsScreen';
 import AddStudentScreen from './components/AddStudentScreen';
 import StudentsScreen from './components/StudentsScreen';
 import ApiTestScreen from './components/ApiTestScreen';
-import OtpVerificationScreen from './components/OtpVerificationScreen';
 import ManageGradesScreen from './components/ManageGradesScreen';
 import UpsertGradeScreen from './components/UpsertGradeScreen';
 import GradeBooksPage from './components/GradeBooksPage';
@@ -24,36 +22,22 @@ import ShippingAddressesScreen from './components/ShippingAddressesScreen';
 import { View, ActivityIndicator } from 'react-native';
 import { colors } from './css/styles';
 
-// Inner component that uses auth context
+// Inner component that uses auth context. Uses authReady (not isLoading) so login screen never unmounts due to loading.
 function AppContent() {
-  const { isLoggedIn, isLoading } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState(null); // Start with null to wait for auth check
-  const [otpVerificationData, setOtpVerificationData] = useState(null);
+  const { isLoggedIn, authReady } = useAuth();
+  const [currentScreen, setCurrentScreen] = useState(null);
   const [upsertGradeId, setUpsertGradeId] = useState(null);
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedGrade, setSelectedGrade] = useState(null);
   const [selectedSubgrade, setSelectedSubgrade] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
 
-  // Set initial screen based on auth status
+  // Set initial screen only when auth is ready (once). Never show loading again after that.
   useEffect(() => {
-    if (!isLoading) {
-      // Auth check is complete, set initial screen
-      if (isLoggedIn) {
-        setCurrentScreen('home');
-      } else {
-        setCurrentScreen('login');
-      }
+    if (authReady && currentScreen === null) {
+      setCurrentScreen(isLoggedIn ? 'home' : 'login');
     }
-  }, [isLoggedIn, isLoading]);
-
-  const switchToRegister = () => {
-    setCurrentScreen('register');
-  };
-
-  const switchToLogin = () => {
-    setCurrentScreen('login');
-  };
+  }, [authReady, isLoggedIn, currentScreen]);
 
   const goToHome = () => {
     setCurrentScreen('home');
@@ -124,21 +108,6 @@ function AppContent() {
     setCurrentScreen('apiTest');
   };
 
-  const goToOtpVerification = (data) => {
-    setOtpVerificationData(data);
-    setCurrentScreen('otpVerification');
-  };
-
-  const goBackFromOtp = () => {
-    setOtpVerificationData(null);
-    setCurrentScreen('register');
-  };
-
-  const handleOtpSuccess = () => {
-    setOtpVerificationData(null);
-    setCurrentScreen('home');
-  };
-
   const goBack = () => {
     if (currentScreen === 'gradeBooks') {
       setSelectedSubgrade(null);
@@ -192,8 +161,8 @@ function AppContent() {
     setCurrentScreen('home');
   };
 
-  // Show loading screen while checking auth status
-  if (isLoading || currentScreen === null) {
+  // Show loading only until first auth check completes. After authReady, login/home never unmount due to loading.
+  if (!authReady || currentScreen === null) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.white }}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -204,30 +173,7 @@ function AppContent() {
   return (
     <>
       {currentScreen === 'login' ? (
-          <LoginScreen 
-            onSwitchToRegister={switchToRegister} 
-            onGoToSearch={goToSchoolCode}
-            onGoToApiTest={goToApiTest}
-          />
-        ) : currentScreen === 'register' ? (
-          <RegisterScreen 
-            onBack={goBack} 
-            onSwitchToLogin={switchToLogin} 
-            onGoToOtpVerification={goToOtpVerification}
-          />
-        ) : currentScreen === 'otpVerification' ? (
-          <OtpVerificationScreen
-            onBack={goBackFromOtp}
-            onSuccess={handleOtpSuccess}
-            email={otpVerificationData?.email}
-            firstName={otpVerificationData?.firstName}
-            lastName={otpVerificationData?.lastName}
-            userName={otpVerificationData?.userName}
-            password={otpVerificationData?.password}
-            schoolName={otpVerificationData?.schoolName}
-            classStandard={otpVerificationData?.classStandard}
-            phoneNumber={otpVerificationData?.phoneNumber}
-          />
+          <LoginScreen onGoToSearch={goToSchoolCode} />
         ) : currentScreen === 'search' ? (
           <SchoolSearchScreen onTabPress={handleTabPress} onClose={goBack} />
         ) : currentScreen === 'schoolCode' ? (

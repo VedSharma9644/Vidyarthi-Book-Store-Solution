@@ -11,12 +11,12 @@ const HomeScreen = () => {
   const isTablet = useIsTablet();
   const homeStyles = getResponsiveHomeStyles(isMobile, isTablet);
 
-  const handleBrowseBooks = () => {
+  const handleSchoolZone = () => {
     navigate('/search');
   };
 
-  const handleShopStationery = () => {
-    alert('Shop Stationery functionality will be implemented');
+  const handleGeneralBooks = () => {
+    alert('General Books – Feature coming soon');
   };
 
   const handleReorderPrevious = () => {
@@ -62,7 +62,7 @@ const HomeScreen = () => {
                   ...homeStyles.homeCard,
                   ...(!isMobile && { minWidth: '250px', maxWidth: '300px', flex: '1 1 250px' })
                 }}
-                onClick={handleBrowseBooks}
+                onClick={handleSchoolZone}
                 onMouseEnter={(e) => {
                   Object.assign(e.currentTarget.style, homeStyles.homeCardHover);
                 }}
@@ -74,7 +74,7 @@ const HomeScreen = () => {
                 <div style={homeStyles.homeCardIconContainer}>
                   <span style={homeStyles.homeCardIcon}>📚</span>
                 </div>
-                <div style={homeStyles.homeCardText}>Browse Books</div>
+                <div style={homeStyles.homeCardText}>School Zone</div>
               </button>
 
               <button
@@ -82,7 +82,7 @@ const HomeScreen = () => {
                   ...homeStyles.homeCard,
                   ...(!isMobile && { minWidth: '250px', maxWidth: '300px', flex: '1 1 250px' })
                 }}
-                onClick={handleShopStationery}
+                onClick={handleGeneralBooks}
                 onMouseEnter={(e) => {
                   Object.assign(e.currentTarget.style, homeStyles.homeCardHover);
                 }}
@@ -94,7 +94,7 @@ const HomeScreen = () => {
                 <div style={homeStyles.homeCardIconContainer}>
                   <span style={homeStyles.homeCardIcon}>✏️</span>
                 </div>
-                <div style={homeStyles.homeCardText}>Shop Stationery</div>
+                <div style={homeStyles.homeCardText}>General Books</div>
               </button>
             </div>
           </div>

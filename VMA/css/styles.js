@@ -330,6 +330,9 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  registerButtonDisabled: {
+    opacity: 0.6,
+  },
   legalContainer: {
     marginTop: 16,
     alignItems: 'center',

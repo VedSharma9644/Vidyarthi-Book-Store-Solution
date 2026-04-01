@@ -138,14 +138,33 @@ class ApiService {
         mobileNumber,
         otp,
       });
-      
-      // Store user data if login successful
-      if (response.data.success) {
-        await this.storeUserData(response.data.user);
+      const data = response.data || {};
+      if (data.success === true && data.user) {
+        await this.storeUserData(data.user);
+        return data;
       }
-      
-      return response.data;
+      const message = (data.message != null) ? String(data.message) : '';
+      const isNewUserBackend = data.isNewUser === true || data.userNotFound === true ||
+        /not found|register first/i.test(message);
+      if (isNewUserBackend) {
+        return {
+          success: false,
+          message: message || 'User not found. Please create an account.',
+          userNotFound: true,
+        };
+      }
+      return { ...data, userNotFound: false };
     } catch (error) {
+      const status = error.response?.status;
+      const data = error.response?.data || {};
+      const message = (data.message != null) ? String(data.message) : '';
+      if (status === 404 || /not found|register first/i.test(message)) {
+        return {
+          success: false,
+          message: message || 'User not found. Please create an account.',
+          userNotFound: true,
+        };
+      }
       throw error;
     }
   }
@@ -173,42 +192,6 @@ class ApiService {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.REGISTER, userData);
       
       // Store user data if registration successful
-      if (response.data.success) {
-        await this.storeUserData(response.data.user);
-      }
-      
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Mobile OTP APIs
-  // Note: sendOtp is defined earlier with better error handling
-
-  async registerMobile(userData) {
-    try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.REGISTER_MOBILE, userData);
-      
-      // Store user data if registration successful
-      if (response.data.success) {
-        await this.storeUserData(response.data.user);
-      }
-      
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async loginMobile(mobileNumber, otp) {
-    try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.AUTH.LOGIN_MOBILE, {
-        mobileNumber,
-        otp,
-      });
-      
-      // Store user data if login successful
       if (response.data.success) {
         await this.storeUserData(response.data.user);
       }

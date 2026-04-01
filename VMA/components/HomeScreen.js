@@ -119,15 +119,14 @@ const HomeScreen = ({ onTabPress, onGoToSearch, onGoToOrderHistory }) => {
     return 'U';
   };
 
-  const handleBrowseBooks = () => {
+  const handleSchoolZone = () => {
     if (onGoToSearch) {
       onGoToSearch();
     }
   };
 
-  const handleShopStationery = () => {
-    // Navigate to stationery shop
-    Alert.alert('Shop Stationery', 'Stationery shop functionality will be implemented');
+  const handleGeneralBooks = () => {
+    Alert.alert('General Books', 'Feature coming soon');
   };
 
   const handleReorderPrevious = () => {
@@ -209,22 +208,22 @@ const HomeScreen = ({ onTabPress, onGoToSearch, onGoToOrderHistory }) => {
           <View style={styles.homeCardsRow}>
             <TouchableOpacity 
               style={styles.homeCard}
-              onPress={handleBrowseBooks}
+              onPress={handleSchoolZone}
             >
               <View style={styles.homeCardIconContainer}>
                 <Text style={styles.homeCardIcon}>📚</Text>
               </View>
-              <Text style={styles.homeCardText}>Browse Books</Text>
+              <Text style={styles.homeCardText}>School Zone</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.homeCard}
-              onPress={handleShopStationery}
+              onPress={handleGeneralBooks}
             >
               <View style={styles.homeCardIconContainer}>
                 <Text style={styles.homeCardIcon}>✏️</Text>
               </View>
-              <Text style={styles.homeCardText}>Shop Stationery</Text>
+              <Text style={styles.homeCardText}>General Books</Text>
             </TouchableOpacity>
           </View>
         </View>
