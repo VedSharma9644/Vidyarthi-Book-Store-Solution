@@ -704,6 +704,8 @@ class ApiService {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, {
         amount,
         receipt,
+      }, {
+        timeout: API_CONFIG.CHECKOUT_TIMEOUT,
       });
       return response.data;
     } catch (error) {
@@ -733,6 +735,8 @@ class ApiService {
         orderId,
         paymentId,
         signature,
+      }, {
+        timeout: API_CONFIG.CHECKOUT_TIMEOUT,
       });
       return response.data;
     } catch (error) {
@@ -847,7 +851,9 @@ class ApiService {
    */
   async validateCartForCheckout() {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.VALIDATE_CART, {});
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.VALIDATE_CART, {}, {
+        timeout: API_CONFIG.CHECKOUT_TIMEOUT,
+      });
       return response.data;
     } catch (error) {
       console.error('Validate cart API Error:', error.message);
@@ -869,10 +875,13 @@ class ApiService {
         };
       }
       if (error.request) {
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
         return {
           success: false,
           valid: false,
-          message: 'Cannot connect to server. Make sure backend is running.',
+          message: isTimeout
+            ? 'Request timed out. The server is taking too long to validate your cart. Please try again.'
+            : 'Cannot connect to server. Make sure backend is running.',
         };
       }
       return {
@@ -888,6 +897,8 @@ class ApiService {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, {
         paymentData,
         shippingAddress,
+      }, {
+        timeout: API_CONFIG.CHECKOUT_TIMEOUT,
       });
       return response.data;
     } catch (error) {

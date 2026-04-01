@@ -88,7 +88,8 @@ export const API_CONFIG = {
     // Health
     HEALTH: '/health',
   },
-  TIMEOUT: 10000, // 10 seconds
+  TIMEOUT: 10000, // 10 seconds (default for most APIs)
+  CHECKOUT_TIMEOUT: 30000, // 30 seconds for validate-cart, payment, create-order (can be slow)
 };
 
 // Helper function to get full URL
