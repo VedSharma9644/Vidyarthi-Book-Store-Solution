@@ -15,6 +15,7 @@ export const API_CONFIG = {
     BOOKS: {
       GET_ALL: '/api/books/get-all-books',
       GET_GENERAL: '/api/books/get-all-generalbooks',
+      SCHOOL_BOOK_PRESENCE: '/api/books/school-book-presence',
       GET_BY_ID: '/api/books',
     },
     // Cart
@@ -32,6 +33,7 @@ export const API_CONFIG = {
       VALIDATE_CODE: '/api/schools/validate-code',
       GET_BY_CODE: '/api/schools/code',
       GET_BY_ID: '/api/schools',
+      PAGE_DATA: '/api/schools', // usage: `${PAGE_DATA}/${schoolId}/page-data`
     },
     // Grades
     GRADES: {

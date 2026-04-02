@@ -68,6 +68,36 @@ const getGeneralBooks = async (req, res) => {
 };
 
 /**
+ * Lightweight: which grades / subgrades have active books for this school (IDs only).
+ * @route GET /api/books/school-book-presence
+ * @query schoolId
+ */
+const getSchoolBookPresence = async (req, res) => {
+    try {
+        const { schoolId } = req.query;
+        if (!schoolId) {
+            return res.status(400).json({
+                success: false,
+                message: 'schoolId is required',
+            });
+        }
+
+        const data = await bookService.getSchoolBookPresence(schoolId);
+        return res.json({
+            success: true,
+            data,
+        });
+    } catch (error) {
+        console.error('Error in getSchoolBookPresence controller:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch book presence for school',
+            error: error.message,
+        });
+    }
+};
+
+/**
  * Get book by ID
  * @route GET /api/books/:id
  */
@@ -101,6 +131,7 @@ const getBookById = async (req, res) => {
 module.exports = {
     getAllBooks,
     getGeneralBooks,
+    getSchoolBookPresence,
     getBookById,
 };
 

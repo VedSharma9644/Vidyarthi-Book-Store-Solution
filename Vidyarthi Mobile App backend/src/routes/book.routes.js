@@ -19,6 +19,13 @@ router.get('/get-all-books', bookController.getAllBooks);
 router.get('/get-all-generalbooks', bookController.getGeneralBooks);
 
 /**
+ * @route   GET /api/books/school-book-presence
+ * @desc    Grade/subgrade IDs that have active books for a school (minimal read)
+ * @query   schoolId
+ */
+router.get('/school-book-presence', bookController.getSchoolBookPresence);
+
+/**
  * @route   GET /api/books/:id
  * @desc    Get book by ID
  * @access  Public

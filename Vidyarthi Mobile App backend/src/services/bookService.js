@@ -1,4 +1,5 @@
 const { db } = require('../config/firebase');
+const { FieldPath } = require('firebase-admin/firestore');
 
 class BookService {
     constructor() {
@@ -81,6 +82,68 @@ class BookService {
             return books;
         } catch (error) {
             console.error('Error getting all books:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * For a school, scan only gradeId/subgradeId on active books (paginated, small payload).
+     * Used by School page to show grades that have books without downloading full book rows.
+     * @param {string} schoolId
+     * @returns {Promise<{ gradeIdsWithDirectBooks: string[], subgradeIdsWithBooks: string[] }>}
+     */
+    async getSchoolBookPresence(schoolId) {
+        try {
+            const sid = schoolId != null ? String(schoolId).trim() : '';
+            if (!sid) {
+                return { gradeIdsWithDirectBooks: [], subgradeIdsWithBooks: [] };
+            }
+
+            const pageSize = 400;
+            const gradeIdsDirect = new Set();
+            const subgradeIds = new Set();
+            let lastDoc = null;
+
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                let q = this.booksRef
+                    .where('schoolId', '==', sid)
+                    .where('isActive', '==', true)
+                    .orderBy(FieldPath.documentId())
+                    .select('gradeId', 'subgradeId')
+                    .limit(pageSize);
+
+                if (lastDoc) {
+                    q = q.startAfter(lastDoc);
+                }
+
+                const snapshot = await q.get();
+                if (snapshot == null || snapshot.empty) {
+                    break;
+                }
+
+                snapshot.forEach((doc) => {
+                    const d = doc.data() || {};
+                    if (d.gradeId) {
+                        gradeIdsDirect.add(String(d.gradeId));
+                    }
+                    if (d.subgradeId) {
+                        subgradeIds.add(String(d.subgradeId));
+                    }
+                });
+
+                lastDoc = snapshot.docs[snapshot.docs.length - 1];
+                if (snapshot.size < pageSize) {
+                    break;
+                }
+            }
+
+            return {
+                gradeIdsWithDirectBooks: Array.from(gradeIdsDirect),
+                subgradeIdsWithBooks: Array.from(subgradeIds),
+            };
+        } catch (error) {
+            console.error('Error getting school book presence:', error);
             throw error;
         }
     }

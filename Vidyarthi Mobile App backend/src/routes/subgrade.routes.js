@@ -10,6 +10,13 @@ const subgradeController = require('../controllers/subgrade.controller');
 router.get('/', subgradeController.getSubgradesByGradeId);
 
 /**
+ * @route   POST /api/subgrades/by-grade-ids
+ * @desc    Batch get subgrades for multiple gradeIds
+ * @body    { gradeIds: string[] }
+ */
+router.post('/by-grade-ids', subgradeController.getSubgradesByGradeIds);
+
+/**
  * @route   GET /api/subgrades/:id
  * @desc    Get subgrade by ID
  */

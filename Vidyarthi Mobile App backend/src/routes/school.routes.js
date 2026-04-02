@@ -30,6 +30,13 @@ router.get('/code/:code', schoolController.getSchoolByCode);
  * @desc    Get school by ID
  * @access  Public
  */
+router.get('/:id/page-data', schoolController.getSchoolPageData);
+
+/**
+ * @route   GET /api/schools/:id
+ * @desc    Get school by ID
+ * @access  Public
+ */
 router.get('/:id', schoolController.getSchoolById);
 
 module.exports = router;

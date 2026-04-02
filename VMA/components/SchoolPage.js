@@ -43,16 +43,37 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
       setError(null);
       setSectionsByGradeId({});
 
-      let result;
-      let loadedSchoolId = null;
+      let loadedSchoolId = schoolId || null;
+      let result = null;
 
-      if (schoolId) {
-        result = await ApiService.getSchoolById(schoolId);
-        loadedSchoolId = schoolId;
-      } else if (schoolCode) {
+      if (!loadedSchoolId && schoolCode) {
         result = await ApiService.getSchoolByCode(schoolCode);
         if (result.success && result.data) {
           loadedSchoolId = result.data.id;
+        }
+      }
+
+      if (loadedSchoolId) {
+        const pageDataRes = await ApiService.getSchoolPageData(loadedSchoolId);
+        if (pageDataRes.success && pageDataRes.data) {
+          const payload = pageDataRes.data;
+          setSchool(payload.school);
+          const transformedGrades = (payload.grades || []).map((grade) => ({
+            id: grade.id,
+            name: grade.name,
+            displayOrder: grade.displayOrder,
+          }));
+          setGrades(sortGrades(transformedGrades));
+          setSectionsByGradeId(payload.sectionsByGradeId || {});
+          return;
+        }
+      }
+
+      if (schoolId) {
+        result = await ApiService.getSchoolById(schoolId);
+      } else if (schoolCode) {
+        if (!result) {
+          result = await ApiService.getSchoolByCode(schoolCode);
         }
       } else {
         setError('No school identifier provided');
@@ -73,61 +94,46 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
               displayOrder: grade.displayOrder,
             }));
 
+            const gradeIds = transformedGrades.map((g) => g.id).filter(Boolean);
+            let subgradesByGradeId = {};
+            try {
+              const subgradesBatchRes = await ApiService.getSubgradesByGradeIds(gradeIds);
+              if (subgradesBatchRes.success && Array.isArray(subgradesBatchRes.data)) {
+                subgradesByGradeId = subgradesBatchRes.data.reduce((acc, sg) => {
+                  const gid = sg.gradeId;
+                  if (!gid) return acc;
+                  if (!acc[gid]) acc[gid] = [];
+                  acc[gid].push(sg);
+                  return acc;
+                }, {});
+              }
+            } catch (e) {
+              console.warn('Batch subgrades fetch failed, will fallback per-grade if needed:', e);
+            }
+
             // Filter out grades that have no products/books
             // This ensures users only see grades with actual content
             let finalGrades = transformedGrades;
             try {
-              // Fetch more books to ensure we don't miss any (increased limit)
-              const booksResult = await ApiService.getAllBooks({ offset: 0, limit: 2000 });
-              if (booksResult.success && Array.isArray(booksResult.data)) {
-                // Get all books for this school
-                const schoolBooks = booksResult.data.filter(
-                  (book) => book.schoolId === loadedSchoolId && book.isActive !== false
+              const presenceRes = await ApiService.getSchoolBookPresence(loadedSchoolId);
+              if (presenceRes.success && presenceRes.data) {
+                const { gradeIdsWithDirectBooks = [], subgradeIdsWithBooks = [] } = presenceRes.data;
+                const subgradeSet = new Set(subgradeIdsWithBooks.map(String));
+                const gradesWithBooks = new Set(gradeIdsWithDirectBooks.map(String));
+
+                const gradesWithoutDirectBooks = transformedGrades.filter(
+                  (grade) => !gradesWithBooks.has(String(grade.id))
                 );
-                
-                // Collect grade IDs that have products
-                const gradesWithBooks = new Set();
-                
-                schoolBooks.forEach((book) => {
-                  // Add gradeId if directly assigned
-                  if (book.gradeId) {
-                    gradesWithBooks.add(book.gradeId);
+                gradesWithoutDirectBooks.forEach((grade) => {
+                  const subgradesForGrade = subgradesByGradeId[grade.id] || [];
+                  const hasBookViaSubgrade = subgradesForGrade.some((sg) => subgradeSet.has(String(sg.id)));
+                  if (hasBookViaSubgrade) {
+                    gradesWithBooks.add(String(grade.id));
                   }
                 });
-                
-                // Also check if any grades have products via their subgrades
-                // Fetch subgrades for grades that don't have direct books
-                const gradesWithoutDirectBooks = transformedGrades.filter(
-                  (grade) => !gradesWithBooks.has(grade.id)
-                );
-                
-                if (gradesWithoutDirectBooks.length > 0) {
-                  // Check each grade's subgrades for books
-                  await Promise.all(
-                    gradesWithoutDirectBooks.map(async (grade) => {
-                      try {
-                        const subgradesRes = await ApiService.getSubgradesByGradeId(grade.id);
-                        if (subgradesRes.success && subgradesRes.data) {
-                          const subgradeIds = subgradesRes.data.map((sg) => sg.id);
-                          // Check if any book belongs to these subgrades
-                          const hasBookViaSubgrade = schoolBooks.some(
-                            (book) => book.subgradeId && subgradeIds.includes(book.subgradeId)
-                          );
-                          if (hasBookViaSubgrade) {
-                            gradesWithBooks.add(grade.id);
-                          }
-                        }
-                      } catch (subgradeError) {
-                        console.warn(`Failed to check subgrades for grade ${grade.id}:`, subgradeError);
-                      }
-                    })
-                  );
-                }
-                
-                // Strictly filter - only show grades that have products
-                // Do NOT fallback to showing all grades if none have books
-                finalGrades = transformedGrades.filter((grade) => gradesWithBooks.has(grade.id));
-                
+
+                finalGrades = transformedGrades.filter((grade) => gradesWithBooks.has(String(grade.id)));
+
                 if (finalGrades.length === 0 && transformedGrades.length > 0) {
                   console.log('No grades with products found for school:', loadedSchoolId);
                 }
@@ -141,12 +147,9 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
             setGrades(sortGrades(finalGrades));
             // Fetch sections (subgrades) for each grade
             const byGrade = {};
-            await Promise.all(
-              finalGrades.map(async (grade) => {
-                const res = await ApiService.getSubgradesByGradeId(grade.id);
-                byGrade[grade.id] = (res.success && res.data) ? res.data : [];
-              })
-            );
+            finalGrades.forEach((grade) => {
+              byGrade[grade.id] = subgradesByGradeId[grade.id] || [];
+            });
             setSectionsByGradeId(byGrade);
           } else {
             setGrades([]);

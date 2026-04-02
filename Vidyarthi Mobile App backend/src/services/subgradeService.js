@@ -46,6 +46,52 @@ class SubgradeService {
     }
 
     /**
+     * Get subgrades for multiple grade IDs in fewer round-trips.
+     * Uses Firestore 'in' queries (chunked to 10 due to Firestore limits).
+     * @param {string[]} gradeIds - Grade IDs
+     * @returns {Promise<Array>} - Array of subgrades
+     */
+    async getSubgradesByGradeIds(gradeIds = []) {
+        try {
+            const ids = Array.isArray(gradeIds) ? gradeIds.filter(Boolean) : [];
+            if (ids.length === 0) return [];
+
+            const chunks = [];
+            for (let i = 0; i < ids.length; i += 10) {
+                chunks.push(ids.slice(i, i + 10));
+            }
+
+            const results = [];
+            // Run chunk queries sequentially to reduce Firestore pressure.
+            for (const chunk of chunks) {
+                const snapshot = await this.subgradesRef
+                    .where('isActive', '==', true)
+                    .where('gradeId', 'in', chunk)
+                    .get();
+
+                snapshot.forEach((doc) => {
+                    results.push({
+                        id: doc.id,
+                        ...doc.data(),
+                    });
+                });
+            }
+
+            results.sort((a, b) => {
+                const aOrder = a.displayOrder || 0;
+                const bOrder = b.displayOrder || 0;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+
+            return results;
+        } catch (error) {
+            console.error('Error getting subgrades by gradeIds:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Get subgrade by ID
      * @param {string} id - Subgrade ID
      * @returns {Promise<object|null>} - Subgrade object or null

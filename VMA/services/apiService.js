@@ -233,6 +233,37 @@ class ApiService {
     }
   }
 
+  /** Grade/subgrade IDs that have active books for this school (small response). */
+  async getSchoolBookPresence(schoolId) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKS.SCHOOL_BOOK_PRESENCE, {
+        params: { schoolId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get school book presence API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch book presence',
+          data: null,
+        };
+      }
+      if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: null,
+        };
+      }
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch book presence.',
+        data: null,
+      };
+    }
+  }
+
   // Cart APIs
   async getCart() {
     try {
@@ -509,6 +540,18 @@ class ApiService {
     }
   }
 
+  async getSchoolPageData(schoolId) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.SCHOOLS.PAGE_DATA}/${schoolId}/page-data`);
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        return { success: false, notFound: true, message: 'Page data endpoint not found' };
+      }
+      return { success: false, message: error.response?.data?.message || error.message || 'Failed to load page data' };
+    }
+  }
+
   // Grades APIs
   async getGradesBySchoolId(schoolId) {
     try {
@@ -557,6 +600,21 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Get subgrades API Error:', error.message);
+      if (error.response) {
+        return { success: false, message: error.response?.data?.message || 'Failed to fetch sections', data: [] };
+      }
+      return { success: false, message: 'Failed to fetch sections.', data: [] };
+    }
+  }
+
+  async getSubgradesByGradeIds(gradeIds) {
+    try {
+      const response = await apiClient.post(`${API_CONFIG.ENDPOINTS.SUBGRADES.GET_ALL}/by-grade-ids`, {
+        gradeIds,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Batch get subgrades API Error:', error.message);
       if (error.response) {
         return { success: false, message: error.response?.data?.message || 'Failed to fetch sections', data: [] };
       }

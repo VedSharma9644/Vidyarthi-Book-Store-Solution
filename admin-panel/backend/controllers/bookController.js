@@ -1,5 +1,6 @@
 const { db } = require('../config/database');
 const Book = require('../models/Book');
+const bookInventoryFlags = require('../services/bookInventoryFlagsService');
 
 // Get all books
 const getAllBooks = async (req, res) => {
@@ -139,10 +140,17 @@ const createBook = async (req, res) => {
     const docRef = await db.collection('books').add(book.toFirestore());
     const newBook = await db.collection('books').doc(docRef.id).get();
 
+    const created = Book.fromFirestore(newBook);
+    try {
+      await bookInventoryFlags.refreshAfterBookChange(null, bookInventoryFlags.modelToRefBook(created));
+    } catch (e) {
+      console.warn('bookInventoryFlags refresh after create:', e.message);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Book created successfully',
-      data: Book.fromFirestore(newBook),
+      data: created,
     });
   } catch (error) {
     console.error('Error creating book:', error);
@@ -264,10 +272,20 @@ const updateBook = async (req, res) => {
     await db.collection('books').doc(id).update(book.toFirestore());
     const updatedBook = await db.collection('books').doc(id).get();
 
+    const updated = Book.fromFirestore(updatedBook);
+    try {
+      await bookInventoryFlags.refreshAfterBookChange(
+        bookInventoryFlags.modelToRefBook(existingBook),
+        bookInventoryFlags.modelToRefBook(updated)
+      );
+    } catch (e) {
+      console.warn('bookInventoryFlags refresh after update:', e.message);
+    }
+
     res.json({
       success: true,
       message: 'Book updated successfully',
-      data: Book.fromFirestore(updatedBook),
+      data: updated,
     });
   } catch (error) {
     console.error('Error updating book:', error);
@@ -296,6 +314,19 @@ const deleteBook = async (req, res) => {
 
     // Permanently delete the book document from Firestore
     await db.collection('books').doc(id).delete();
+
+    try {
+      await bookInventoryFlags.refreshAfterBookChange(
+        {
+          gradeId: bookData.gradeId || '',
+          subgradeId: bookData.subgradeId || '',
+          isActive: true,
+        },
+        null
+      );
+    } catch (e) {
+      console.warn('bookInventoryFlags refresh after delete:', e.message);
+    }
 
     // Optionally delete the cover image from Firebase Storage if it exists
     if (bookData.coverImageUrl) {

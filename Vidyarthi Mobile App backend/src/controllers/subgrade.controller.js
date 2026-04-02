@@ -20,6 +20,39 @@ const getSubgradesByGradeId = async (req, res) => {
     }
 };
 
+/**
+ * Batch get subgrades by multiple gradeIds
+ * @route   POST /api/subgrades/by-grade-ids
+ * @access  Public
+ * @body    { gradeIds: string[] }
+ */
+const getSubgradesByGradeIds = async (req, res) => {
+    try {
+        const gradeIds = req.body?.gradeIds;
+        if (!Array.isArray(gradeIds) || gradeIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'gradeIds array is required',
+                data: [],
+            });
+        }
+
+        const subgrades = await subgradeService.getSubgradesByGradeIds(gradeIds);
+        return res.json({
+            success: true,
+            data: subgrades,
+            count: subgrades.length,
+        });
+    } catch (error) {
+        console.error('Error in getSubgradesByGradeIds controller:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch subgrades',
+            error: error.message,
+        });
+    }
+};
+
 const getSubgradeById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -48,5 +81,6 @@ const getSubgradeById = async (req, res) => {
 
 module.exports = {
     getSubgradesByGradeId,
+    getSubgradesByGradeIds,
     getSubgradeById,
 };
