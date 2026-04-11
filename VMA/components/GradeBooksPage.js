@@ -112,44 +112,54 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
         ? categoriesResult.data.map(cat => cat.id)
         : [];
 
-      let allBooks = [];
-      let offset = 0;
-      const limit = 100;
-      let hasMore = true;
-
-      while (hasMore) {
-        const booksResult = await ApiService.getAllBooks({ offset, limit });
-
-        if (booksResult.success && booksResult.data && booksResult.data.length > 0) {
-          allBooks = allBooks.concat(booksResult.data);
-          if (booksResult.data.length < limit) hasMore = false;
-          else offset += limit;
-        } else {
-          hasMore = false;
+      let books = [];
+      let usedScopedApi = false;
+      if (schoolId && gradeId) {
+        const scoped = await ApiService.getBooksForGradePage({
+          schoolId,
+          gradeId,
+          subgradeId: subgradeId || null,
+          categoryIds,
+        });
+        if (scoped && scoped.success && Array.isArray(scoped.data)) {
+          books = scoped.data;
+          usedScopedApi = true;
         }
       }
 
-      const books = allBooks.length > 0
-        ? allBooks.filter(book => {
-            // When a specific section (subgrade) is selected
-            if (subgradeId) {
-              return (
-                book.subgradeId === subgradeId ||
-                (book.categoryId && categoryIds.includes(book.categoryId))
-              );
-            }
+      if (!usedScopedApi) {
+        let allBooks = [];
+        let offset = 0;
+        const limit = 100;
+        let hasMore = true;
 
-            // "View all books" (no section selected)
-            // Prefer category-based mapping when available
-            if (categoryIds.length > 0 && book.categoryId && categoryIds.includes(book.categoryId)) {
-              return true;
-            }
+        while (hasMore) {
+          const booksResult = await ApiService.getAllBooks({ offset, limit });
 
-            // Fallback: include books that are directly linked to this grade
-            // even if they don't have a category/section assigned
-            return book.gradeId === gradeId;
-          })
-        : [];
+          if (booksResult.success && booksResult.data && booksResult.data.length > 0) {
+            allBooks = allBooks.concat(booksResult.data);
+            if (booksResult.data.length < limit) hasMore = false;
+            else offset += limit;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        books = allBooks.length > 0
+          ? allBooks.filter((book) => {
+              if (subgradeId) {
+                return (
+                  book.subgradeId === subgradeId ||
+                  (book.categoryId && categoryIds.includes(book.categoryId))
+                );
+              }
+              if (categoryIds.length > 0 && book.categoryId && categoryIds.includes(book.categoryId)) {
+                return true;
+              }
+              return book.gradeId === gradeId;
+            })
+          : [];
+      }
 
       if (books.length > 0) {
         

@@ -27,6 +27,7 @@ export const API_CONFIG = {
       GET_ALL: '/api/books/get-all-books',
       GET_GENERAL: '/api/books/get-all-generalbooks',
       SCHOOL_BOOK_PRESENCE: '/api/books/school-book-presence',
+      GRADE_BOOKS: '/api/books/grade-books',
       GET_BY_ID: '/api/books',
     },
     // Cart

@@ -92,6 +92,99 @@ class BookService {
      * @param {string} schoolId
      * @returns {Promise<{ gradeIdsWithDirectBooks: string[], subgradeIdsWithBooks: string[] }>}
      */
+    /**
+     * Books for grade/section screen: targeted queries (school + grade/subgrade + categories).
+     * Replaces client-side full-catalog pagination for GradeBooksPage.
+     * @param {{ schoolId: string, gradeId: string, subgradeId?: string|null, categoryIds?: string[] }} params
+     */
+    async getBooksForGradePage(params = {}) {
+        const schoolId = params.schoolId != null ? String(params.schoolId).trim() : '';
+        const gradeId = params.gradeId != null ? String(params.gradeId).trim() : '';
+        const subgradeId =
+            params.subgradeId != null && String(params.subgradeId).trim() !== ''
+                ? String(params.subgradeId).trim()
+                : '';
+        const rawCats = Array.isArray(params.categoryIds) ? params.categoryIds : [];
+        const categoryIds = [...new Set(rawCats.map((c) => String(c).trim()).filter(Boolean))];
+
+        if (!schoolId || !gradeId) {
+            return [];
+        }
+
+        const byId = new Map();
+        const addSnap = (snapshot) => {
+            if (!snapshot) return;
+            snapshot.forEach((doc) => {
+                if (!byId.has(doc.id)) {
+                    byId.set(doc.id, { id: doc.id, ...doc.data() });
+                }
+            });
+        };
+
+        const queries = [];
+
+        if (subgradeId) {
+            queries.push(
+                this.booksRef
+                    .where('schoolId', '==', schoolId)
+                    .where('subgradeId', '==', subgradeId)
+                    .where('isActive', '==', true)
+                    .get()
+            );
+        } else {
+            queries.push(
+                this.booksRef
+                    .where('schoolId', '==', schoolId)
+                    .where('gradeId', '==', gradeId)
+                    .where('isActive', '==', true)
+                    .get()
+            );
+        }
+
+        for (let i = 0; i < categoryIds.length; i += 10) {
+            const chunk = categoryIds.slice(i, i + 10);
+            queries.push(
+                this.booksRef
+                    .where('schoolId', '==', schoolId)
+                    .where('categoryId', 'in', chunk)
+                    .where('isActive', '==', true)
+                    .get()
+            );
+        }
+
+        const snapshots = await Promise.all(queries);
+        snapshots.forEach(addSnap);
+
+        const catSet = new Set(categoryIds);
+        let merged = Array.from(byId.values());
+
+        if (subgradeId) {
+            merged = merged.filter(
+                (b) =>
+                    String(b.subgradeId || '') === subgradeId ||
+                    (b.categoryId && catSet.has(String(b.categoryId)))
+            );
+        } else {
+            merged = merged.filter(
+                (b) =>
+                    String(b.gradeId || '') === gradeId ||
+                    (b.categoryId && catSet.has(String(b.categoryId)))
+            );
+        }
+
+        const createdAtMs = (b) => {
+            const c = b.createdAt;
+            if (c == null) return 0;
+            if (typeof c.toMillis === 'function') return c.toMillis();
+            if (typeof c._seconds === 'number') return c._seconds * 1000;
+            if (typeof c.seconds === 'number') return c.seconds * 1000;
+            return 0;
+        };
+
+        merged.sort((a, b) => createdAtMs(b) - createdAtMs(a));
+        return merged;
+    }
+
     async getSchoolBookPresence(schoolId) {
         try {
             const sid = schoolId != null ? String(schoolId).trim() : '';

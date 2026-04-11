@@ -587,6 +587,35 @@ class ApiService {
     }
   }
 
+  async getBooksForGradePage({ schoolId, gradeId, subgradeId, categoryIds = [] }) {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.BOOKS.GRADE_BOOKS, {
+        schoolId,
+        gradeId,
+        ...(subgradeId ? { subgradeId } : {}),
+        categoryIds: Array.isArray(categoryIds) ? categoryIds : [],
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get books for grade page API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch books',
+          data: [],
+        };
+      }
+      if (error.request) {
+        return {
+          success: false,
+          message: 'Cannot connect to server. Make sure backend is running.',
+          data: [],
+        };
+      }
+      return { success: false, message: error.message || 'Failed to fetch books.', data: [] };
+    }
+  }
+
   /**
    * Minimal payload: which gradeIds and subgradeIds have active books for this school.
    */

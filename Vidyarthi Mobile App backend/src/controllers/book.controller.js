@@ -72,6 +72,49 @@ const getGeneralBooks = async (req, res) => {
  * @route GET /api/books/school-book-presence
  * @query schoolId
  */
+/**
+ * Scoped books for grade / section screen (single round-trip from client).
+ * @route POST /api/books/grade-books
+ * @body { schoolId, gradeId, subgradeId?: string, categoryIds?: string[] }
+ */
+const getBooksForGradePage = async (req, res) => {
+    try {
+        const schoolId = req.body?.schoolId;
+        const gradeId = req.body?.gradeId;
+        const subgradeId = req.body?.subgradeId;
+        const categoryIds = req.body?.categoryIds;
+
+        if (!schoolId || !gradeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'schoolId and gradeId are required',
+                data: [],
+            });
+        }
+
+        const books = await bookService.getBooksForGradePage({
+            schoolId,
+            gradeId,
+            subgradeId: subgradeId || null,
+            categoryIds: Array.isArray(categoryIds) ? categoryIds : [],
+        });
+
+        return res.json({
+            success: true,
+            data: books,
+            count: books.length,
+        });
+    } catch (error) {
+        console.error('Error in getBooksForGradePage controller:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch books for grade',
+            error: error.message,
+            data: [],
+        });
+    }
+};
+
 const getSchoolBookPresence = async (req, res) => {
     try {
         const { schoolId } = req.query;
@@ -131,6 +174,7 @@ const getBookById = async (req, res) => {
 module.exports = {
     getAllBooks,
     getGeneralBooks,
+    getBooksForGradePage,
     getSchoolBookPresence,
     getBookById,
 };

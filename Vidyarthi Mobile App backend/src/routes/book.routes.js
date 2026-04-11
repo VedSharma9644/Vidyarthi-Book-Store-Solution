@@ -26,6 +26,14 @@ router.get('/get-all-generalbooks', bookController.getGeneralBooks);
 router.get('/school-book-presence', bookController.getSchoolBookPresence);
 
 /**
+ * @route   POST /api/books/grade-books
+ * @desc    Active books for a school grade/section (replaces full-catalog client filter)
+ * @access  Public
+ * @body    { schoolId, gradeId, subgradeId?: string, categoryIds?: string[] }
+ */
+router.post('/grade-books', bookController.getBooksForGradePage);
+
+/**
  * @route   GET /api/books/:id
  * @desc    Get book by ID
  * @access  Public
