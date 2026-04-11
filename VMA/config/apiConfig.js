@@ -81,6 +81,7 @@ export const API_CONFIG = {
     HEALTH: '/health',
   },
   TIMEOUT: 10000, // 10 seconds
+  CHECKOUT_TIMEOUT: 30000, // validate-cart, payment, create-order (can be slow)
 };
 
 // Helper function to get full URL

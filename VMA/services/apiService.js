@@ -352,7 +352,7 @@ class ApiService {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, {
         amount,
         receipt,
-      });
+      }, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
       return response.data;
     } catch (error) {
       console.error('Create payment order API Error:', error.message);
@@ -381,7 +381,7 @@ class ApiService {
         orderId,
         paymentId,
         signature,
-      });
+      }, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
       return response.data;
     } catch (error) {
       console.error('Verify payment API Error:', error.message);
@@ -407,9 +407,21 @@ class ApiService {
   // Orders APIs
   async validateCartForCheckout() {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.VALIDATE_CART);
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.VALIDATE_CART, {}, {
+        timeout: API_CONFIG.CHECKOUT_TIMEOUT,
+      });
       return response.data;
     } catch (error) {
+      if (error.response?.status === 400 && error.response.data) {
+        const data = error.response.data;
+        return {
+          success: false,
+          valid: false,
+          message: data.message || 'Cart validation failed',
+          code: data.code,
+          insufficientBundles: data.insufficientBundles ?? null,
+        };
+      }
       if (error.response?.data) {
         return {
           success: false,
@@ -419,10 +431,15 @@ class ApiService {
           insufficientBundles: error.response.data.insufficientBundles ?? null,
         };
       }
+      const isTimeout = error.code === 'ECONNABORTED' || (error.message && String(error.message).toLowerCase().includes('timeout'));
       return {
         success: false,
         valid: false,
-        message: error.request ? 'Cannot connect to server.' : (error.message || 'Failed to validate cart'),
+        message: error.request
+          ? (isTimeout
+              ? 'Request timed out while validating your cart. Please try again.'
+              : 'Cannot connect to server.')
+          : (error.message || 'Failed to validate cart'),
       };
     }
   }
@@ -436,7 +453,7 @@ class ApiService {
         userId, // Include in body as fallback (header also set by interceptor)
         paymentData,
         shippingAddress,
-      });
+      }, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
       return response.data;
     } catch (error) {
       console.error('Create order API Error:', error.message);
@@ -543,9 +560,12 @@ class ApiService {
   async getSchoolPageData(schoolId) {
     try {
       const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.SCHOOLS.PAGE_DATA}/${schoolId}/page-data`);
-      return response.data;
+      const body = response.data;
+      if (body?.success && body.data) return body;
+      return { success: false, notFound: true, message: 'Page data payload incomplete' };
     } catch (error) {
-      if (error.response && error.response.status === 404) {
+      const status = error.response?.status;
+      if (status === 404 || status === 405 || status === 501) {
         return { success: false, notFound: true, message: 'Page data endpoint not found' };
       }
       return { success: false, message: error.response?.data?.message || error.message || 'Failed to load page data' };
@@ -607,14 +627,42 @@ class ApiService {
     }
   }
 
+  async fetchSubgradesByGradeIdsLegacy(gradeIds) {
+    const ids = Array.isArray(gradeIds) ? gradeIds.filter(Boolean) : [];
+    if (ids.length === 0) return { success: true, data: [], count: 0 };
+    const results = await Promise.all(ids.map((gradeId) => this.getSubgradesByGradeId(gradeId)));
+    const merged = [];
+    for (const r of results) {
+      if (r.success && Array.isArray(r.data)) merged.push(...r.data);
+    }
+    return { success: true, data: merged, count: merged.length };
+  }
+
   async getSubgradesByGradeIds(gradeIds) {
+    const ids = Array.isArray(gradeIds) ? gradeIds.filter(Boolean) : [];
+    if (ids.length === 0) return { success: true, data: [], count: 0 };
+
+    const batchMissingStatus = (error) => {
+      const s = error.response?.status;
+      return s === 404 || s === 405 || s === 501;
+    };
+    const batchTimedOut = (error) =>
+      error.code === 'ECONNABORTED' || (error.message && String(error.message).toLowerCase().includes('timeout'));
+
     try {
       const response = await apiClient.post(`${API_CONFIG.ENDPOINTS.SUBGRADES.GET_ALL}/by-grade-ids`, {
-        gradeIds,
+        gradeIds: ids,
       });
-      return response.data;
+      const body = response.data;
+      if (body?.success && Array.isArray(body.data)) return body;
+      console.warn('Batch subgrades response unexpected, falling back to per-grade');
+      return this.fetchSubgradesByGradeIdsLegacy(ids);
     } catch (error) {
       console.error('Batch get subgrades API Error:', error.message);
+      if (batchMissingStatus(error) || batchTimedOut(error)) {
+        console.warn('Batch subgrades unavailable, using per-grade requests');
+        return this.fetchSubgradesByGradeIdsLegacy(ids);
+      }
       if (error.response) {
         return { success: false, message: error.response?.data?.message || 'Failed to fetch sections', data: [] };
       }
