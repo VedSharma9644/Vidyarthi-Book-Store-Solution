@@ -53,7 +53,12 @@ const isRazorpayAvailable = () => {
 import { styles, colors } from '../css/styles';
 import ApiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
-import { getOptionalTypeTitle, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
+import {
+  getOptionalTypeTitle,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+} from '../utils/categoryNames';
 
 const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   const { user } = useAuth();
@@ -297,8 +302,12 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
         optionalByType[type].items.push(item);
       }
     });
-    
-    return { textbooks, mandatoryNotebooks, optionalByType };
+
+    return {
+      textbooks,
+      mandatoryNotebooks,
+      optionalByType: mergeHiddenOptionalBundleGroups(optionalByType),
+    };
   };
 
   const toggleCategory = (category) => {

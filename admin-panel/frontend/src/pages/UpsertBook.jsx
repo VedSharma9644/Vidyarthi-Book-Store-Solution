@@ -59,18 +59,28 @@ const UpsertBook = () => {
   const [loadingSubgrades, setLoadingSubgrades] = useState(false);
   const [isRefreshingStock, setIsRefreshingStock] = useState(false);
 
-  const bookTypeOptions = [
+  /** Full list (OPTIONAL_3/OPTIONAL_4 kept for legacy data; hidden from dropdown unless current book uses them). */
+  const bookTypeOptionsAll = [
     { value: 'TEXTBOOK', label: 'Mandatory Textbook' },
     { value: 'NOTEBOOK', label: 'Notebook' },
     { value: 'MANDATORY_NOTEBOOK', label: 'Mandatory Notebook' },
     { value: 'STATIONARY', label: 'Stationary' },
     { value: 'UNIFORM', label: 'Uniform' },
-    { value: 'OPTIONAL_1', label: 'Optional 1' },
-    { value: 'OPTIONAL_2', label: 'Optional 2' },
+    { value: 'OPTIONAL_1', label: 'School suggested' },
+    { value: 'OPTIONAL_2', label: 'Optional' },
     { value: 'OPTIONAL_3', label: 'Optional 3' },
     { value: 'OPTIONAL_4', label: 'Optional 4' },
     { value: 'OTHER', label: 'Other' },
   ];
+  const BOOK_TYPE_HIDDEN_IN_UI = new Set(['OPTIONAL_3', 'OPTIONAL_4']);
+  const bookTypeOptionsForSelect = (() => {
+    const base = bookTypeOptionsAll.filter((o) => !BOOK_TYPE_HIDDEN_IN_UI.has(o.value));
+    if (BOOK_TYPE_HIDDEN_IN_UI.has(formData.BookType)) {
+      const legacy = bookTypeOptionsAll.find((o) => o.value === formData.BookType);
+      if (legacy) return [...base, legacy];
+    }
+    return base;
+  })();
 
   // Load grades when school is selected
   const loadGradesForSchool = async (schoolId) => {
@@ -748,7 +758,7 @@ const UpsertBook = () => {
                     required
                   >
                     <option value="">-- Select Book Type --</option>
-                    {bookTypeOptions.map(option => (
+                    {bookTypeOptionsForSelect.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>

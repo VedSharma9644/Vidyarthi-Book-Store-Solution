@@ -6,6 +6,26 @@ const userService = require('./userService');
 /** Book types that are mandatory: if out of stock, entire grade order is blocked */
 const MANDATORY_BOOK_TYPES = ['TEXTBOOK', 'MANDATORY_NOTEBOOK'];
 
+/** User-facing labels for stock messages (aligned with app/website categoryNames). */
+const BOOK_TYPE_LABEL = {
+    TEXTBOOK: 'Mandatory Textbook',
+    MANDATORY_NOTEBOOK: 'Mandatory Notebook',
+    NOTEBOOK: 'Notebook',
+    STATIONARY: 'Stationary',
+    STATIONERY: 'Stationery',
+    UNIFORM: 'Uniform',
+    OPTIONAL_1: 'School suggested',
+    OPTIONAL_2: 'Optional',
+    OPTIONAL_3: 'Optional',
+    OPTIONAL_4: 'Optional',
+    OTHER: 'Other',
+};
+
+function bookTypeLabelForMessage(code) {
+    const u = String(code || 'OTHER').toUpperCase();
+    return BOOK_TYPE_LABEL[u] || u.replace(/_/g, ' ');
+}
+
 /**
  * Throws an inventory error for order creation (mandatory vs optional bundles).
  * @param {Array<{ itemId: string, bookType: string }>} insufficientItems - Items with insufficient stock
@@ -31,7 +51,7 @@ function throwInventoryError(insufficientItems) {
     } else {
         err.message =
             optionalBundles.length > 0
-                ? `Insufficient stock. Please uncheck: ${optionalBundles.join(', ')}.`
+                ? `Insufficient stock. Please uncheck: ${optionalBundles.map(bookTypeLabelForMessage).join(', ')}.`
                 : 'Insufficient stock for some items.';
         err.insufficientBundles = optionalBundles;
     }

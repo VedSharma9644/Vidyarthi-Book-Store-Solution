@@ -13,7 +13,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
-import { getOptionalTypeTitle, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
+import {
+  getOptionalTypeTitle,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+} from '../utils/categoryNames';
 
 const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   const [cartItems, setCartItems] = useState([]);
@@ -24,7 +29,6 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   
   // State for dropdown expansion (open by default)
   const [expandedCategories, setExpandedCategories] = useState({
-    optionalFirst: true,
     mandatoryTextbooks: true,
     mandatoryNotebooks: true,
     optionalRest: true,
@@ -232,8 +236,12 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
         optionalByType[type].items.push(item);
       }
     });
-    
-    return { textbooks, mandatoryNotebooks, optionalByType };
+
+    return {
+      textbooks,
+      mandatoryNotebooks,
+      optionalByType: mergeHiddenOptionalBundleGroups(optionalByType),
+    };
   };
 
   const toggleCategory = (category) => {
@@ -396,28 +404,9 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                 const optionalRest = getOptionalBundlesRest(optionalGroups);
                 return (
                   <>
-                    {/* Optional 1–4 (top when available) */}
                     {optionalFirst.length > 0 && (
                       <>
-                        <TouchableOpacity
-                          onPress={() => toggleCategory('optionalFirst')}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingHorizontal: 16,
-                            paddingTop: 12,
-                            paddingBottom: 8,
-                          }}
-                        >
-                          <Text style={{ color: '#0e1b16', fontSize: 18, fontWeight: 'bold' }}>
-                            Optional 1–4 ({optionalFirst.reduce((s, g) => s + g.items.length, 0)})
-                          </Text>
-                          <Text style={{ fontSize: 16, color: '#06412c' }}>
-                            {(expandedCategories.optionalFirst ?? true) ? '▼' : '▶'}
-                          </Text>
-                        </TouchableOpacity>
-                        {(expandedCategories.optionalFirst ?? true) && optionalFirst.map((group) => (
+                        {optionalFirst.map((group) => (
                           <View key={group.type} style={{ marginBottom: 8 }}>
                             <TouchableOpacity
                               onPress={() => toggleBundleExpansion(group.type)}

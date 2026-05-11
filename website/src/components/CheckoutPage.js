@@ -10,7 +10,12 @@ import OrderSummary from './checkout/OrderSummary';
 import AddressSection from './checkout/AddressSection';
 import CartTable from './cart/CartTable';
 import CartItem from './cart/CartItem';
-import { getCategoryDisplayName, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
+import {
+  getCategoryDisplayName,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+} from '../utils/categoryNames';
 
 // Load Razorpay script
 const loadRazorpayScript = () => {
@@ -135,7 +140,11 @@ const CheckoutPage = () => {
         optionalByType[type].items.push(item);
       }
     });
-    return { textbooks, mandatoryNotebooks, optionalByType };
+    return {
+      textbooks,
+      mandatoryNotebooks,
+      optionalByType: mergeHiddenOptionalBundleGroups(optionalByType),
+    };
   };
 
   const toggleCategory = (category) => {

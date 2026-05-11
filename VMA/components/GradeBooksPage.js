@@ -12,7 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
-import { getCategoryDisplayName, getOptionalTypeTitle, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
+import {
+  getCategoryDisplayName,
+  getOptionalTypeTitle,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+  buildDefaultSelectedBundles,
+} from '../utils/categoryNames';
 
 
 
@@ -23,20 +30,10 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
   const [optionalItemsByType, setOptionalItemsByType] = useState({});
 
 
-  const [selectedBundles, setSelectedBundles] = useState({
-    NOTEBOOK: false,
-    UNIFORM: false,
-    STATIONARY: false,
-    OPTIONAL_1: false,
-    OPTIONAL_2: false,
-    OPTIONAL_3: false,
-    OPTIONAL_4: false,
-    OTHER: false,
-  });
+  const [selectedBundles, setSelectedBundles] = useState(() => buildDefaultSelectedBundles({}));
   
   // State for dropdown expansion (open by default)
   const [expandedSections, setExpandedSections] = useState({
-    optionalFirst: true,
     mandatoryTextbooks: true,
     mandatoryNotebooks: true,
     optionalRest: true,
@@ -246,14 +243,16 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
           
         });
 
+        const mergedOptional = mergeHiddenOptionalBundleGroups(optionalByType);
+
         setTextbooks(textbooksList);
         setMandatoryNotebooks(mandatoryNotebooksList);
         setOptionalItems(optionalList);
-        setOptionalItemsByType(optionalByType);
-        
-        // Initialize expanded bundles state (all open by default)
+        setOptionalItemsByType(mergedOptional);
+        setSelectedBundles(buildDefaultSelectedBundles(mergedOptional));
+
         const initialExpandedBundles = {};
-        Object.keys(optionalByType).forEach(type => {
+        Object.keys(mergedOptional).forEach((type) => {
           initialExpandedBundles[type] = true;
         });
         setExpandedBundles(initialExpandedBundles);
@@ -263,6 +262,7 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
         setMandatoryNotebooks([]);
         setOptionalItems([]);
         setOptionalItemsByType({});
+        setSelectedBundles(buildDefaultSelectedBundles({}));
         setError(subgradeId ? 'No books found for this section.' : 'No books found for this grade.');
       }
     } catch (error) {
@@ -497,37 +497,10 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Optional 1–4 Section (top when available) */}
         {getOptionalBundlesFirst(Object.values(optionalItemsByType)).length > 0 && (
           <>
-            <TouchableOpacity
-              onPress={() => toggleSection('optionalFirst')}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 16,
-                paddingTop: 20,
-                paddingBottom: 12,
-              }}
-            >
-              <Text style={{
-                color: '#0e1b16',
-                fontSize: 22,
-                fontWeight: 'bold',
-              }}>
-                Optional 1–4
-              </Text>
-              <Text style={{
-                fontSize: 20,
-                color: '#06412c',
-              }}>
-                {(expandedSections.optionalFirst ?? true) ? '▼' : '▶'}
-              </Text>
-            </TouchableOpacity>
-            {(expandedSections.optionalFirst ?? true) &&
-              getOptionalBundlesFirst(Object.values(optionalItemsByType)).map((group) => (
-                <View key={group.type}>
+            {getOptionalBundlesFirst(Object.values(optionalItemsByType)).map((group, idx) => (
+                <View key={group.type} style={idx === 0 ? { paddingTop: 16 } : undefined}>
                   <View style={{
                     flexDirection: 'row',
                     alignItems: 'center',

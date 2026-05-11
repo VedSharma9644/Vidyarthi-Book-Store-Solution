@@ -7,7 +7,14 @@ import LoadingScreen from './common/LoadingScreen';
 import BookCard from './books/BookCard';
 import BookTable from './books/BookTable';
 import OptionalBundleSection from './books/OptionalBundleSection';
-import { getOptionalTypeTitle, getCategoryDisplayName, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
+import {
+  getOptionalTypeTitle,
+  getCategoryDisplayName,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+  buildDefaultSelectedBundles,
+} from '../utils/categoryNames';
 
 const GradeBooksPage = () => {
   const { gradeId } = useParams();
@@ -120,7 +127,6 @@ const GradeBooksPage = () => {
         const textbooksList = [];
         const mandatoryNotebooksList = [];
         const optionalByType = {};
-        const initialSelectedBundles = {};
 
         books.forEach(book => {
           let itemPrice = 0;
@@ -157,22 +163,23 @@ const GradeBooksPage = () => {
             const typeKey = book.bookType || 'OTHER';
             if (!optionalByType[typeKey]) {
               optionalByType[typeKey] = { type: typeKey, title: getOptionalTypeTitle(typeKey), items: [] };
-              initialSelectedBundles[typeKey] = false;
             }
             optionalByType[typeKey].items.push(bookItem);
           }
         });
 
+        const mergedOptional = mergeHiddenOptionalBundleGroups(optionalByType);
+
         setTextbooks(textbooksList);
         setMandatoryNotebooks(mandatoryNotebooksList);
-        setOptionalItemsByType(optionalByType);
-        setSelectedBundles(initialSelectedBundles);
+        setOptionalItemsByType(mergedOptional);
+        setSelectedBundles(buildDefaultSelectedBundles(mergedOptional));
         setError(null);
       } else {
         setTextbooks([]);
         setMandatoryNotebooks([]);
         setOptionalItemsByType({});
-        setSelectedBundles({});
+        setSelectedBundles(buildDefaultSelectedBundles({}));
         setError(subgradeId ? 'No books found for this section.' : 'No books found for this grade.');
       }
     } catch (error) {
@@ -327,12 +334,9 @@ const GradeBooksPage = () => {
         </div>
       </div>
 
-      {/* Main Content — Order: Optional 1–4 first, then Mandatory Textbooks, Mandatory Notebooks, then Other optional */}
       <div style={booksStyles.booksContent}>
-        {/* Optional 1–4 (top when available) */}
         {getOptionalBundlesFirst(Object.values(optionalItemsByType)).length > 0 && (
           <>
-            <h2 style={booksStyles.sectionHeader}>Optional 1–4</h2>
             {getOptionalBundlesFirst(Object.values(optionalItemsByType)).map((bundle) => (
               <OptionalBundleSection
                 key={bundle.type}

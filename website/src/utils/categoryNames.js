@@ -1,6 +1,8 @@
-/** Optional 1–4 show at top; then mandatory + rest optional (same as mobile app). */
+/** OPTIONAL_1–4 at top (School suggested, Optional, Optional 3–4); then mandatory + rest (same as mobile app). */
 const OPTIONAL_FIRST_TYPES = ['OPTIONAL_1', 'OPTIONAL_2', 'OPTIONAL_3', 'OPTIONAL_4'];
 const OPTIONAL_REST_ORDER = ['NOTEBOOK', 'UNIFORM', 'STATIONARY', 'STATIONERY', 'OTHER'];
+
+const OPTIONAL_TYPES_MERGED_INTO_OPTIONAL_2 = ['OPTIONAL_3', 'OPTIONAL_4'];
 
 export function getOptionalBundlesFirst(groups) {
   if (!Array.isArray(groups)) return [];
@@ -36,19 +38,59 @@ export const getCategoryDisplayName = (bookType) => {
     STATIONARY: 'Stationary',
     STATIONERY: 'Stationery',
     UNIFORM: 'Uniform',
-    OPTIONAL_1: 'Optional 1',
-    OPTIONAL_2: 'Optional 2',
-    OPTIONAL_3: 'Optional 3',
-    OPTIONAL_4: 'Optional 4',
+    OPTIONAL_1: 'School suggested',
+    OPTIONAL_2: 'Optional',
+    OPTIONAL_3: 'Optional',
+    OPTIONAL_4: 'Optional',
     OTHER: 'Other',
   };
   return map[u] || (u.charAt(0) + u.slice(1).toLowerCase().replace(/_/g, ' '));
 };
 
 export const getOptionalTypeTitle = (typeKey) => {
-  if (typeKey === 'OPTIONAL_1') return 'Optional 1';
-  if (typeKey === 'OPTIONAL_2') return 'Optional 2';
-  if (typeKey === 'OPTIONAL_3') return 'Optional 3';
-  if (typeKey === 'OPTIONAL_4') return 'Optional 4';
+  if (typeKey === 'OPTIONAL_1') return 'School suggested';
+  if (typeKey === 'OPTIONAL_2') return 'Optional';
+  if (typeKey === 'OPTIONAL_3' || typeKey === 'OPTIONAL_4') return 'Optional';
   return getCategoryDisplayName(typeKey);
 };
+
+export function mergeHiddenOptionalBundleGroups(optionalByType) {
+  if (!optionalByType || typeof optionalByType !== 'object') return optionalByType || {};
+  const out = { ...optionalByType };
+  const target = 'OPTIONAL_2';
+  for (const hid of OPTIONAL_TYPES_MERGED_INTO_OPTIONAL_2) {
+    if (!out[hid]?.items?.length) {
+      delete out[hid];
+      continue;
+    }
+    if (!out[target]) {
+      out[target] = {
+        type: target,
+        title: getOptionalTypeTitle(target),
+        items: [],
+      };
+    }
+    out[target].items = [...out[target].items, ...out[hid].items];
+    delete out[hid];
+  }
+  return out;
+}
+
+export function buildDefaultSelectedBundles(mergedOptionalByType) {
+  const next = {
+    NOTEBOOK: false,
+    UNIFORM: false,
+    STATIONARY: false,
+    OPTIONAL_1: true,
+    OPTIONAL_2: false,
+    OPTIONAL_3: false,
+    OPTIONAL_4: false,
+    OTHER: false,
+  };
+  if (mergedOptionalByType && typeof mergedOptionalByType === 'object') {
+    Object.keys(mergedOptionalByType).forEach((k) => {
+      if (next[k] === undefined) next[k] = false;
+    });
+  }
+  return next;
+}

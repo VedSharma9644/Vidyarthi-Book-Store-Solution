@@ -8,7 +8,12 @@ import CartItem from './cart/CartItem';
 import CartTable from './cart/CartTable';
 import CartSummary from './cart/CartSummary';
 import { useModal } from '../contexts/ModalContext';
-import { getCategoryDisplayName, getOptionalBundlesFirst, getOptionalBundlesRest } from '../utils/categoryNames';
+import {
+  getCategoryDisplayName,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+} from '../utils/categoryNames';
 
 const CartPage = () => {
   const navigate = useNavigate();
@@ -88,7 +93,11 @@ const CartPage = () => {
         optionalByType[type].items.push(item);
       }
     });
-    return { textbooks, mandatoryNotebooks, optionalByType };
+    return {
+      textbooks,
+      mandatoryNotebooks,
+      optionalByType: mergeHiddenOptionalBundleGroups(optionalByType),
+    };
   };
 
   const toggleCategory = (category) => {
@@ -301,47 +310,15 @@ const CartPage = () => {
 
               const renderOptionalBlock = (sectionKey, title, groups) => {
                 if (!groups || groups.length === 0) return null;
+                const hideOuterTitle = title == null;
                 const isSectionExpanded = expandedCategories[sectionKey] !== false;
                 const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
-                return (
-                  <div key={sectionKey} style={{ marginBottom: '24px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '16px',
-                        backgroundColor: colors.gray50,
-                        borderRadius: '8px',
-                        border: `1px solid ${colors.borderLight}`,
-                        cursor: 'pointer',
-                        marginBottom: isSectionExpanded ? '12px' : '0',
-                        transition: 'background-color 0.2s ease',
-                      }}
-                      onClick={() => toggleCategory(sectionKey)}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.gray100; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.gray50; }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{
-                          fontSize: '20px',
-                          transition: 'transform 0.2s ease',
-                          transform: isSectionExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                        }}>▶</span>
-                        <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>
-                          {title}
-                        </h3>
-                        <span style={{ fontSize: '14px', color: colors.textSecondary, marginLeft: '8px' }}>
-                          ({totalItems} item{totalItems !== 1 ? 's' : ''})
-                        </span>
-                      </div>
-                    </div>
-                    {isSectionExpanded && (
+                const innerGroups = (
                       <>
                         {groups.map((group) => {
                             const isTypeExpanded = expandedCategories[group.type] !== false;
                             return (
-                              <div key={group.type} style={{ marginLeft: '16px', marginBottom: '16px' }}>
+                              <div key={group.type} style={{ marginLeft: hideOuterTitle ? 0 : '16px', marginBottom: '16px' }}>
                                 <div
                                   style={{
                                     display: 'flex',
@@ -396,14 +373,55 @@ const CartPage = () => {
                             );
                         })}
                       </>
-                    )}
+                );
+                if (hideOuterTitle) {
+                  return (
+                    <div key={sectionKey} style={{ marginBottom: '24px' }}>
+                      {innerGroups}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={sectionKey} style={{ marginBottom: '24px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        backgroundColor: colors.gray50,
+                        borderRadius: '8px',
+                        border: `1px solid ${colors.borderLight}`,
+                        cursor: 'pointer',
+                        marginBottom: isSectionExpanded ? '12px' : '0',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                      onClick={() => toggleCategory(sectionKey)}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.gray100; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.gray50; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          fontSize: '20px',
+                          transition: 'transform 0.2s ease',
+                          transform: isSectionExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        }}>▶</span>
+                        <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>
+                          {title}
+                        </h3>
+                        <span style={{ fontSize: '14px', color: colors.textSecondary, marginLeft: '8px' }}>
+                          ({totalItems} item{totalItems !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                    </div>
+                    {isSectionExpanded && innerGroups}
                   </div>
                 );
               };
 
               return (
                 <>
-                  {renderOptionalBlock('optionalFirst', 'Optional 1–4', optionalFirst)}
+                  {renderOptionalBlock('optionalFirst', null, optionalFirst)}
                   {renderSection('mandatoryTextbooks', 'Mandatory Textbooks', textbooks)}
                   {renderSection('mandatoryNotebooks', 'Mandatory Notebooks', mandatoryNotebooks)}
                   {renderOptionalBlock('optionalRest', 'Other optional', optionalRest)}

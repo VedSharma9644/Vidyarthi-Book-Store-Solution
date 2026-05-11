@@ -1,6 +1,11 @@
 import React from 'react';
 import { checkoutStyles, colors } from '../../css/checkoutStyles';
-import { getCategoryDisplayName, getOptionalBundlesFirst, getOptionalBundlesRest } from '../../utils/categoryNames';
+import {
+  getCategoryDisplayName,
+  getOptionalBundlesFirst,
+  getOptionalBundlesRest,
+  mergeHiddenOptionalBundleGroups,
+} from '../../utils/categoryNames';
 
 const DELIVERY_CHARGE = 300;
 
@@ -22,7 +27,11 @@ const OrderSummary = ({ cartItems, onPlaceOrder, isProcessing }) => {
         optionalByType[type].items.push(item);
       }
     });
-    return { textbooks, mandatoryNotebooks, optionalByType };
+    return {
+      textbooks,
+      mandatoryNotebooks,
+      optionalByType: mergeHiddenOptionalBundleGroups(optionalByType),
+    };
   };
 
   const calculateSubtotal = () => {
