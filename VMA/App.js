@@ -21,6 +21,7 @@ import GradeBooksPage from './components/GradeBooksPage';
 import ShippingAddressesScreen from './components/ShippingAddressesScreen';
 import { View, ActivityIndicator } from 'react-native';
 import { colors } from './css/styles';
+import { getGradeScreenTitle } from './utils/gradeUtils';
 
 // Inner component that uses auth context. Uses authReady (not isLoading) so login screen never unmounts due to loading.
 function AppContent() {
@@ -201,7 +202,11 @@ function AppContent() {
             onBack={goBack}
             onBackToSchool={goBackToSchoolFromGradeBooks}
             gradeId={selectedGrade?.id}
-            gradeName={selectedSubgrade ? `${selectedGrade?.name} - ${selectedSubgrade?.name}` : selectedGrade?.name}
+            gradeName={getGradeScreenTitle(
+              selectedSubgrade && selectedGrade
+                ? `${selectedGrade.name} - ${selectedSubgrade.name}`
+                : selectedGrade?.name
+            )}
             schoolId={selectedSchool?.id}
             subgradeId={selectedSubgrade?.id}
             subgradeName={selectedSubgrade?.name}

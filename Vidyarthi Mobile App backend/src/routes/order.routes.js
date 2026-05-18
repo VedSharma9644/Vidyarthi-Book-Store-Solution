@@ -13,7 +13,7 @@ router.post('/validate-cart', orderController.validateCartForCheckout);
  * @route   POST /api/orders/create
  * @desc    Create order after payment
  * @access  Private (requires user-id header)
- * @body    { paymentData: { razorpayOrderId, razorpayPaymentId, razorpaySignature }, shippingAddress?: object }
+ * @body    { paymentData: { razorpayOrderId, razorpayPaymentId, razorpaySignature }, shippingAddress?: object, orderingStudent?: { id?, name, age?, gender?, schoolLabel?, gradeLabel? } }
  */
 router.post('/create', orderController.createOrder);
 

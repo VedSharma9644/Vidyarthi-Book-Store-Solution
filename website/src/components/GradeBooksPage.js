@@ -15,8 +15,7 @@ import {
   mergeHiddenOptionalBundleGroups,
   buildDefaultSelectedBundles,
 } from '../utils/categoryNames';
-
-const GradeBooksPage = () => {
+import { getGradeScreenTitle } from '../utils/gradeUtils';
   const { gradeId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -323,7 +322,7 @@ const GradeBooksPage = () => {
       {/* Page Header */}
       <div style={booksStyles.booksPageHeader}>
         <div style={booksStyles.booksPageHeaderContent}>
-          <h1 style={booksStyles.booksPageTitle}>{gradeName}</h1>
+          <h1 style={booksStyles.booksPageTitle}>{getGradeScreenTitle(gradeName)}</h1>
           <p style={booksStyles.booksPageSubtitle}>
             {textbooks.length} mandatory textbook{textbooks.length !== 1 ? 's' : ''}
             {mandatoryNotebooks.length > 0 && ` • ${mandatoryNotebooks.length} mandatory notebook${mandatoryNotebooks.length !== 1 ? 's' : ''}`}

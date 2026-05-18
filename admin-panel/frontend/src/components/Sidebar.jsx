@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
@@ -16,6 +16,12 @@ const Sidebar = ({ isOpen }) => {
       [menuId]: !prev[menuId]
     }));
   };
+
+  useEffect(() => {
+    if (location.pathname === '/change-password') {
+      setOpenMenus((prev) => ({ ...prev, pages: true }));
+    }
+  }, [location.pathname]);
 
   return (
     <nav id="sidebar" className={`sidebar ${!isOpen ? 'collapsed' : ''}`}>
@@ -39,16 +45,17 @@ const Sidebar = ({ isOpen }) => {
           </li>
 
           {/* Profile Section */}
-          <li className="sidebar-item">
+          <li className={`sidebar-item ${isActive('/change-password') ? 'active' : ''}`}>
             <a onClick={(e) => { e.preventDefault(); toggleMenu('pages'); }} className={`sidebar-link ${!openMenus.pages ? 'collapsed' : ''}`} style={{ cursor: 'pointer' }}>
               <i className="align-middle me-2 fas fa-fw fa-user-cog"></i>
               <span className="align-middle">Profile</span>
             </a>
             <ul id="pages" className={`sidebar-dropdown list-unstyled ${openMenus.pages ? 'show' : 'collapse'}`}>
-              <li className="sidebar-item">
-                <a className="sidebar-link" href="/admin-update-password">
-                  <i className="fas fa-lock me-2"></i>Change Password
-                </a>
+              <li className={`sidebar-item ${isActive('/change-password') ? 'active' : ''}`}>
+                <Link to="/change-password" className="sidebar-link">
+                  <i className="fas fa-lock me-2" aria-hidden="true" />
+                  Change Password
+                </Link>
               </li>
             </ul>
           </li>

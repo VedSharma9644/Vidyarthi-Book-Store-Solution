@@ -70,9 +70,10 @@ class PaymentService {
      * Create a Razorpay order
      * @param {number} amount - Amount in INR (will be converted to paise)
      * @param {string} receipt - Receipt ID for the order
+     * @param {Record<string, string|number|boolean>|null} [notes] - Optional notes (stringified; e.g. userId for webhooks)
      * @returns {Promise<Object>} Order details
      */
-    async createOrder(amount, receipt) {
+    async createOrder(amount, receipt, notes = null) {
         try {
             // Get Razorpay client (will fetch config from Firestore)
             const razorpay = await this.getRazorpayClient();
@@ -87,6 +88,19 @@ class PaymentService {
                 receipt: receipt || `receipt_${Date.now()}`,
                 payment_capture: 1, // Auto-capture payment
             };
+
+            if (notes && typeof notes === 'object') {
+                const n = {};
+                for (const [k, v] of Object.entries(notes)) {
+                    if (v == null || !k) {
+                        continue;
+                    }
+                    n[String(k).slice(0, 40)] = String(v).slice(0, 500);
+                }
+                if (Object.keys(n).length > 0) {
+                    options.notes = n;
+                }
+            }
 
             const order = await razorpay.orders.create(options);
 
@@ -103,6 +117,51 @@ class PaymentService {
             console.error('Error creating Razorpay order:', error);
             throw new Error(`Failed to create order: ${error.message}`);
         }
+    }
+
+    /**
+     * List payments for a Razorpay order (used by reconciliation job).
+     * @param {string} orderId - Razorpay order id (order_...)
+     * @returns {Promise<{ items?: Array<object> }>}
+     */
+    async fetchPaymentsForOrder(orderId) {
+        const razorpay = await this.getRazorpayClient();
+        return razorpay.orders.fetchPayments(orderId);
+    }
+
+    /**
+     * Fetch Razorpay order (includes `notes` set at creation).
+     * @param {string} orderId - Razorpay order id (order_...)
+     */
+    async fetchRazorpayOrder(orderId) {
+        const razorpay = await this.getRazorpayClient();
+        return razorpay.orders.fetch(orderId);
+    }
+
+    /**
+     * Fetch a single payment (status, order_id, etc.).
+     * @param {string} paymentId
+     */
+    async fetchPayment(paymentId) {
+        const razorpay = await this.getRazorpayClient();
+        return razorpay.payments.fetch(paymentId);
+    }
+
+    /**
+     * Validate Razorpay webhook signature (raw JSON body bytes).
+     * @param {Buffer|string} rawBody
+     * @param {string|undefined} signatureHeader - x-razorpay-signature
+     */
+    verifyWebhookSignature(rawBody, signatureHeader) {
+        const secret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+        if (!secret || !signatureHeader || rawBody == null || rawBody.length === 0) {
+            return false;
+        }
+        const expected = crypto
+            .createHmac('sha256', secret)
+            .update(rawBody)
+            .digest('hex');
+        return expected === signatureHeader;
     }
 
     /**

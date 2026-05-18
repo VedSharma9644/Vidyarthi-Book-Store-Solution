@@ -82,8 +82,43 @@
   color: #f6c23e !important;
 }
 
-.text-muted {
-  color: #858796 !important;
+.metric-icon-wrap {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.35rem;
+}
+
+.metric-icon-wrap--primary {
+  background-color: rgba(78, 115, 223, 0.15);
+}
+
+.metric-icon-wrap--success {
+  background-color: rgba(28, 200, 138, 0.15);
+}
+
+.metric-icon-wrap--warning {
+  background-color: rgba(246, 194, 62, 0.22);
+}
+
+.metric-icon-wrap--info {
+  background-color: rgba(54, 185, 204, 0.15);
+}
+
+.metric-icon-wrap--danger {
+  background-color: rgba(231, 74, 59, 0.12);
+}
+
+.metric-icon-wrap .bi {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.dashboard-alert {
+  border-radius: 0.35rem;
 }
 
 .badge {
@@ -191,6 +226,41 @@
 
 .mb-4 {
   margin-bottom: 1.5rem !important;
+}
+
+.metric-icon-wrap {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.35rem;
+}
+
+.metric-icon-wrap--primary {
+  background-color: rgba(78, 115, 223, 0.15);
+}
+
+.metric-icon-wrap--success {
+  background-color: rgba(28, 200, 138, 0.15);
+}
+
+.metric-icon-wrap--warning {
+  background-color: rgba(246, 194, 62, 0.22);
+}
+
+.metric-icon-wrap--info {
+  background-color: rgba(54, 185, 204, 0.15);
+}
+
+.metric-icon-wrap--danger {
+  background-color: rgba(231, 74, 59, 0.12);
+}
+
+.metric-icon-wrap .bi {
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 @media (max-width: 768px) {

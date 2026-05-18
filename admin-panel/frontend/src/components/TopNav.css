@@ -117,3 +117,23 @@
   color: #858796 !important;
 }
 
+@media (max-width: 991.98px) {
+  nav.navbar.navbar-theme {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    width: 100%;
+  }
+}
+
+button.sidebar-toggle {
+  background: transparent;
+  border: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+

@@ -2,17 +2,36 @@ const { db } = require('../config/database');
 const Book = require('../models/Book');
 const bookInventoryFlags = require('../services/bookInventoryFlagsService');
 
+function toCreatedAtIso(value) {
+  if (!value) return null;
+  if (value.toDate) return value.toDate().toISOString();
+  if (value._seconds != null) return new Date(value._seconds * 1000).toISOString();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // Get all books
 const getAllBooks = async (req, res) => {
   try {
-    // Only fetch active books (not soft-deleted)
+    const lite =
+      req.query.lite === '1' ||
+      req.query.lite === 'true' ||
+      req.query.lite === 'yes';
+
     const booksSnapshot = await db.collection('books')
       .where('isActive', '==', true)
       .get();
     const books = [];
 
     booksSnapshot.forEach((doc) => {
-      books.push(Book.fromFirestore(doc));
+      if (lite) {
+        books.push({
+          id: doc.id,
+          createdAt: toCreatedAtIso(doc.data().createdAt),
+        });
+      } else {
+        books.push(Book.fromFirestore(doc));
+      }
     });
 
     res.json({

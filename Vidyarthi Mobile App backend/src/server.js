@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const paymentWebhookController = require('./controllers/payment.webhook.controller');
 
 // Initialize Firebase (import to trigger initialization)
 require('./config/firebase');
@@ -29,6 +30,13 @@ app.use(cors({
     origin: process.env.CORS_ORIGIN?.split(',') || '*',
     credentials: true,
 }));
+
+// Razorpay webhooks require raw body for signature verification
+app.post(
+    '/api/payment/webhook',
+    express.raw({ type: 'application/json' }),
+    paymentWebhookController.handleWebhook
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

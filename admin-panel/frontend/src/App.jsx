@@ -18,6 +18,7 @@ import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
 import Customers from './pages/Customers';
 import EmailConfig from './pages/EmailConfig';
+import ChangePassword from './pages/ChangePassword';
 import ForgotPassword from './pages/ForgotPassword';
 import authService from './services/auth';
 
@@ -27,39 +28,36 @@ const ProtectedRoute = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates if component unmounts
+    let cancelled = false;
 
     const checkAuth = async () => {
-      // Check if token exists first
       if (!authService.isAuthenticated()) {
-        if (isMounted) {
+        if (!cancelled) {
           setIsAuthenticated(false);
           setLoading(false);
         }
         return;
       }
 
-      // Verify token with server
       try {
         const result = await authService.verifyToken();
-        if (isMounted) {
-          setIsAuthenticated(result.success || false);
+        if (!cancelled) {
+          setIsAuthenticated(Boolean(result.success));
           setLoading(false);
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        if (isMounted) {
-          setIsAuthenticated(false);
+        if (!cancelled) {
+          // Keep session on transient network errors if token still present
+          setIsAuthenticated(authService.isAuthenticated());
           setLoading(false);
         }
       }
     };
 
     checkAuth();
-
-    // Cleanup function
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, []);
 
@@ -111,6 +109,8 @@ function App() {
                   <Route path="/get-order-details" element={<OrderDetails />} />
                   <Route path="/all-customers" element={<Customers />} />
                   <Route path="/email-config" element={<EmailConfig />} />
+                  <Route path="/change-password" element={<ChangePassword />} />
+                  <Route path="/admin-update-password" element={<Navigate to="/change-password" replace />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

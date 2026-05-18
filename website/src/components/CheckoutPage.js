@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkoutStyles, colors } from '../css/checkoutStyles';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -10,6 +10,8 @@ import OrderSummary from './checkout/OrderSummary';
 import AddressSection from './checkout/AddressSection';
 import CartTable from './cart/CartTable';
 import CartItem from './cart/CartItem';
+import { normalizeStudentsFromUser, toOrderingStudentPayload } from '../utils/students';
+import { getGradeDisplayLabel } from '../utils/gradeUtils';
 import {
   getCategoryDisplayName,
   getOptionalBundlesFirst,
@@ -33,6 +35,21 @@ const loadRazorpayScript = () => {
   });
 };
 
+function buildCartSnapshotForPayment(items) {
+  return (items || []).map((item) => ({
+    itemId: item.itemId,
+    title: item.title,
+    author: item.author,
+    coverImageUrl: item.coverImageUrl || '',
+    price: Number(item.price) || 0,
+    quantity: parseInt(item.quantity, 10) || 1,
+    bookType: item.bookType || '',
+    productQuantity:
+      item.productQuantity != null ? parseInt(item.productQuantity, 10) || 1 : undefined,
+    subtotal: item.subtotal != null ? Number(item.subtotal) : undefined,
+  }));
+}
+
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -52,13 +69,43 @@ const CheckoutPage = () => {
     postalCode: '',
     country: 'India',
   });
+  const [students, setStudents] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const orderingForOrderRef = useRef(null);
 
   useEffect(() => {
     loadCart();
+    loadStudents();
     loadRazorpayScript().catch(err => {
       console.error('Failed to load Razorpay:', err);
     });
   }, []);
+
+  const loadStudents = async () => {
+    try {
+      let userData = ApiService.getUserData();
+      const userId = user?.id || localStorage.getItem('userId');
+      if (userId) {
+        const res = await ApiService.getUserById(userId);
+        if (res?.success && res.data) {
+          userData = res.data;
+          ApiService.storeUserData(res.data);
+        }
+      }
+      const list = normalizeStudentsFromUser(userData);
+      setStudents(list);
+      if (list.length === 1) {
+        setSelectedStudentId(list[0].id);
+      }
+      if (list.length === 0) {
+        setSelectedStudentId('');
+      }
+    } catch (e) {
+      console.warn('Checkout loadStudents failed:', e?.message);
+      setStudents([]);
+      setSelectedStudentId('');
+    }
+  };
 
   const loadCart = async () => {
     try {
@@ -160,6 +207,11 @@ const CheckoutPage = () => {
       return;
     }
 
+    if (students.length > 0 && !selectedStudentId) {
+      showWarning('Please select which student this order is for.');
+      return;
+    }
+
     // Validate shipping address
     if (!shippingAddress.name || !shippingAddress.address || !shippingAddress.city) {
       showWarning('Please select a shipping address before placing your order.');
@@ -186,7 +238,17 @@ const CheckoutPage = () => {
       const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Create Razorpay order
-      const orderResult = await ApiService.createPaymentOrder(totalAmount, receipt);
+      const selectedStudent = students.find((s) => s.id === selectedStudentId);
+      const orderingStudentPayload = selectedStudent ? toOrderingStudentPayload(selectedStudent) : null;
+      orderingForOrderRef.current = orderingStudentPayload;
+
+      const orderResult = await ApiService.createPaymentOrder(
+        totalAmount,
+        receipt,
+        orderingStudentPayload || undefined,
+        buildCartSnapshotForPayment(cartItems),
+        shippingAddress
+      );
 
       if (!orderResult.success || !orderResult.data) {
         showError(orderResult.message || 'Failed to create payment order');
@@ -243,7 +305,8 @@ const CheckoutPage = () => {
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpaySignature: response.razorpay_signature,
                 },
-                shippingAddress
+                shippingAddress,
+                orderingForOrderRef.current || undefined
               );
 
               console.log('Order creation result:', orderResult);
@@ -583,10 +646,63 @@ const CheckoutPage = () => {
             isProcessing={isProcessing}
           />
           
+          {/* Student selection — required before shipping address when profile has students */}
+          {students.length > 0 && (
+            <div
+              style={{
+                backgroundColor: colors.white,
+                borderRadius: '12px',
+                padding: '16px',
+                border: `1px solid ${colors.borderLight}`,
+                marginTop: '16px',
+              }}
+            >
+              <h3 style={{ margin: 0, marginBottom: '12px', color: colors.textPrimary }}>
+                Ordering for
+              </h3>
+              <select
+                value={selectedStudentId}
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: `1px solid ${colors.borderLight}`,
+                  fontSize: '15px',
+                }}
+              >
+                <option value="">Select student</option>
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.gradeLabel || s.schoolLabel
+                      ? ` (${[
+                          s.gradeLabel ? getGradeDisplayLabel(s.gradeLabel) : '',
+                          s.schoolLabel,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')})`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+              <div style={{ marginTop: 10, fontSize: 13, color: colors.textSecondary }}>
+                Select a student before adding your shipping address.
+              </div>
+            </div>
+          )}
+
           {/* Shipping Address */}
           <AddressSection
             shippingAddress={shippingAddress}
             onAddressChange={handleAddressChange}
+            requireStudentSelection={students.length > 0}
+            selectedStudentId={selectedStudentId}
+            onStudentRequired={() =>
+              showWarning(
+                'Please select which student this order is for before adding or editing a shipping address.'
+              )
+            }
           />
         </div>
       </div>

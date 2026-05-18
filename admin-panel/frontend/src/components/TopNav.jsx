@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import authService from '../services/auth';
 import './TopNav.css';
 
-const TopNav = ({ onToggleSidebar }) => {
+const TopNav = ({ onToggleSidebar, sidebarOpen }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -29,9 +29,15 @@ const TopNav = ({ onToggleSidebar }) => {
 
   return (
     <nav className="navbar navbar-expand navbar-theme shadow-lg">
-      <a className="sidebar-toggle d-flex me-2" onClick={onToggleSidebar} style={{ cursor: 'pointer' }}>
-        <i className="hamburger align-self-center"></i>
-      </a>
+      <button
+        type="button"
+        className="sidebar-toggle d-flex me-2 align-items-center"
+        onClick={onToggleSidebar}
+        aria-label="Toggle sidebar menu"
+        aria-expanded={Boolean(sidebarOpen)}
+      >
+        <i className="hamburger align-self-center" aria-hidden="true" />
+      </button>
       <div className="navbar-collapse collapse">
         <ul className="navbar-nav ms-auto">
           <li className="nav-item dropdown ms-lg-2" ref={dropdownRef}>

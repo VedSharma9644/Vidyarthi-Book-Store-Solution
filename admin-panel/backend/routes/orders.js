@@ -17,6 +17,9 @@ router.post('/:id/shiprocket', (req, res, next) => {
 // GET /api/orders/:id/shiprocket-status - Get Shiprocket order status (must be before /:id route)
 router.get('/:id/shiprocket-status', orderController.getShiprocketStatus);
 
+// GET /api/orders/:id/invoice - PDF invoice (must be before /:id)
+router.get('/:id/invoice', orderController.generateInvoicePdf);
+
 // GET /api/orders/:id - Get order by ID (must be last)
 router.get('/:id', orderController.getOrderById);
 

@@ -3,3 +3,7 @@
   padding: 20px;
 }
 
+.orders-page .card-body {
+  overflow-x: auto;
+}
+

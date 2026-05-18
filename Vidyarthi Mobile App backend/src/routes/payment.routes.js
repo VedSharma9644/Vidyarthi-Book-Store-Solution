@@ -6,7 +6,7 @@ const paymentController = require('../controllers/payment.controller');
  * @route   POST /api/payment/create-order
  * @desc    Create Razorpay order
  * @access  Public
- * @body    { amount: number, receipt?: string }
+ * @body    { amount: number, receipt?: string, orderingStudent?: object, cartSnapshot?: Array, shippingAddress?: object }
  */
 router.post('/create-order', paymentController.createOrder);
 

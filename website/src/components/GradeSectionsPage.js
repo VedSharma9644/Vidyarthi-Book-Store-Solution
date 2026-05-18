@@ -5,6 +5,7 @@ import { getSchoolPageStyles } from '../css/schoolPageStyles';
 import { useHeaderHeight } from '../hooks/useHeaderHeight';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
+import { getGradeDisplayLabel } from '../utils/gradeUtils';
 
 const GradeSectionsPage = () => {
   const { gradeId } = useParams();
@@ -99,7 +100,7 @@ const GradeSectionsPage = () => {
             fontWeight: 'bold',
             margin: '0 0 8px 0',
           }}>
-            {gradeName}
+            {getGradeDisplayLabel(gradeName)}
           </h1>
           <p style={{
             color: colors.textSecondary,

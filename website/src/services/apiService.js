@@ -788,12 +788,19 @@ class ApiService {
   }
 
   // Payment APIs
-  async createPaymentOrder(amount, receipt) {
+  async createPaymentOrder(amount, receipt, orderingStudent = null, cartSnapshot = null, shippingAddress = null) {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, {
-        amount,
-        receipt,
-      }, {
+      const body = { amount, receipt };
+      if (orderingStudent && orderingStudent.name) {
+        body.orderingStudent = orderingStudent;
+      }
+      if (Array.isArray(cartSnapshot) && cartSnapshot.length > 0) {
+        body.cartSnapshot = cartSnapshot;
+      }
+      if (shippingAddress && typeof shippingAddress === 'object') {
+        body.shippingAddress = shippingAddress;
+      }
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, body, {
         timeout: API_CONFIG.CHECKOUT_TIMEOUT,
       });
       return response.data;
@@ -981,12 +988,13 @@ class ApiService {
     }
   }
 
-  async createOrder(paymentData, shippingAddress = null) {
+  async createOrder(paymentData, shippingAddress = null, orderingStudent = null) {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, {
-        paymentData,
-        shippingAddress,
-      }, {
+      const body = { paymentData, shippingAddress };
+      if (orderingStudent && orderingStudent.name) {
+        body.orderingStudent = orderingStudent;
+      }
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, body, {
         timeout: API_CONFIG.CHECKOUT_TIMEOUT,
       });
       return response.data;

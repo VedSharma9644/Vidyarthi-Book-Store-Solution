@@ -30,9 +30,22 @@ class Book {
   // Convert Firestore document to Book object
   static fromFirestore(doc) {
     const data = doc.data();
+    const toIso = (ts) => {
+      if (!ts) return null;
+      try {
+        if (ts.toDate) return ts.toDate().toISOString();
+        if (ts._seconds != null) return new Date(ts._seconds * 1000).toISOString();
+        const d = new Date(ts);
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+      } catch {
+        return null;
+      }
+    };
     return new Book({
       id: doc.id,
       ...data,
+      createdAt: toIso(data.createdAt) ?? null,
+      updatedAt: toIso(data.updatedAt) ?? null,
     });
   }
 

@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { createSession, removeSession, ADMIN_USERNAME, getAdminPassword } = require('../middleware/auth');
+const { db } = require('../config/database');
+const {
+  createSession,
+  removeSession,
+  ADMIN_USERNAME,
+  getAdminPassword,
+  authenticate,
+} = require('../middleware/auth');
 
 /**
  * @route   POST /api/auth/login
@@ -121,6 +128,67 @@ router.get('/verify', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Verification failed',
+    });
+  }
+});
+
+/**
+ * @route   POST /api/auth/change-password
+ * @desc    Update admin password (must know current password)
+ * @access  Private (session)
+ */
+router.post('/change-password', authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required',
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long',
+      });
+    }
+
+    const adminPassword = await getAdminPassword();
+    if (currentPassword !== adminPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from your current password',
+      });
+    }
+
+    await db.collection('admin_config').doc('credentials').set(
+      {
+        password: newPassword,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+
+    console.log('✅ Admin password changed via change-password');
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully. Please sign in again with your new password.',
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update password. Please try again.',
     });
   }
 });

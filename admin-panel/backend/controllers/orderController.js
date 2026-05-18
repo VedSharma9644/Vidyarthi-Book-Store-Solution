@@ -1,5 +1,6 @@
 const { db } = require('../config/database');
 const shiprocketService = require('../services/shiprocketService');
+const invoicePdfService = require('../services/invoicePdfService');
 
 // Helper function to get customer name
 const getCustomerName = async (data) => {
@@ -93,6 +94,8 @@ const enrichOrderItemsWithSchoolGradeSection = async (items) => {
     let schoolName = '';
     let gradeName = '';
     let sectionName = '';
+    let productQuantity = null;
+    let perProductPrice = null;
     if (item.itemId) {
       try {
         const bookDoc = await db.collection('books').doc(item.itemId).get();
@@ -106,6 +109,10 @@ const enrichOrderItemsWithSchoolGradeSection = async (items) => {
             getGradeName(gradeId),
             getSubgradeName(subgradeId),
           ]);
+          const pq = parseInt(book.productQuantity, 10);
+          productQuantity = Number.isFinite(pq) && pq > 0 ? pq : 1;
+          const ppp = parseFloat(book.perProductPrice);
+          perProductPrice = Number.isFinite(ppp) && ppp > 0 ? ppp : null;
         }
       } catch (err) {
         console.warn('Enrich order item: could not resolve book', item.itemId, err.message);
@@ -116,68 +123,349 @@ const enrichOrderItemsWithSchoolGradeSection = async (items) => {
       schoolName: schoolName || '—',
       gradeName: gradeName || '—',
       sectionName: sectionName || '—',
+      productQuantity: productQuantity != null ? productQuantity : item.productQuantity,
+      perProductPrice: perProductPrice != null ? perProductPrice : item.perProductPrice,
     });
   }
   return enriched;
 };
 
-// Get all orders
+/** Customer display name from order document only (no extra user fetch). */
+function getCustomerNameFast(data) {
+  if (data.customerInfo?.name && String(data.customerInfo.name).trim()) {
+    return String(data.customerInfo.name).trim();
+  }
+  if (data.shippingAddress?.name && String(data.shippingAddress.name).trim()) {
+    return String(data.shippingAddress.name).trim();
+  }
+  if (data.customerInfo?.phoneNumber) {
+    return `Customer (${data.customerInfo.phoneNumber})`;
+  }
+  if (data.shippingAddress?.phone) {
+    return `Customer (${data.shippingAddress.phone})`;
+  }
+  return 'Unknown Customer';
+}
+
+/** Batch-resolve grade/section for first line items (shared caches). */
+async function buildFirstItemMetaMap(itemIds) {
+  const unique = [...new Set(itemIds.filter(Boolean))];
+  const metaByItemId = {};
+  if (unique.length === 0) return metaByItemId;
+
+  const gradeCache = {};
+  const subgradeCache = {};
+
+  const getGradeName = async (gradeId) => {
+    if (!gradeId) return '';
+    if (gradeCache[gradeId] !== undefined) return gradeCache[gradeId];
+    try {
+      const doc = await db.collection('grades').doc(gradeId).get();
+      gradeCache[gradeId] = doc.exists ? (doc.data().name || '') : '';
+    } catch {
+      gradeCache[gradeId] = '';
+    }
+    return gradeCache[gradeId];
+  };
+  const getSubgradeName = async (subgradeId) => {
+    if (!subgradeId) return '';
+    if (subgradeCache[subgradeId] !== undefined) return subgradeCache[subgradeId];
+    try {
+      const doc = await db.collection('subgrades').doc(subgradeId).get();
+      subgradeCache[subgradeId] = doc.exists ? (doc.data().name || '') : '';
+    } catch {
+      subgradeCache[subgradeId] = '';
+    }
+    return subgradeCache[subgradeId];
+  };
+
+  const bookSnaps = [];
+  const BATCH = 30;
+  for (let i = 0; i < unique.length; i += BATCH) {
+    const chunk = unique.slice(i, i + BATCH);
+    const refs = chunk.map((id) => db.collection('books').doc(id));
+    bookSnaps.push(...(await db.getAll(...refs)));
+  }
+
+  const gradeIds = new Set();
+  const subgradeIds = new Set();
+  for (const snap of bookSnaps) {
+    if (!snap.exists) continue;
+    const book = snap.data();
+    if (book.gradeId) gradeIds.add(book.gradeId);
+    if (book.subgradeId) subgradeIds.add(book.subgradeId);
+  }
+
+  await Promise.all([
+    ...[...gradeIds].map((id) => getGradeName(id)),
+    ...[...subgradeIds].map((id) => getSubgradeName(id)),
+  ]);
+
+  for (const snap of bookSnaps) {
+    if (!snap.exists) {
+      metaByItemId[snap.id] = { gradeName: '—', sectionName: '—' };
+      continue;
+    }
+    const book = snap.data();
+    metaByItemId[snap.id] = {
+      gradeName: (book.gradeId && gradeCache[book.gradeId]) || '—',
+      sectionName: (book.subgradeId && subgradeCache[book.subgradeId]) || '—',
+    };
+  }
+  return metaByItemId;
+}
+
+/** Section only (class already known from student profile). */
+async function buildSectionOnlyMetaMap(itemIds) {
+  const unique = [...new Set(itemIds.filter(Boolean))];
+  const metaByItemId = {};
+  if (unique.length === 0) return metaByItemId;
+
+  const subgradeCache = {};
+  const getSubgradeName = async (subgradeId) => {
+    if (!subgradeId) return '';
+    if (subgradeCache[subgradeId] !== undefined) return subgradeCache[subgradeId];
+    try {
+      const doc = await db.collection('subgrades').doc(subgradeId).get();
+      subgradeCache[subgradeId] = doc.exists ? (doc.data().name || '') : '';
+    } catch {
+      subgradeCache[subgradeId] = '';
+    }
+    return subgradeCache[subgradeId];
+  };
+
+  const bookSnaps = [];
+  const BATCH = 30;
+  for (let i = 0; i < unique.length; i += BATCH) {
+    const chunk = unique.slice(i, i + BATCH);
+    const refs = chunk.map((id) => db.collection('books').doc(id));
+    bookSnaps.push(...(await db.getAll(...refs)));
+  }
+
+  const subgradeIds = new Set();
+  for (const snap of bookSnaps) {
+    if (snap.exists && snap.data().subgradeId) {
+      subgradeIds.add(snap.data().subgradeId);
+    }
+  }
+  await Promise.all([...subgradeIds].map((id) => getSubgradeName(id)));
+
+  for (const snap of bookSnaps) {
+    if (!snap.exists) {
+      metaByItemId[snap.id] = { gradeName: '—', sectionName: '—' };
+      continue;
+    }
+    const book = snap.data();
+    metaByItemId[snap.id] = {
+      gradeName: '—',
+      sectionName: (book.subgradeId && subgradeCache[book.subgradeId]) || '—',
+    };
+  }
+  return metaByItemId;
+}
+
+function orderHasClassFromProfile(data) {
+  const student = data.orderingForStudent;
+  return Boolean(
+    (student?.gradeLabel && String(student.gradeLabel).trim()) ||
+      (data.customerInfo?.classStandard && String(data.customerInfo.classStandard).trim())
+  );
+}
+
+async function buildEnrichmentMapsForDocs(docs) {
+  const fullLookup = [];
+  const sectionOnly = [];
+  for (const doc of docs) {
+    const data = doc.data();
+    const itemId = data.items?.[0]?.itemId;
+    if (!itemId) continue;
+    if (orderHasClassFromProfile(data)) {
+      sectionOnly.push(itemId);
+    } else {
+      fullLookup.push(itemId);
+    }
+  }
+  const [fullMap, sectionMap] = await Promise.all([
+    buildFirstItemMetaMap(fullLookup),
+    buildSectionOnlyMetaMap(sectionOnly),
+  ]);
+  return { ...fullMap, ...sectionMap };
+}
+
+function resolveOrderListMeta(data, bookMetaByItemId) {
+  const student = data.orderingForStudent;
+  const studentName =
+    student?.name && String(student.name).trim() ? String(student.name).trim() : '—';
+
+  let className =
+    (student?.gradeLabel && String(student.gradeLabel).trim()) ||
+    (data.customerInfo?.classStandard && String(data.customerInfo.classStandard).trim()) ||
+    '';
+
+  let sectionName = '';
+
+  const customerContact =
+    data.shippingAddress?.phone ||
+    data.customerInfo?.phoneNumber ||
+    data.customerInfo?.email ||
+    '';
+
+  const firstItemId = data.items?.[0]?.itemId;
+  if (firstItemId && bookMetaByItemId[firstItemId]) {
+    const meta = bookMetaByItemId[firstItemId];
+    if (!className && meta.gradeName && meta.gradeName !== '—') {
+      className = meta.gradeName;
+    }
+    if (meta.sectionName && meta.sectionName !== '—') {
+      sectionName = meta.sectionName;
+    }
+  }
+
+  return {
+    studentName,
+    className: className || '—',
+    sectionName: sectionName || '—',
+    customerContact: customerContact || '—',
+  };
+}
+
+function mapDocToListOrder(doc, bookMetaByItemId) {
+  const data = doc.data();
+  const listMeta = resolveOrderListMeta(data, bookMetaByItemId);
+
+  const createdAtDate = data.createdAt?.toDate
+    ? data.createdAt.toDate()
+    : data.createdAt
+      ? new Date(data.createdAt)
+      : null;
+
+  return {
+    id: doc.id,
+    orderId: doc.id,
+    orderNumber: data.orderNumber || '',
+    customerName: getCustomerNameFast(data),
+    orderTotal: data.total || 0,
+    studentName: listMeta.studentName,
+    className: listMeta.className,
+    sectionName: listMeta.sectionName,
+    customerContact: listMeta.customerContact,
+    status: data.orderStatus || 'Pending',
+    paymentStatus: data.paymentStatus || 'Pending',
+    createdAt: createdAtDate && !Number.isNaN(createdAtDate.getTime())
+      ? createdAtDate.toISOString()
+      : null,
+    dateCreated: createdAtDate && !Number.isNaN(createdAtDate.getTime())
+      ? createdAtDate.toLocaleString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : '',
+  };
+}
+
+function orderMatchesSearch(data, q) {
+  const haystack = [
+    data.orderNumber,
+    data.orderingForStudent?.name,
+    data.customerInfo?.name,
+    data.customerInfo?.phoneNumber,
+    data.customerInfo?.email,
+    data.shippingAddress?.phone,
+    data.shippingAddress?.name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+/** Paginated slice of orders (newest first). */
+async function fetchOrderDocsPage(page, limit) {
+  const safePage = Math.max(parseInt(page, 10) || 1, 1);
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100);
+  const offset = (safePage - 1) * safeLimit;
+
+  let query = db.collection('orders').orderBy('createdAt', 'desc');
+
+  if (offset > 0) {
+    const skipSnap = await db.collection('orders')
+      .orderBy('createdAt', 'desc')
+      .limit(offset)
+      .get();
+    const cursor = skipSnap.docs[skipSnap.docs.length - 1];
+    if (!cursor) {
+      return { docs: [], page: safePage, limit: safeLimit };
+    }
+    query = db.collection('orders').orderBy('createdAt', 'desc').startAfter(cursor);
+  }
+
+  const pageSnap = await query.limit(safeLimit).get();
+  return { docs: pageSnap.docs, page: safePage, limit: safeLimit };
+}
+
+// Get all orders (lightweight list payload for admin table + dashboard)
 const getAllOrders = async (req, res) => {
   try {
+    const lite =
+      req.query.lite === '1' ||
+      req.query.lite === 'true' ||
+      req.query.lite === 'yes';
+    const paginated = req.query.page != null || req.query.limit != null;
+    const searchQ = String(req.query.q || req.query.search || '')
+      .trim()
+      .toLowerCase();
+
+    if (paginated && !lite) {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 25;
+
+      let docs;
+      let total;
+
+      if (searchQ) {
+        const allSnap = await db.collection('orders').orderBy('createdAt', 'desc').get();
+        const filtered = allSnap.docs.filter((doc) => orderMatchesSearch(doc.data(), searchQ));
+        total = filtered.length;
+        const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100);
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100);
+        docs = filtered.slice(offset, offset + safeLimit);
+      } else {
+        const countSnap = await db.collection('orders').count().get();
+        total = countSnap.data().count;
+        const pageResult = await fetchOrderDocsPage(page, limit);
+        docs = pageResult.docs;
+      }
+
+      const bookMetaByItemId = await buildEnrichmentMapsForDocs(docs);
+      const orders = docs.map((doc) => mapDocToListOrder(doc, bookMetaByItemId));
+
+      return res.json({
+        success: true,
+        data: orders,
+        count: orders.length,
+        total,
+        page: Math.max(parseInt(page, 10) || 1, 1),
+        limit: Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100),
+      });
+    }
+
     const ordersSnapshot = await db.collection('orders')
       .orderBy('createdAt', 'desc')
       .get();
-    
-    const orders = [];
 
-    // Process orders and fetch customer names
-    for (const doc of ordersSnapshot.docs) {
-      const data = doc.data();
-      const customerName = await getCustomerName(data);
-      
-      const order = {
-        id: doc.id,
-        orderId: doc.id, // For compatibility with existing frontend
-        orderNumber: data.orderNumber || '',
-        customerName: customerName,
-        orderTotal: data.total || 0,
-        status: data.orderStatus || 'Pending',
-        paymentStatus: data.paymentStatus || 'Pending',
-        dateCreated: data.createdAt?.toDate 
-          ? data.createdAt.toDate().toLocaleString('en-IN', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: true,
-            })
-          : new Date(data.createdAt).toLocaleString('en-IN', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: true,
-            }),
-        // Additional fields for order details
-        userId: data.userId || '',
-        items: data.items || [],
-        subtotal: data.subtotal || 0,
-        deliveryCharge: data.deliveryCharge || 0,
-        tax: data.tax || 0,
-        shippingAddress: data.shippingAddress || null,
-        customerInfo: data.customerInfo || null,
-        razorpayOrderId: data.razorpayOrderId || '',
-        razorpayPaymentId: data.razorpayPaymentId || '',
-      };
-      orders.push(order);
-    }
+    const docs = ordersSnapshot.docs;
+    const bookMetaByItemId = lite ? {} : await buildEnrichmentMapsForDocs(docs);
+    const orders = docs.map((doc) => mapDocToListOrder(doc, bookMetaByItemId));
 
     res.json({
       success: true,
       data: orders,
       count: orders.length,
+      total: orders.length,
     });
   } catch (error) {
     console.error('Error fetching orders:', error);
@@ -241,6 +529,7 @@ const getOrderById = async (req, res) => {
       customerInfo: data.customerInfo || null,
       razorpayOrderId: data.razorpayOrderId || '',
       razorpayPaymentId: data.razorpayPaymentId || '',
+      orderingForStudent: data.orderingForStudent || null,
       deliveryStatus: data.deliveryStatus || 'pending',
       trackingNumber: data.trackingNumber || null,
       shiprocketOrderId: data.shiprocketOrderId || null,
@@ -263,6 +552,71 @@ const getOrderById = async (req, res) => {
       message: 'Failed to fetch order',
       error: error.message,
     });
+  }
+};
+
+/** PDF invoice for admin (authenticated). Includes payment, student, line items, totals. */
+const generateInvoicePdf = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderDoc = await db.collection('orders').doc(id).get();
+
+    if (!orderDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    const data = orderDoc.data();
+    const customerName = await getCustomerName(data);
+    const enrichedItems = await enrichOrderItemsWithSchoolGradeSection(data.items || []);
+
+    const dateLabel = data.createdAt?.toDate
+      ? data.createdAt.toDate().toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : new Date(data.createdAt || Date.now()).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+    const orderForPdf = {
+      orderNumber: data.orderNumber || orderDoc.id,
+      dateLabel,
+      customerName,
+      customerInfo: data.customerInfo || null,
+      shippingAddress: data.shippingAddress || null,
+      paymentStatus: data.paymentStatus || '—',
+      orderingForStudent: data.orderingForStudent || null,
+      items: enrichedItems,
+      subtotal: data.subtotal ?? 0,
+      deliveryCharge: data.deliveryCharge ?? 0,
+      tax: data.tax ?? 0,
+      total: data.total ?? 0,
+      trackingNumber: data.trackingNumber || null,
+      shiprocketAWB: data.shiprocketAWB || null,
+    };
+
+    await invoicePdfService.renderOrderInvoicePdf(orderForPdf, res);
+  } catch (error) {
+    console.error('Error generating invoice PDF:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate invoice',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
   }
 };
 
@@ -767,6 +1121,7 @@ const handleShiprocketWebhook = async (req, res) => {
 module.exports = {
   getAllOrders,
   getOrderById,
+  generateInvoicePdf,
   updateOrderStatus,
   createShiprocketOrder,
   getShiprocketStatus,

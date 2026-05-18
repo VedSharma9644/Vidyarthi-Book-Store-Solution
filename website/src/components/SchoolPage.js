@@ -6,7 +6,7 @@ import { useHeaderHeight } from '../hooks/useHeaderHeight';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
-import { sortGrades } from '../utils/gradeUtils';
+import { sortGrades, getGradeDisplayLabel } from '../utils/gradeUtils';
 
 const SchoolPage = () => {
   const { schoolId } = useParams();
@@ -303,7 +303,7 @@ const SchoolPage = () => {
                     fontWeight: 'bold',
                     margin: '0 0 12px 0',
                   }}>
-                    {grade.name}
+                    {getGradeDisplayLabel(grade.name)}
                   </h3>
                   <p style={{
                     color: colors.textPrimary,

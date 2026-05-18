@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
-import { sortGrades } from '../utils/gradeUtils';
+import { sortGrades, getGradeDisplayLabel } from '../utils/gradeUtils';
 
 // Grade card background image - using local asset
 // Place your grade background image in: assets/images/grade-background.jpg
@@ -350,7 +350,7 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
                     marginBottom: 12,
                   }}
                 >
-                  {grade.name}
+                  {getGradeDisplayLabel(grade.name)}
                 </Text>
                 <Text
                   style={{

@@ -23,7 +23,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
-const ProfileScreen = ({ onTabPress, onBack, onLogout, onGoToOrderHistory, onGoToShippingAddresses }) => {
+const ProfileScreen = ({
+  onTabPress,
+  onBack,
+  onLogout,
+  onGoToOrderHistory,
+  onGoToShippingAddresses,
+  onGoToStudents,
+  onGoToManageGrades,
+}) => {
   const { logout } = useAuth();
   const defaultProfileImage = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBpjxEfE7ea34iS2cRGSWsmeaKsAFJRhbMGl69cHfVqKLFhPihowan-DypyvXbvvn0088j2FSLVvnYQccFUXJ73y1eNXuGDz7KAWV5_t5tguQ_78LpNELkmN9zjgxGwv15mYEGnQ2BLbuOaM5v3bB4ZqMjmnvbwFuvNwUatcbej9LbHH92_fwVOMKk2vqSYRmMUXx-d7urQeB4sjVbew1-CARvegFPvB4-ifYUqGvVa0YgVIlUqEF2rkCV3WZX3WmnVstFVlPqbGTI';
   const [profileImage, setProfileImage] = useState(defaultProfileImage);
@@ -331,6 +339,18 @@ const ProfileScreen = ({ onTabPress, onBack, onLogout, onGoToOrderHistory, onGoT
       } else {
         Alert.alert(option, `${option} functionality will be implemented`);
       }
+    } else if (option === 'Students') {
+      if (onGoToStudents) {
+        onGoToStudents();
+      } else {
+        Alert.alert(option, `${option} is not available.`);
+      }
+    } else if (option === 'Manage grades') {
+      if (onGoToManageGrades) {
+        onGoToManageGrades();
+      } else {
+        Alert.alert(option, `${option} is not available.`);
+      }
     } else {
       Alert.alert(option, `${option} functionality will be implemented`);
     }
@@ -546,6 +566,36 @@ const ProfileScreen = ({ onTabPress, onBack, onLogout, onGoToOrderHistory, onGoT
               </View>
               <Text style={styles.chevronIcon}>›</Text>
             </TouchableOpacity>
+
+            {onGoToStudents && (
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => handleAccountOption('Students')}
+              >
+                <View style={styles.optionLeft}>
+                  <View style={styles.optionIconContainer}>
+                    <Text style={styles.optionIcon}>🎓</Text>
+                  </View>
+                  <Text style={styles.optionTitle}>Students</Text>
+                </View>
+                <Text style={styles.chevronIcon}>›</Text>
+              </TouchableOpacity>
+            )}
+
+            {onGoToManageGrades && (
+              <TouchableOpacity
+                style={styles.optionItem}
+                onPress={() => handleAccountOption('Manage grades')}
+              >
+                <View style={styles.optionLeft}>
+                  <View style={styles.optionIconContainer}>
+                    <Text style={styles.optionIcon}>📚</Text>
+                  </View>
+                  <Text style={styles.optionTitle}>Manage grades</Text>
+                </View>
+                <Text style={styles.chevronIcon}>›</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Orders Section */}

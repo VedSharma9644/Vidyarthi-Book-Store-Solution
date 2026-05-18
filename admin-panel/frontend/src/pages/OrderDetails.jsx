@@ -36,11 +36,23 @@ const OrderDetails = () => {
           const formatAddress = (shippingAddress) => {
             if (!shippingAddress) return 'N/A';
             const parts = [];
-            if (shippingAddress.address) parts.push(shippingAddress.address);
+            const line =
+              shippingAddress.address ||
+              shippingAddress.line1 ||
+              shippingAddress.street ||
+              '';
+            if (line) parts.push(line);
             if (shippingAddress.city) parts.push(shippingAddress.city);
             if (shippingAddress.state) parts.push(shippingAddress.state);
-            if (shippingAddress.postalCode) parts.push(shippingAddress.postalCode);
-            if (shippingAddress.country) parts.push(shippingAddress.country);
+            const pin =
+              shippingAddress.postalCode ||
+              shippingAddress.pincode ||
+              shippingAddress.pinCode ||
+              '';
+            if (pin) parts.push(pin);
+            if (shippingAddress.country && shippingAddress.country !== 'India') {
+              parts.push(shippingAddress.country);
+            }
             return parts.join(', ') || 'N/A';
           };
 
@@ -48,7 +60,10 @@ const OrderDetails = () => {
           const transformedOrder = {
             id: orderData.id,
             orderNumber: orderData.orderNumber || `ORD-${orderData.id}`,
-            customerName: orderData.customerName || 'Unknown Customer',
+            customerName:
+              orderData.shippingAddress?.name ||
+              orderData.customerName ||
+              'Unknown Customer',
             phone: orderData.shippingAddress?.phone || 
                    orderData.customerInfo?.phoneNumber || 
                    'N/A',
@@ -79,6 +94,7 @@ const OrderDetails = () => {
             shiprocketShipmentId: orderData.shiprocketShipmentId || null,
             shiprocketAWB: orderData.shiprocketAWB || null,
             shiprocketStatus: orderData.shiprocketStatus || null,
+            orderingForStudent: orderData.orderingForStudent || null,
           };
           
           setOrder(transformedOrder);
@@ -160,6 +176,7 @@ const OrderDetails = () => {
   };
 
   const [isCreatingShiprocket, setIsCreatingShiprocket] = useState(false);
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
 
   const handleCreateShiprocketOrder = async (e) => {
     e.preventDefault();
@@ -212,6 +229,42 @@ const OrderDetails = () => {
       alert(error.response?.data?.message || 'Failed to create Shiprocket order. Please check your Shiprocket credentials.');
     } finally {
       setIsCreatingShiprocket(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!orderId || !order) return;
+    try {
+      setIsDownloadingInvoice(true);
+      const response = await ordersAPI.downloadInvoice(orderId);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeNum = String(order.orderNumber || orderId).replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `Invoice_Order_${safeNum}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Invoice download failed:', error);
+      let message = 'Could not download invoice. Please try again.';
+      const data = error.response?.data;
+      if (data?.message) {
+        message = data.message;
+      } else if (data instanceof Blob) {
+        try {
+          const text = await data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) message = parsed.message;
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      alert(message);
+    } finally {
+      setIsDownloadingInvoice(false);
     }
   };
 
@@ -329,17 +382,17 @@ const OrderDetails = () => {
                 </button>
               </form>
 
-              {/* Right: Generate Invoice */}
+              {/* Right: Download invoice (PDF) */}
               <div>
-                <label className="form-label d-block invisible">Generate</label>
-                <a
-                  href={`/orders/generate-invoice?orderId=${orderId}`}
+                <label className="form-label d-block invisible">Invoice</label>
+                <button
+                  type="button"
                   className="btn btn-outline-primary"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  disabled={isDownloadingInvoice}
+                  onClick={handleDownloadInvoice}
                 >
-                  Generate Invoice
-                </a>
+                  {isDownloadingInvoice ? 'Generating…' : 'Download invoice'}
+                </button>
               </div>
             </div>
           </div>
@@ -413,6 +466,11 @@ const OrderDetails = () => {
                   <strong>Razorpay Order ID:</strong> <small>{order.razorpayOrderId}</small>
                 </p>
               )}
+              {order.razorpayPaymentId && (
+                <p>
+                  <strong>Razorpay Payment ID:</strong> <small>{order.razorpayPaymentId}</small>
+                </p>
+              )}
               {(order.trackingNumber || shiprocketStatus?.awb) && (
                 <p>
                   <strong>Tracking Number (AWB):</strong> {shiprocketStatus?.awb || order.trackingNumber}
@@ -454,6 +512,14 @@ const OrderDetails = () => {
               <p>
                 <strong>Address:</strong> {order.address}
               </p>
+              {order.orderingForStudent?.name && (
+                <p>
+                  <strong>Student (order for):</strong> {order.orderingForStudent.name}
+                  {order.orderingForStudent.gradeLabel || order.orderingForStudent.schoolLabel
+                    ? ` (${[order.orderingForStudent.gradeLabel, order.orderingForStudent.schoolLabel].filter(Boolean).join(' · ')})`
+                    : ''}
+                </p>
+              )}
             </div>
           </div>
         </div>

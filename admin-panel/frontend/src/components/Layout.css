@@ -50,9 +50,29 @@
   text-decoration: none !important;
 }
 
-@media (max-width: 768px) {
+/* Backdrop: only visible on small screens when Layout mounts this node (sidebar open) */
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
   .main {
     margin-left: 0;
+    /* Space for fixed top nav (see TopNav.css) */
+    padding-top: 3.75rem;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1035;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 

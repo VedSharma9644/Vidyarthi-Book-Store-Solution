@@ -377,12 +377,19 @@ class ApiService {
   }
 
   // Payment APIs
-  async createPaymentOrder(amount, receipt) {
+  async createPaymentOrder(amount, receipt, orderingStudent = null, cartSnapshot = null, shippingAddress = null) {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, {
-        amount,
-        receipt,
-      }, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
+      const body = { amount, receipt };
+      if (orderingStudent && orderingStudent.name) {
+        body.orderingStudent = orderingStudent;
+      }
+      if (Array.isArray(cartSnapshot) && cartSnapshot.length > 0) {
+        body.cartSnapshot = cartSnapshot;
+      }
+      if (shippingAddress && typeof shippingAddress === 'object') {
+        body.shippingAddress = shippingAddress;
+      }
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PAYMENT.CREATE_ORDER, body, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
       return response.data;
     } catch (error) {
       console.error('Create payment order API Error:', error.message);
@@ -474,16 +481,21 @@ class ApiService {
     }
   }
 
-  async createOrder(paymentData, shippingAddress = null) {
+  async createOrder(paymentData, shippingAddress = null, orderingStudent = null) {
     try {
       // Get userId from storage as fallback (header is set by interceptor)
       const userId = await AsyncStorage.getItem('userId');
       
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, {
+      const body = {
         userId, // Include in body as fallback (header also set by interceptor)
         paymentData,
         shippingAddress,
-      }, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
+      };
+      if (orderingStudent && orderingStudent.name) {
+        body.orderingStudent = orderingStudent;
+      }
+
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.ORDERS.CREATE, body, { timeout: API_CONFIG.CHECKOUT_TIMEOUT });
       return response.data;
     } catch (error) {
       console.error('Create order API Error:', error.message);
@@ -1000,6 +1012,24 @@ class ApiService {
     } catch (error) {
       console.error('Update user profile API Error:', error.message);
       throw error;
+    }
+  }
+
+  /** Fresh user profile from backend (includes students[], addresses[], etc.). */
+  async getUserById(userId) {
+    try {
+      const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.USERS.GET_BY_ID}/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get user by ID API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to fetch user',
+          data: null,
+        };
+      }
+      return { success: false, message: error.message || 'Failed to fetch user', data: null };
     }
   }
 

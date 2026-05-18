@@ -1,4 +1,5 @@
 const paymentService = require('../services/paymentService');
+const paymentCheckoutAttemptService = require('../services/paymentCheckoutAttemptService');
 
 /**
  * Create Razorpay order
@@ -6,7 +7,8 @@ const paymentService = require('../services/paymentService');
  */
 const createOrder = async (req, res) => {
     try {
-        const { amount, receipt } = req.body;
+        const { amount, receipt, orderingStudent, cartSnapshot, shippingAddress } = req.body;
+        const userId = req.headers['user-id'] || req.body.userId;
 
         // Validate amount
         if (!amount || amount <= 0) {
@@ -16,8 +18,25 @@ const createOrder = async (req, res) => {
             });
         }
 
-        // Create order
-        const order = await paymentService.createOrder(amount, receipt);
+        const rzNotes = userId ? { userId: String(userId) } : null;
+        const order = await paymentService.createOrder(amount, receipt, rzNotes);
+
+        // Best-effort: record checkout attempt + cart snapshot for webhook / reconciliation (non-blocking for response)
+        if (userId && order?.orderId) {
+            try {
+                await paymentCheckoutAttemptService.recordAttempt({
+                    razorpayOrderId: order.orderId,
+                    userId: String(userId),
+                    amountInr: Number(amount),
+                    receipt: receipt || '',
+                    orderingStudent: orderingStudent || null,
+                    cartSnapshot: cartSnapshot || null,
+                    shippingAddress: shippingAddress || null,
+                });
+            } catch (e) {
+                console.error('paymentCheckoutAttemptService.recordAttempt (non-fatal):', e.message);
+            }
+        }
 
         res.json({
             success: true,

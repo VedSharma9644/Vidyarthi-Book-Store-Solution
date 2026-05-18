@@ -1,56 +1,93 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
+import ApiService from '../services/apiService';
+import { normalizeStudentsFromUser } from '../utils/students';
+import { getGradeDisplayLabel } from '../utils/gradeUtils';
 
 const StudentsScreen = ({ onTabPress, onBack, onGoToAddStudent }) => {
-  const students = [
-    {
-      id: 1,
-      name: 'Ethan Harper',
-      class: 'Class 10',
-      school: 'Springfield High',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAx3fHgLKjb_9s9qu1qg0nRPXK3qDdwSA_-JBTDmmbJN6l-RGOc88GxKmB3ELkE0OFHTEhWafaH9qylIeNbmROEiebscHrfm-ErL-f6b0E6gm_21eJM-I62Z5PlS6so1_9_2w4mMcjeCcR5paXkw1yYyxwqj6KKiBefMc9kcjQPKE3wSABlFFba9sRi3xlqU0e3c404jmnAHKC4SMxiTb114fIEc6fieSvZodZ277geEh6uLxbhrCTdk89GerXGrusv7NryTw0r-uk',
-    },
-    {
-      id: 2,
-      name: 'Olivia Bennett',
-      class: 'Class 11',
-      school: 'Lakeside Academy',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB51Qjz5VVjr_eUUm6b-lYmgUuW4rd507LcfDE-VjWsiHQGd_0aaECXot7rgRZ-RGwUdnIE3hiEyvWA-Tkdu8PbYt96HWjuRzvaT8-Oi8jy6XyNVXY8TCHoOVd987wGkNg9CJGC9SoJRdB9dPDPXjKlK3biP1iX_UcpmFbFaeYueqH6chsF5tzQJD0Wi_UDjYe0971rySvn4qkPZtuxAviOEDYiw-95XoifEz2umwUQMnCnZDrEhDqe_sDE1-kKR5SphaMu2N2aCtc',
-    },
-    {
-      id: 3,
-      name: 'Noah Carter',
-      class: 'Class 9',
-      school: 'Northwood School',
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBTqIhwjrPpXWrjrjLcLS5bYAlwFTXyMZ8FdP5YJmA6U4jnQ85rUjWo-bSg0Z4WtMCj6zajbUbGbCDo71EY2M0Ksa-CkuW9EMsPp3BEuKBcJpwPU7JWTEK46oJcmTmBjgvTCt3SWYWiRYDtrr5Ko6EDuaL_fyrqW3w_h9wFzpYiuToYYFqDOky3laCdrLTkz6OZ2m8lYl-IoDz631MOKohM3mCMC0uzwHAHbLAgTRhuWLRMnSn5cpCtkX5UU1Q7fddTd7l4IPcvT8w',
-    },
-  ];
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleStudentPress = (student) => {
-    Alert.alert('Student Details', `${student.name} details will be implemented`);
+  const loadStudents = useCallback(async () => {
+    try {
+      setLoading(true);
+      let userData = await ApiService.getUserData();
+      const userId = userData?.id || (await AsyncStorage.getItem('userId'));
+      if (userId) {
+        const res = await ApiService.getUserById(userId);
+        if (res?.success && res.data) {
+          userData = res.data;
+          await ApiService.storeUserData(res.data);
+        }
+      }
+      setStudents(normalizeStudentsFromUser(userData));
+    } catch (e) {
+      console.error('StudentsScreen load:', e);
+      setStudents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStudents();
+  }, [loadStudents]);
+
+  const handleDelete = (student) => {
+    Alert.alert(
+      'Remove student',
+      `Remove ${student.name} from your profile?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const userData = await ApiService.getUserData();
+              const userId = userData?.id || (await AsyncStorage.getItem('userId'));
+              if (!userId || !userData) {
+                Alert.alert('Error', 'Could not load your profile.');
+                return;
+              }
+              const raw = Array.isArray(userData.students) ? userData.students : [];
+              const next = raw.filter((s) => String(s?.id) !== String(student.id));
+              const res = await ApiService.updateUserProfile(userId, { ...userData, students: next });
+              if (res.success && res.data) {
+                await ApiService.storeUserData(res.data);
+              }
+              await loadStudents();
+            } catch (err) {
+              console.error(err);
+              Alert.alert('Error', 'Could not remove student.');
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const handleAddStudent = () => {
-    if (onGoToAddStudent) {
-      onGoToAddStudent();
-    } else {
-      Alert.alert('Add Student', 'Add student functionality will be implemented');
-    }
+  const subtitleFor = (s) => {
+    const parts = [
+      s.gradeLabel ? getGradeDisplayLabel(s.gradeLabel) : '',
+      s.schoolLabel,
+    ].filter(Boolean);
+    return parts.length ? parts.join(' · ') : 'Tap to view';
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.studentsHeader}>
         <View style={styles.studentsHeaderContent}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
@@ -61,42 +98,73 @@ const StudentsScreen = ({ onTabPress, onBack, onGoToAddStudent }) => {
         </View>
       </View>
 
-      {/* Main Content */}
-      <ScrollView style={styles.studentsMainContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.studentsContent}>
-          {students.map((student, index) => (
-            <TouchableOpacity
-              key={student.id}
-              style={styles.studentCard}
-              onPress={() => handleStudentPress(student)}
-            >
-              <Image 
-                source={{ uri: student.image }} 
-                style={styles.studentImage}
-                resizeMode="cover"
-              />
-              <View style={styles.studentInfo}>
-                <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentDetails}>{student.class}, {student.school}</Text>
-              </View>
-              <Text style={styles.studentChevron}>›</Text>
-            </TouchableOpacity>
-          ))}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView style={styles.studentsMainContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.studentsContent}>
+            {students.length === 0 ? (
+              <View style={{ padding: 24, alignItems: 'center' }}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>🎓</Text>
+                <Text style={{ color: colors.textPrimary || '#333', fontSize: 16, textAlign: 'center' }}>
+                  No students added yet. Tap below to add a student for checkout.
+                </Text>
+              </View>
+            ) : (
+              students.map((student) => (
+                <View key={student.id} style={[styles.studentCard, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                    onPress={() =>
+                      Alert.alert(student.name, subtitleFor(student), [{ text: 'OK' }])
+                    }
+                  >
+                    <View
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        backgroundColor: '#e8eef9',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12,
+                      }}
+                    >
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: colors.primary }}>
+                        {(student.name || '?').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.studentInfo}>
+                      <Text style={styles.studentName}>{student.name}</Text>
+                      <Text style={styles.studentDetails}>{subtitleFor(student)}</Text>
+                    </View>
+                    <Text style={styles.studentChevron}>›</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDelete(student)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: '#c0392b', fontWeight: '600' }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
+        </ScrollView>
+      )}
 
-      {/* Add Student Button */}
       <View style={styles.studentsAddStudentButtonContainer}>
         <TouchableOpacity
           style={styles.studentsAddStudentButton}
-          onPress={handleAddStudent}
+          onPress={() => onGoToAddStudent && onGoToAddStudent()}
         >
           <Text style={styles.studentsAddStudentButtonIcon}>+</Text>
           <Text style={styles.studentsAddStudentButtonText}>Add Student</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Navigation */}
       <BottomNavigation activeTab="profile" onTabPress={onTabPress} />
     </SafeAreaView>
   );

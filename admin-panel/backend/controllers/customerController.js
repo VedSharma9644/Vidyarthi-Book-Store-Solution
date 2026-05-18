@@ -1,17 +1,34 @@
 const { db } = require('../config/database');
 const Customer = require('../models/Customer');
 
+function toCreatedAtIso(value) {
+  if (!value) return null;
+  if (value.toDate) return value.toDate().toISOString();
+  if (value._seconds != null) return new Date(value._seconds * 1000).toISOString();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // Get all customers
 const getAllCustomers = async (req, res) => {
   try {
-    // Fetch from 'users' collection (AppUser in .NET maps to 'users' in Firestore typically)
-    // If your collection is named differently, adjust accordingly
+    const lite =
+      req.query.lite === '1' ||
+      req.query.lite === 'true' ||
+      req.query.lite === 'yes';
+
     const usersSnapshot = await db.collection('users').get();
     const customers = [];
 
     usersSnapshot.forEach((doc) => {
-      const customer = Customer.fromFirestore(doc);
-      customers.push(customer);
+      if (lite) {
+        customers.push({
+          id: doc.id,
+          createdAt: toCreatedAtIso(doc.data().createdAt),
+        });
+      } else {
+        customers.push(Customer.fromFirestore(doc));
+      }
     });
 
     // Sort by createdAt descending (newest first)

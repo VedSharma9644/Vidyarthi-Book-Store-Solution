@@ -12,6 +12,7 @@ import CheckoutPage from '../components/CheckoutPage';
 import ProfilePage from '../components/ProfilePage';
 import ProfileCompletePage from '../components/ProfileCompletePage';
 import ShippingAddressesPage from '../components/ShippingAddressesPage';
+import StudentsPage from '../components/StudentsPage';
 import OrderHistoryPage from '../components/OrderHistoryPage';
 import OrderDetailsPage from '../components/OrderDetailsPage';
 import ProtectedRoute from './ProtectedRoute';
@@ -77,6 +78,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <ShippingAddressesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/students"
+        element={
+          <ProtectedRoute>
+            <StudentsPage />
           </ProtectedRoute>
         }
       />

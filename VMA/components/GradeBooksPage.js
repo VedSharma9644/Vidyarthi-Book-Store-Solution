@@ -20,8 +20,7 @@ import {
   mergeHiddenOptionalBundleGroups,
   buildDefaultSelectedBundles,
 } from '../utils/categoryNames';
-
-
+import { getGradeScreenTitle } from '../utils/gradeUtils';
 
 const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName, schoolId, subgradeId, subgradeName }) => {
   const [textbooks, setTextbooks] = useState([]);
@@ -453,7 +452,7 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
           fontWeight: 'bold',
           color: colors.white,
         }}>
-          {gradeName || 'Grade Books'}
+          {getGradeScreenTitle(gradeName) || 'Grade Books'}
         </Text>
         <TouchableOpacity
           style={{ 

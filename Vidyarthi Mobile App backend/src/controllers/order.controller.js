@@ -1,4 +1,5 @@
 const orderService = require('../services/orderService');
+const paymentCheckoutAttemptService = require('../services/paymentCheckoutAttemptService');
 
 /**
  * Validate cart for checkout (inventory check only).
@@ -56,7 +57,7 @@ const createOrder = async (req, res) => {
         });
 
         const userId = req.headers['user-id'] || req.body.userId;
-        const { paymentData, shippingAddress } = req.body;
+        const { paymentData, shippingAddress, orderingStudent } = req.body;
 
         if (!userId) {
             console.error('❌ Order creation failed: User ID is missing');
@@ -78,6 +79,36 @@ const createOrder = async (req, res) => {
             });
         }
 
+        const existing = await orderService.findOrderByRazorpayOrderId(paymentData.razorpayOrderId);
+        if (existing) {
+            let orderPayload = existing;
+            try {
+                const patched = await orderService.patchShippingAddressIfMissing(
+                    existing.id,
+                    shippingAddress,
+                    userId
+                );
+                if (patched) {
+                    orderPayload = patched;
+                }
+            } catch (patchErr) {
+                console.error('patchShippingAddressIfMissing (non-fatal):', patchErr.message);
+            }
+            try {
+                await paymentCheckoutAttemptService.markFulfilled(paymentData.razorpayOrderId, {
+                    source: 'client_idempotent',
+                    orderDocId: existing.id,
+                });
+            } catch (e) {
+                console.error('paymentCheckoutAttemptService.markFulfilled (non-fatal):', e.message);
+            }
+            return res.json({
+                success: true,
+                data: orderPayload,
+                message: 'Order already exists',
+            });
+        }
+
         // Log shipping address information
         console.log(`📦 Creating order for user: ${userId}, Razorpay Order: ${paymentData.razorpayOrderId}`);
         if (shippingAddress) {
@@ -94,8 +125,19 @@ const createOrder = async (req, res) => {
             console.log(`⚠️ No shipping address provided, will use user's default address`);
         }
 
-        const order = await orderService.createOrder(userId, paymentData, shippingAddress);
+        const order = await orderService.createOrder(userId, paymentData, shippingAddress, orderingStudent || null);
         console.log(`✅ Order created successfully: ${order.orderNumber} (${order.id})`);
+
+        if (paymentData?.razorpayOrderId) {
+            try {
+                await paymentCheckoutAttemptService.markFulfilled(paymentData.razorpayOrderId, {
+                    source: 'client',
+                    orderDocId: order.id,
+                });
+            } catch (e) {
+                console.error('paymentCheckoutAttemptService.markFulfilled (non-fatal):', e.message);
+            }
+        }
 
         res.json({
             success: true,

@@ -2,11 +2,33 @@ import React, { useState } from 'react';
 import { checkoutStyles, colors } from '../../css/checkoutStyles';
 import AddressModal from './AddressModal';
 
-const AddressSection = ({ shippingAddress, onAddressChange }) => {
+const AddressSection = ({
+  shippingAddress,
+  onAddressChange,
+  requireStudentSelection = false,
+  selectedStudentId = '',
+  onStudentRequired,
+}) => {
   const [showModal, setShowModal] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
+  const addressBlockedUntilStudent =
+    requireStudentSelection && !selectedStudentId;
+
+  const handleOpenAddress = () => {
+    if (addressBlockedUntilStudent) {
+      if (onStudentRequired) {
+        onStudentRequired();
+      }
+      return;
+    }
+    setShowModal(true);
+  };
+
   const formatAddressDisplay = () => {
+    if (addressBlockedUntilStudent) {
+      return 'Select a student above, then add your shipping address';
+    }
     if (!shippingAddress.address && !shippingAddress.city) {
       return 'Tap to add shipping address';
     }
@@ -30,13 +52,22 @@ const AddressSection = ({ shippingAddress, onAddressChange }) => {
       <div style={checkoutStyles.checkoutSection}>
         <h2 style={checkoutStyles.checkoutSectionTitle}>Shipping Address</h2>
         <div
-          style={{
-            ...checkoutStyles.infoCard,
-            ...(isHovered && checkoutStyles.infoCardHover),
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOpenAddress();
+            }
           }}
-          onClick={() => setShowModal(true)}
+          onClick={handleOpenAddress}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
+          style={{
+            ...checkoutStyles.infoCard,
+            ...(isHovered && !addressBlockedUntilStudent && checkoutStyles.infoCardHover),
+            ...(addressBlockedUntilStudent && { opacity: 0.65, cursor: 'not-allowed' }),
+          }}
         >
           <div style={checkoutStyles.infoCardLeft}>
             <div style={checkoutStyles.infoCardIcon}>
@@ -77,4 +108,3 @@ const AddressSection = ({ shippingAddress, onAddressChange }) => {
 };
 
 export default AddressSection;
-

@@ -11,6 +11,20 @@ const api = axios.create({
   },
 });
 
+/** Dedupe parallel GETs (e.g. React Strict Mode double-mount). */
+const inFlightGets = new Map();
+function dedupedGet(url, config = {}) {
+  const key = `${url}?${JSON.stringify(config.params || {})}`;
+  if (inFlightGets.has(key)) {
+    return inFlightGets.get(key);
+  }
+  const promise = api.get(url, config).finally(() => {
+    inFlightGets.delete(key);
+  });
+  inFlightGets.set(key, promise);
+  return promise;
+}
+
 // Add authentication token to all requests
 api.interceptors.request.use(
   (config) => {
@@ -30,11 +44,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      authService.logout();
-      // Redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const path = error.config?.url || '';
+      const isAuthRoute = path.includes('/api/auth/');
+      if (!isAuthRoute) {
+        authService.logout();
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/forgot-password') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
@@ -52,7 +68,7 @@ export const schoolsAPI = {
 
 // Customers API
 export const customersAPI = {
-  getAll: () => api.get('/api/customers'),
+  getAll: (params) => dedupedGet('/api/customers', { params }),
   getById: (id) => api.get(`/api/customers/${id}`),
   delete: (id) => api.delete(`/api/customers/${id}`),
 };
@@ -97,7 +113,7 @@ export const categoriesAPI = {
 
 // Books API
 export const booksAPI = {
-  getAll: () => api.get('/api/books'),
+  getAll: (params) => dedupedGet('/api/books', { params }),
   getById: (id) => api.get(`/api/books/${id}`),
   getLowInventory: (threshold = 5) => api.get('/api/books/inventory/low', { params: { threshold } }),
   create: (data) => api.post('/api/books', data),
@@ -132,11 +148,21 @@ export const uploadAPI = {
 
 // Orders API
 export const ordersAPI = {
-  getAll: () => api.get('/api/orders'),
+  getAll: (params) => dedupedGet('/api/orders', { params }),
   getById: (id) => api.get(`/api/orders/${id}`),
   updateStatus: (id, data) => api.put(`/api/orders/${id}/status`, data),
   createShiprocketOrder: (id) => api.post(`/api/orders/${id}/shiprocket`),
   getShiprocketStatus: (id) => api.get(`/api/orders/${id}/shiprocket-status`),
+  downloadInvoice: (id) =>
+    api.get(`/api/orders/${id}/invoice`, {
+      responseType: 'blob',
+    }),
+};
+
+// Auth (session) — change password while logged in
+export const authAPI = {
+  changePassword: ({ currentPassword, newPassword }) =>
+    api.post('/api/auth/change-password', { currentPassword, newPassword }),
 };
 
 // Email API

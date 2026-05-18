@@ -54,6 +54,46 @@ export const normalizeGradeName = (name) => {
   return normalized;
 };
 
+/** Friendly labels for default early-year grades (canonical name → UI only). */
+const GRADE_DISPLAY_LABEL_BY_NORMALIZED = {
+  NURSERY: 'NURSERY(EY-1)',
+  'PP-1': 'Lower KG(EY-2)',
+  'PP-2': 'Upper KG(EY-3)',
+};
+
+/**
+ * Map backend/canonical grade name to shopper-facing label without changing sort keys.
+ * Unknown or custom names are returned unchanged (trimmed).
+ * @param {string|null|undefined} name
+ * @returns {string}
+ */
+export const getGradeDisplayLabel = (name) => {
+  if (name == null) return '';
+  const raw = String(name).trim();
+  if (!raw) return '';
+  const normalized = normalizeGradeName(raw);
+  if (GRADE_DISPLAY_LABEL_BY_NORMALIZED[normalized]) {
+    return GRADE_DISPLAY_LABEL_BY_NORMALIZED[normalized];
+  }
+  return raw;
+};
+
+/**
+ * Format a grade header that may include " - section" after the grade name.
+ * @param {string|null|undefined} name
+ * @returns {string}
+ */
+export const getGradeScreenTitle = (name) => {
+  if (name == null) return '';
+  const s = String(name).trim();
+  if (!s) return '';
+  const idx = s.indexOf(' - ');
+  if (idx === -1) return getGradeDisplayLabel(s);
+  const left = s.slice(0, idx).trim();
+  const right = s.slice(idx + 3).trim();
+  return [getGradeDisplayLabel(left), right].filter(Boolean).join(' - ');
+};
+
 /**
  * Get the sort index for a grade name based on canonical order.
  * Uses displayOrder if available, otherwise falls back to name matching.
@@ -165,6 +205,8 @@ export const validateGradeName = (name) => {
 export default {
   GRADE_DISPLAY_ORDER,
   normalizeGradeName,
+  getGradeDisplayLabel,
+  getGradeScreenTitle,
   getGradeSortIndex,
   sortGrades,
   validateGradeName,
