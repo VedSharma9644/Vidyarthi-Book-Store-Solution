@@ -1,14 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { profileStyles, colors } from '../css/profileStyles';
 import { borderRadius } from '../css/theme';
 import ApiService from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
 import { normalizeStudentsFromUser, newStudentId } from '../utils/students';
 import { getGradeDisplayLabel } from '../utils/gradeUtils';
 
+function buildStudentsUpdatePayload(userData, studentsList) {
+  return {
+    students: studentsList,
+    phoneNumber: userData?.phoneNumber || null,
+    email: userData?.email || null,
+  };
+}
+
 const StudentsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout } = useAuth();
+  const returnTo = location.state?.returnTo;
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(null);
   const [students, setStudents] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -20,26 +33,63 @@ const StudentsPage = () => {
     gender: '',
   });
 
-  const userId = useMemo(() => localStorage.getItem('userId'), []);
+  const resolveUserId = () => user?.id || localStorage.getItem('userId');
 
   const load = async () => {
     try {
       setLoading(true);
-      let userData = ApiService.getUserData();
-      if (userId) {
-        const res = await ApiService.getUserById(userId);
-        if (res?.success && res.data) {
-          userData = res.data;
-          ApiService.storeUserData(res.data);
-        }
+      setProfileError(null);
+      const userId = resolveUserId();
+      if (!userId) {
+        setProfileError('Please log in to manage students.');
+        setStudents([]);
+        return;
       }
-      setStudents(normalizeStudentsFromUser(userData));
+      const res = await ApiService.getUserById(userId);
+      if (!res?.success || !res.data) {
+        setProfileError(
+          res?.message || 'Your profile could not be loaded. Please log out and sign in again.'
+        );
+        setStudents([]);
+        return;
+      }
+      ApiService.storeUserData(res.data);
+      setStudents(normalizeStudentsFromUser(res.data));
     } catch (e) {
       console.error(e);
+      setProfileError('Could not load your profile. Please try again.');
       setStudents([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveStudents = async (studentsList) => {
+    const userId = resolveUserId();
+    const userData = ApiService.getUserData();
+    if (!userId || !userData) {
+      alert('Please log in again.');
+      return { success: false };
+    }
+    const res = await ApiService.updateUserProfile(
+      userId,
+      buildStudentsUpdatePayload(userData, studentsList)
+    );
+    if (!res.success) {
+      const msg =
+        res.code === 'USER_NOT_FOUND'
+          ? 'Your account was not found. Please log out and sign in again.'
+          : res.message || 'Could not save student';
+      alert(msg);
+      if (res.code === 'USER_NOT_FOUND') {
+        setProfileError(msg);
+      }
+      return res;
+    }
+    if (res.data) {
+      ApiService.storeUserData(res.data);
+    }
+    return res;
   };
 
   useEffect(() => {
@@ -48,21 +98,17 @@ const StudentsPage = () => {
   }, []);
 
   const removeStudent = async (student) => {
-    if (!confirm(`Remove ${student.name} from your profile?`)) return;
+    if (!window.confirm(`Remove ${student.name} from your profile?`)) return;
     try {
       const userData = ApiService.getUserData();
-      if (!userId || !userData) {
+      if (!resolveUserId() || !userData) {
         alert('Please log in again.');
         return;
       }
       const raw = Array.isArray(userData.students) ? userData.students : [];
       const next = raw.filter((s) => String(s?.id) !== String(student.id));
-      const res = await ApiService.updateUserProfile(userId, { ...userData, students: next });
-      if (!res.success) {
-        alert(res.message || 'Could not remove student');
-        return;
-      }
-      if (res.data) ApiService.storeUserData(res.data);
+      const res = await saveStudents(next);
+      if (!res.success) return;
       await load();
     } catch (e) {
       console.error(e);
@@ -78,7 +124,7 @@ const StudentsPage = () => {
     try {
       setSaving(true);
       const userData = ApiService.getUserData();
-      if (!userId || !userData) {
+      if (!resolveUserId() || !userData) {
         alert('Please log in again.');
         return;
       }
@@ -91,15 +137,14 @@ const StudentsPage = () => {
         age: form.age.trim() || '',
         gender: form.gender.trim() || '',
       });
-      const res = await ApiService.updateUserProfile(userId, { ...userData, students: raw });
-      if (!res.success) {
-        alert(res.message || 'Could not save student');
-        return;
-      }
-      if (res.data) ApiService.storeUserData(res.data);
+      const res = await saveStudents(raw);
+      if (!res.success) return;
       setForm({ name: '', schoolLabel: '', gradeLabel: '', age: '', gender: '' });
       setShowAdd(false);
       await load();
+      if (returnTo) {
+        navigate(returnTo);
+      }
     } catch (e) {
       console.error(e);
       alert('Could not save student');
@@ -113,6 +158,50 @@ const StudentsPage = () => {
       <div style={profileStyles.profilePageContainer}>
         <div style={{ ...profileStyles.profileContent, textAlign: 'center', color: colors.textSecondary }}>
           Loading…
+        </div>
+      </div>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <div style={profileStyles.profilePageContainer}>
+        <div style={{ ...profileStyles.profileContent, textAlign: 'center', padding: 24 }}>
+          <p style={{ color: colors.textPrimary, marginBottom: 16 }}>{profileError}</p>
+          <button
+            type="button"
+            style={{
+              backgroundColor: colors.primary,
+              color: colors.white,
+              border: 'none',
+              padding: '10px 16px',
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              fontWeight: 700,
+              marginRight: 12,
+            }}
+            onClick={async () => {
+              await logout();
+              navigate('/login');
+            }}
+          >
+            Log in again
+          </button>
+          <button
+            type="button"
+            style={{
+              backgroundColor: colors.gray200,
+              color: colors.textPrimary,
+              border: 'none',
+              padding: '10px 16px',
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+            onClick={() => navigate('/profile')}
+          >
+            Back to profile
+          </button>
         </div>
       </div>
     );
@@ -142,21 +231,39 @@ const StudentsPage = () => {
           >
             {showAdd ? 'Cancel' : 'Add student'}
           </button>
-          <button
-            style={{
-              marginLeft: 12,
-              backgroundColor: colors.gray200,
-              color: colors.textPrimary,
-              border: 'none',
-              padding: '10px 14px',
-              borderRadius: borderRadius.md,
-              cursor: 'pointer',
-              fontWeight: 700,
-            }}
-            onClick={() => navigate('/profile')}
-          >
-            Back to profile
-          </button>
+          {returnTo ? (
+            <button
+              style={{
+                marginLeft: 12,
+                backgroundColor: colors.gray200,
+                color: colors.textPrimary,
+                border: 'none',
+                padding: '10px 14px',
+                borderRadius: borderRadius.md,
+                cursor: 'pointer',
+                fontWeight: 700,
+              }}
+              onClick={() => navigate(returnTo)}
+            >
+              Back to checkout
+            </button>
+          ) : (
+            <button
+              style={{
+                marginLeft: 12,
+                backgroundColor: colors.gray200,
+                color: colors.textPrimary,
+                border: 'none',
+                padding: '10px 14px',
+                borderRadius: borderRadius.md,
+                cursor: 'pointer',
+                fontWeight: 700,
+              }}
+              onClick={() => navigate('/profile')}
+            >
+              Back to profile
+            </button>
+          )}
         </div>
 
         {showAdd && (

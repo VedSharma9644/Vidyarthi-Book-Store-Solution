@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
+import ProductTitle from './ProductTitle';
 
 const OrderHistoryScreen = ({ onTabPress, onBack, onGoToOrderDetails }) => {
   const [orders, setOrders] = useState([]);
@@ -346,13 +347,13 @@ const OrderHistoryScreen = ({ onTabPress, onBack, onGoToOrderDetails }) => {
                           )}
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{
+                          <ProductTitle style={{
                             fontSize: 14,
                             fontWeight: '500',
                             color: colors.textPrimary,
-                          }} numberOfLines={1}>
+                          }}>
                             {item.title || item.bookTitle || 'Unknown Book'}
-                          </Text>
+                          </ProductTitle>
                           <Text style={{
                             fontSize: 12,
                             color: colors.textSecondary,

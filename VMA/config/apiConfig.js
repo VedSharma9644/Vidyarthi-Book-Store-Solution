@@ -80,6 +80,10 @@ export const API_CONFIG = {
           },
     // Health
     HEALTH: '/health',
+    // App version policy
+    APP: {
+      VERSION_POLICY: '/api/app/version-policy',
+    },
   },
   TIMEOUT: 10000, // 10 seconds
   CHECKOUT_TIMEOUT: 30000, // validate-cart, payment, create-order (can be slow)

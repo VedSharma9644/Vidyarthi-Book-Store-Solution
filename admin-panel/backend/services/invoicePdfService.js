@@ -171,8 +171,10 @@ async function renderOrderInvoicePdf(order, res) {
   const xRight = left + colW + colGap;
 
   const billPhone = order.shippingAddress?.phone || order.customerInfo?.phoneNumber;
+  const parentName =
+    order.parentName || order.customerName || order.customerInfo?.name || 'Customer';
   const billBody = [
-    order.customerName || 'Customer',
+    `Parent / guardian: ${parentName}`,
     ...(order.customerInfo?.email ? [`Email: ${order.customerInfo.email}`] : []),
     ...(billPhone ? [`Phone: ${billPhone}`] : []),
   ].join('\n');
@@ -227,14 +229,18 @@ async function renderOrderInvoicePdf(order, res) {
 
   doc.fontSize(10).font('Helvetica');
   const st = order.orderingForStudent;
-  if (st && st.name) {
+  const studentDisplayName =
+    (st && st.name && String(st.name).trim()) ||
+    (order.studentName && String(order.studentName).trim()) ||
+    '';
+  if (studentDisplayName) {
     const studentLines = [
-      `Name: ${st.name}`,
-      st.age ? `Age: ${st.age}` : null,
-      st.gender ? `Gender: ${st.gender}` : null,
-      st.schoolLabel ? `School: ${st.schoolLabel}` : null,
-      st.gradeLabel ? `Class / grade: ${st.gradeLabel}` : null,
-      st.id ? `Student record ID: ${st.id}` : null,
+      `Student name: ${studentDisplayName}`,
+      st?.age ? `Age: ${st.age}` : null,
+      st?.gender ? `Gender: ${st.gender}` : null,
+      st?.schoolLabel ? `School: ${st.schoolLabel}` : null,
+      st?.gradeLabel ? `Class / grade: ${st.gradeLabel}` : null,
+      st?.id ? `Student record ID: ${st.id}` : null,
     ].filter(Boolean);
     for (const line of studentLines) {
       y = drawAt(doc, line, left, y, { width: contentWidth });

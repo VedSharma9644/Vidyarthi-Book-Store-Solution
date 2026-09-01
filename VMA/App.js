@@ -12,8 +12,6 @@ import ProfileScreen from './components/ProfileScreen';
 import CheckoutScreen from './components/CheckoutScreen';
 import OrderHistoryScreen from './components/OrderHistoryScreen';
 import OrderDetailsScreen from './components/OrderDetailsScreen';
-import AddStudentScreen from './components/AddStudentScreen';
-import StudentsScreen from './components/StudentsScreen';
 import ApiTestScreen from './components/ApiTestScreen';
 import ManageGradesScreen from './components/ManageGradesScreen';
 import UpsertGradeScreen from './components/UpsertGradeScreen';
@@ -22,6 +20,12 @@ import ShippingAddressesScreen from './components/ShippingAddressesScreen';
 import { View, ActivityIndicator } from 'react-native';
 import { colors } from './css/styles';
 import { getGradeScreenTitle } from './utils/gradeUtils';
+import AppUpdateModal from './components/AppUpdateModal';
+import {
+  checkAppVersionPolicy,
+  dismissOptionalUpdate,
+  wasOptionalUpdateDismissed,
+} from './services/versionCheckService';
 
 // Inner component that uses auth context. Uses authReady (not isLoading) so login screen never unmounts due to loading.
 function AppContent() {
@@ -32,6 +36,47 @@ function AppContent() {
   const [selectedGrade, setSelectedGrade] = useState(null);
   const [selectedSubgrade, setSelectedSubgrade] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [versionChecking, setVersionChecking] = useState(true);
+  const [updatePrompt, setUpdatePrompt] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const runVersionCheck = async () => {
+      const result = await checkAppVersionPolicy();
+      if (cancelled) {
+        return;
+      }
+
+      if (result.forceUpdateRequired) {
+        setUpdatePrompt({ mode: 'force', ...result });
+        setVersionChecking(false);
+        return;
+      }
+
+      if (result.optionalUpdateAvailable && result.latestVersion) {
+        const dismissed = await wasOptionalUpdateDismissed(result.latestVersion);
+        if (!dismissed && !cancelled) {
+          setUpdatePrompt({ mode: 'optional', ...result });
+        }
+      }
+
+      setVersionChecking(false);
+    };
+
+    runVersionCheck();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleDismissOptionalUpdate = () => {
+    if (updatePrompt?.latestVersion) {
+      dismissOptionalUpdate(updatePrompt.latestVersion);
+    }
+    setUpdatePrompt(null);
+  };
 
   // Set initial screen only when auth is ready (once). Never show loading again after that.
   useEffect(() => {
@@ -77,14 +122,6 @@ function AppContent() {
   const goBackFromOrderDetails = () => {
     setSelectedOrderId(null);
     setCurrentScreen('orderHistory');
-  };
-
-  const goToAddStudent = () => {
-    setCurrentScreen('addStudent');
-  };
-
-  const goToStudents = () => {
-    setCurrentScreen('students');
   };
 
   const goToManageGrades = () => {
@@ -162,6 +199,29 @@ function AppContent() {
     setCurrentScreen('home');
   };
 
+  if (versionChecking) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.white }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (updatePrompt?.mode === 'force') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.white }}>
+        <AppUpdateModal
+          visible
+          mode="force"
+          message={updatePrompt.message}
+          storeUrl={updatePrompt.storeUrl}
+          minVersion={updatePrompt.minVersion}
+          latestVersion={updatePrompt.latestVersion}
+        />
+      </View>
+    );
+  }
+
   // Show loading only until first auth check completes. After authReady, login/home never unmount due to loading.
   if (!authReady || currentScreen === null) {
     return (
@@ -214,17 +274,13 @@ function AppContent() {
         ) : currentScreen === 'cart' ? (
           <CartScreen onTabPress={handleTabPress} onBack={goBack} onGoToCheckout={goToCheckout} />
         ) : currentScreen === 'profile' ? (
-          <ProfileScreen onTabPress={handleTabPress} onBack={goToLogin} onLogout={goToLogin} onGoToOrderHistory={goToOrderHistory} onGoToStudents={goToStudents} onGoToManageGrades={goToManageGrades} onGoToShippingAddresses={goToShippingAddresses} />
+          <ProfileScreen onTabPress={handleTabPress} onBack={goToLogin} onLogout={goToLogin} onGoToOrderHistory={goToOrderHistory} onGoToManageGrades={goToManageGrades} onGoToShippingAddresses={goToShippingAddresses} />
         ) : currentScreen === 'checkout' ? (
-          <CheckoutScreen onBack={goBack} onPlaceOrder={handlePlaceOrder} />
+          <CheckoutScreen onBack={goToCart} onBackToCart={goToCart} onPlaceOrder={handlePlaceOrder} />
         ) : currentScreen === 'orderHistory' ? (
           <OrderHistoryScreen onTabPress={handleTabPress} onBack={goToProfile} onGoToOrderDetails={goToOrderDetails} />
         ) : currentScreen === 'orderDetails' ? (
           <OrderDetailsScreen onTabPress={handleTabPress} onBack={goBackFromOrderDetails} orderId={selectedOrderId} />
-        ) : currentScreen === 'addStudent' ? (
-          <AddStudentScreen onTabPress={handleTabPress} onBack={goToStudents} />
-        ) : currentScreen === 'students' ? (
-          <StudentsScreen onTabPress={handleTabPress} onBack={goToProfile} onGoToAddStudent={goToAddStudent} />
         ) : currentScreen === 'manageGrades' ? (
           <ManageGradesScreen onTabPress={handleTabPress} onBack={goToProfile} onGoToUpsertGrade={goToUpsertGrade} />
         ) : currentScreen === 'upsertGrade' ? (
@@ -240,6 +296,17 @@ function AppContent() {
             onGoToOrderHistory={goToOrderHistory}
           />
         )}
+      {updatePrompt?.mode === 'optional' ? (
+        <AppUpdateModal
+          visible
+          mode="optional"
+          message={updatePrompt.message}
+          storeUrl={updatePrompt.storeUrl}
+          minVersion={updatePrompt.minVersion}
+          latestVersion={updatePrompt.latestVersion}
+          onDismiss={handleDismissOptionalUpdate}
+        />
+      ) : null}
       <StatusBar style="light" />
     </>
   );

@@ -24,6 +24,7 @@ apiClient.interceptors.request.use(
       if (userId) {
         config.headers['user-id'] = userId;
       }
+      config.headers['X-Order-Channel'] = 'website';
     } catch (error) {
       console.log('Error getting stored data:', error);
     }
@@ -1054,7 +1055,11 @@ class ApiService {
   async updateUserProfile(userId, updateData) {
     try {
       const response = await apiClient.put(`${API_CONFIG.ENDPOINTS.USERS.UPDATE}/${userId}`, updateData);
-      return response.data;
+      const result = response.data;
+      if (result?.success && result.data) {
+        this.storeUserData(result.data);
+      }
+      return result;
     } catch (error) {
       console.error('Update user profile API Error:', error.message);
       if (error.response) {

@@ -19,6 +19,8 @@ const paymentRoutes = require('./routes/payment.routes');
 const orderRoutes = require('./routes/order.routes');
 const imageRoutes = require('./routes/image.routes');
 const userRoutes = require('./routes/user.routes');
+const appRoutes = require('./routes/app.routes');
+const appVersionMiddleware = require('./middleware/appVersionMiddleware');
 
 // Initialize Express app
 const app = express();
@@ -47,6 +49,9 @@ app.use((req, res, next) => {
     next();
 });
 
+// Mobile app version enforcement (separate from student-name checkout gate)
+app.use(appVersionMiddleware);
+
 // Routes
 app.get('/health', (req, res) => {
     res.json({
@@ -67,6 +72,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/app', appRoutes);
 
 // Error handling
 app.use(notFound);

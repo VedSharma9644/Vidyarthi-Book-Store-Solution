@@ -34,6 +34,7 @@ const UpsertBook = () => {
     Author: '',
     Publisher: '',
     ISBN: '',
+    SKU: '',
     Description: '',
     Price: '0.00',
     StockQuantity: '0',
@@ -215,6 +216,7 @@ const UpsertBook = () => {
               Author: book.author || '',
               Publisher: book.publisher || '',
               ISBN: isDuplicateMode ? '' : (book.isbn || ''),
+              SKU: isDuplicateMode ? '' : (book.sku || ''),
               Description: book.description || '',
               Price: book.price?.toString() || '0.00',
               StockQuantity: isDuplicateMode ? '0' : (book.stockQuantity?.toString() || '0'),
@@ -400,6 +402,9 @@ const UpsertBook = () => {
     } else if (formData.ISBN.length > 20) {
       newErrors.ISBN = 'ISBN cannot exceed 20 characters.';
     }
+    if (formData.SKU && formData.SKU.length > 50) {
+      newErrors.SKU = 'SKU cannot exceed 50 characters.';
+    }
     
     if (formData.Description && formData.Description.length > 1000) {
       newErrors.Description = 'Description cannot exceed 1000 characters.';
@@ -455,6 +460,7 @@ const UpsertBook = () => {
         Author: formData.Author,
         Publisher: formData.Publisher || '',
         ISBN: formData.ISBN,
+        SKU: formData.SKU || '',
         Description: formData.Description || '',
         Price: parseFloat(formData.Price) || 0,
         DiscountPrice: null, // Always set to null - discount price field removed
@@ -617,6 +623,28 @@ const UpsertBook = () => {
                   {errors.ISBN && (
                     <span className="text-danger">{errors.ISBN}</span>
                   )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="SKU">
+                    SKU <span className="text-muted">(optional)</span>
+                  </label>
+                  <input
+                    className={`form-control ${errors.SKU ? 'is-invalid' : ''}`}
+                    type="text"
+                    id="SKU"
+                    name="SKU"
+                    maxLength="50"
+                    placeholder="e.g. DPS-C7-TXT-001 — used for Shiprocket; defaults to ISBN"
+                    value={formData.SKU}
+                    onChange={handleChange}
+                  />
+                  {errors.SKU && (
+                    <span className="text-danger">{errors.SKU}</span>
+                  )}
+                  <small className="text-muted">
+                    If blank, ISBN is used as the product SKU for shipping.
+                  </small>
                 </div>
 
                 <div className="mb-3">

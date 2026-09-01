@@ -1,5 +1,8 @@
 const paymentService = require('../services/paymentService');
 const paymentCheckoutAttemptService = require('../services/paymentCheckoutAttemptService');
+const { orderChannelFromRequest } = require('../utils/orderChannel');
+const { mobileStudentNameUpgradeGate } = require('../utils/mobileCheckoutGate');
+const { buildRazorpayCheckoutNotes } = require('../utils/checkoutMetadata');
 
 /**
  * Create Razorpay order
@@ -9,6 +12,7 @@ const createOrder = async (req, res) => {
     try {
         const { amount, receipt, orderingStudent, cartSnapshot, shippingAddress } = req.body;
         const userId = req.headers['user-id'] || req.body.userId;
+        const orderChannel = orderChannelFromRequest(req);
 
         // Validate amount
         if (!amount || amount <= 0) {
@@ -18,25 +22,58 @@ const createOrder = async (req, res) => {
             });
         }
 
-        const rzNotes = userId ? { userId: String(userId) } : null;
-        const order = await paymentService.createOrder(amount, receipt, rzNotes);
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required for checkout',
+            });
+        }
 
-        // Best-effort: record checkout attempt + cart snapshot for webhook / reconciliation (non-blocking for response)
-        if (userId && order?.orderId) {
-            try {
-                await paymentCheckoutAttemptService.recordAttempt({
-                    razorpayOrderId: order.orderId,
-                    userId: String(userId),
-                    amountInr: Number(amount),
-                    receipt: receipt || '',
-                    orderingStudent: orderingStudent || null,
-                    cartSnapshot: cartSnapshot || null,
-                    shippingAddress: shippingAddress || null,
+        const upgradeGate = mobileStudentNameUpgradeGate(req, {
+            orderingStudent,
+            shippingAddress,
+        });
+        if (upgradeGate) {
+            return res.status(upgradeGate.status).json(upgradeGate.body);
+        }
+
+        if (orderChannel === 'website') {
+            const studentName =
+                (orderingStudent?.name && String(orderingStudent.name).trim()) ||
+                (shippingAddress?.studentName && String(shippingAddress.studentName).trim());
+            if (!studentName) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Student name is required for website checkout',
                 });
-            } catch (e) {
-                console.error('paymentCheckoutAttemptService.recordAttempt (non-fatal):', e.message);
             }
         }
+
+        const rzNotes = buildRazorpayCheckoutNotes({
+            userId: String(userId),
+            orderChannel,
+            orderingStudent,
+            shippingAddress,
+        });
+        const order = await paymentService.createOrder(amount, receipt, rzNotes);
+
+        if (!order?.orderId) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to create payment order',
+            });
+        }
+
+        await paymentCheckoutAttemptService.recordAttempt({
+            razorpayOrderId: order.orderId,
+            userId: String(userId),
+            amountInr: Number(amount),
+            receipt: receipt || '',
+            orderingStudent: orderingStudent || null,
+            cartSnapshot: cartSnapshot || null,
+            shippingAddress: shippingAddress || null,
+            orderChannel,
+        });
 
         res.json({
             success: true,

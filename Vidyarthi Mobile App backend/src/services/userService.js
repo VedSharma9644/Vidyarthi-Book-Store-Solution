@@ -1,9 +1,67 @@
 const { db } = require('../config/firebase');
 const { Timestamp } = require('firebase-admin/firestore');
 
+const ALLOWED_USER_UPDATE_FIELDS = new Set([
+    'userName',
+    'firstName',
+    'lastName',
+    'email',
+    'phoneNumber',
+    'phoneNumberConfirmed',
+    'schoolName',
+    'classStandard',
+    'roleName',
+    'address',
+    'addresses',
+    'students',
+    'profileImageUrl',
+    'password',
+]);
+
+function pickAllowedUserUpdateFields(updateData) {
+    const out = {};
+    if (!updateData || typeof updateData !== 'object') return out;
+    for (const key of ALLOWED_USER_UPDATE_FIELDS) {
+        if (updateData[key] !== undefined) {
+            out[key] = updateData[key];
+        }
+    }
+    return out;
+}
+
 class UserService {
     constructor() {
         this.usersRef = db.collection('users');
+    }
+
+    /**
+     * Resolve Firestore user doc when :id is missing (stale client id).
+     * @returns {Promise<{ ref: FirebaseFirestore.DocumentReference, id: string }|null>}
+     */
+    async resolveUserDocForUpdate(userId, hints = {}) {
+        const ref = this.usersRef.doc(userId);
+        const snap = await ref.get();
+        if (snap.exists) {
+            return { ref, id: userId };
+        }
+
+        const phone = hints.phoneNumber && String(hints.phoneNumber).trim();
+        if (phone) {
+            const byPhone = await this.getUserByPhoneNumber(phone);
+            if (byPhone?.id) {
+                return { ref: this.usersRef.doc(byPhone.id), id: byPhone.id };
+            }
+        }
+
+        const email = hints.email && String(hints.email).trim().toLowerCase();
+        if (email) {
+            const byEmail = await this.getUserByEmail(email);
+            if (byEmail?.id) {
+                return { ref: this.usersRef.doc(byEmail.id), id: byEmail.id };
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -176,21 +234,52 @@ class UserService {
      */
     async updateUser(userId, updateData) {
         try {
+            const sanitized = pickAllowedUserUpdateFields(updateData);
+            if (Object.keys(sanitized).length === 0) {
+                const err = new Error('No valid fields to update');
+                err.code = 'INVALID_UPDATE';
+                throw err;
+            }
+
             // Log address updates for debugging
-            if (updateData.addresses && Array.isArray(updateData.addresses)) {
-                console.log(`📍 Updating user ${userId} with ${updateData.addresses.length} address(es)`);
-                updateData.addresses.forEach((addr, index) => {
+            if (sanitized.addresses && Array.isArray(sanitized.addresses)) {
+                console.log(`📍 Updating user ${userId} with ${sanitized.addresses.length} address(es)`);
+                sanitized.addresses.forEach((addr, index) => {
                     console.log(`  Address ${index + 1}: ${addr.name || 'Unnamed'}, ${addr.city || 'No city'}, ${addr.isDefault ? '(Default)' : ''}`);
                 });
             }
-            
-            updateData.updatedAt = Timestamp.now();
-            
-            await this.usersRef.doc(userId).update(updateData);
-            
-            console.log(`✅ User ${userId} updated successfully`);
-            
-            return await this.getUserById(userId);
+
+            const resolved = await this.resolveUserDocForUpdate(userId, {
+                phoneNumber: sanitized.phoneNumber || updateData.phoneNumber,
+                email: sanitized.email || updateData.email,
+            });
+
+            if (!resolved) {
+                const err = new Error(
+                    'User profile not found. Please log out and sign in again with your phone or email.'
+                );
+                err.code = 'USER_NOT_FOUND';
+                throw err;
+            }
+
+            const { ref, id: resolvedId } = resolved;
+            sanitized.updatedAt = Timestamp.now();
+
+            await ref.update(sanitized);
+
+            if (resolvedId !== userId) {
+                console.warn(
+                    `⚠️ User update: client id ${userId} not found; updated Firestore user ${resolvedId} instead`
+                );
+            } else {
+                console.log(`✅ User ${resolvedId} updated successfully`);
+            }
+
+            const user = await this.getUserById(resolvedId);
+            return {
+                user,
+                correctedUserId: resolvedId !== userId ? resolvedId : null,
+            };
         } catch (error) {
             console.error('Error updating user:', error);
             throw error;

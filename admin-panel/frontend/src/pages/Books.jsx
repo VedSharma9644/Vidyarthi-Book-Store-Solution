@@ -327,9 +327,14 @@ const Books = () => {
           <div className="card">
             <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
               <span>Books</span>
-              <Link to="/upsert-book" className="btn btn-dark btn-sm">
-                Add Book
-              </Link>
+              <div className="d-flex gap-2">
+                <Link to="/bulk-upload-books" className="btn btn-light btn-sm">
+                  Bulk Upload
+                </Link>
+                <Link to="/upsert-book" className="btn btn-dark btn-sm">
+                  Add Book
+                </Link>
+              </div>
             </div>
             <div className="card-body">
               <p className="text-muted small mb-3">

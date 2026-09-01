@@ -21,6 +21,7 @@ import {
   buildDefaultSelectedBundles,
 } from '../utils/categoryNames';
 import { getGradeScreenTitle } from '../utils/gradeUtils';
+import ProductTitle from './ProductTitle';
 
 const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName, schoolId, subgradeId, subgradeName }) => {
   const [textbooks, setTextbooks] = useState([]);
@@ -582,9 +583,9 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                             )}
                           </View>
                           <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={{ color: '#0e1b16', fontSize: 15, fontWeight: '500' }} numberOfLines={1}>
+                            <ProductTitle style={{ color: '#0e1b16', fontSize: 15, fontWeight: '500' }}>
                               {item.title}
-                            </Text>
+                            </ProductTitle>
                             <View style={{ marginTop: 6 }}>
                               <View style={{ flexDirection: 'row' }}>
                                 <Text style={{ flex: 1, fontSize: 12, color: '#555' }}>Per Unit</Text>
@@ -681,16 +682,15 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                   )}
                 </View>
                 <View style={{ flex: 1, justifyContent: 'center' }}>
-                  <Text
+                  <ProductTitle
                     style={{
                       color: '#0e1b16',
                       fontSize: 16,
                       fontWeight: '500',
                     }}
-                    numberOfLines={1}
                   >
                     {book.title}
-                  </Text>
+                  </ProductTitle>
                   {/* Code for showing per product price and product quantity in the mobile app*/}
                   <View style={{ marginTop: 6 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -791,16 +791,15 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                   )}
                 </View>
                 <View style={{ flex: 1, justifyContent: 'center' }}>
-                  <Text
+                  <ProductTitle
                     style={{
                       color: '#0e1b16',
                       fontSize: 16,
                       fontWeight: '500',
                     }}
-                    numberOfLines={1}
                   >
                     {book.title}
-                  </Text>
+                  </ProductTitle>
                   <View style={{ marginTop: 6 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Text style={{ flex: 1, fontSize: 12, color: '#555' }}>Per Unit</Text>
@@ -964,16 +963,15 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
 
                         {/* Details */}
                         <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text
+                          <ProductTitle
                             style={{
                               color: '#0e1b16',
                               fontSize: 15,
                               fontWeight: '500',
                             }}
-                            numberOfLines={1}
                           >
                             {item.title}
-                          </Text>
+                          </ProductTitle>
 
                           {/* Per Unit | Qty */}
                           <View style={{ marginTop: 6 }}>

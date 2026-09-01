@@ -9,7 +9,13 @@ import {
 
 const DELIVERY_CHARGE = 300;
 
-const OrderSummary = ({ cartItems, onPlaceOrder, isProcessing }) => {
+const OrderSummary = ({
+  cartItems,
+  onPlaceOrder,
+  isProcessing,
+  placeOrderDisabled = false,
+  placeOrderHint = '',
+}) => {
   const groupItemsByCategory = () => {
     const textbooks = [];
     const mandatoryNotebooks = [];
@@ -99,15 +105,28 @@ const OrderSummary = ({ cartItems, onPlaceOrder, isProcessing }) => {
         </div>
       </div>
 
+      {placeOrderHint ? (
+        <p
+          style={{
+            margin: '0 0 10px',
+            fontSize: 13,
+            color: colors.textSecondary,
+            textAlign: 'center',
+          }}
+        >
+          {placeOrderHint}
+        </p>
+      ) : null}
+
       <button
         style={{
           ...checkoutStyles.placeOrderButton,
-          ...(isProcessing && checkoutStyles.placeOrderButtonDisabled),
+          ...((isProcessing || placeOrderDisabled) && checkoutStyles.placeOrderButtonDisabled),
         }}
         onClick={onPlaceOrder}
-        disabled={isProcessing || cartItems.length === 0}
+        disabled={isProcessing || cartItems.length === 0 || placeOrderDisabled}
         onMouseEnter={(e) => {
-          if (!isProcessing && cartItems.length > 0) {
+          if (!isProcessing && cartItems.length > 0 && !placeOrderDisabled) {
             Object.assign(e.currentTarget.style, checkoutStyles.placeOrderButtonHover);
           }
         }}

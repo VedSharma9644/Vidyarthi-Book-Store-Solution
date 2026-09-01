@@ -1,0 +1,15 @@
+https://techqa1.translations.com/issues/?jql=status%20in%20(Open%2C%20%22In%20Progress%22%2C%20Reopened)%20AND%20Sprint%20%3D%203677%20AND%20assignee%20in%20(prishah)%20ORDER%20BY%20assignee%20DESC%2C%20priority%2C%20urgency%2C%20due%20ASC
+Username: prishah
+Password: LMSPassYear2026
+
+==============================================================================================================================================================================
+
+
+Please join the meeting to do quick review of the active tickets for each developer and ensure the mandatory fields are updated right in the call itself.  Please share your screen to view the assigned tickets and update at least the following fields during the sharing itself.
+
+Story Point
+Urgency – can’t be 5_Medium to Low
+Cc – add your name
+QA Tester – Assign Elena if you’re not aware of the QA tester
+Due Date
+Sprint

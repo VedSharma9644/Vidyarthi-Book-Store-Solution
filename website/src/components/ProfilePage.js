@@ -212,9 +212,6 @@ const ProfilePage = () => {
       case 'Payment Methods':
         alert('Payment methods will be implemented');
         break;
-      case 'Students':
-        navigate('/profile/students');
-        break;
       case 'Shipping Address':
         navigate('/profile/shipping-addresses');
         break;
@@ -540,27 +537,6 @@ const ProfilePage = () => {
                 <span style={profileStyles.optionIcon}>💳</span>
               </div>
               <h3 style={profileStyles.optionTitle}>Payment Methods</h3>
-            </div>
-            <span style={profileStyles.chevronIcon}>›</span>
-          </div>
-
-          <div
-            style={profileStyles.optionItem}
-            onClick={() => handleAccountOption('Students')}
-            onMouseEnter={(e) => {
-              Object.assign(e.currentTarget.style, profileStyles.optionItemHover);
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = colors.gray50;
-              e.currentTarget.style.borderColor = colors.borderLight;
-              e.currentTarget.style.transform = 'translateX(0)';
-            }}
-          >
-            <div style={profileStyles.optionLeft}>
-              <div style={profileStyles.optionIconContainer}>
-                <span style={profileStyles.optionIcon}>🎓</span>
-              </div>
-              <h3 style={profileStyles.optionTitle}>Students</h3>
             </div>
             <span style={profileStyles.chevronIcon}>›</span>
           </div>

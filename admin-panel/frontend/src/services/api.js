@@ -119,6 +119,20 @@ export const booksAPI = {
   create: (data) => api.post('/api/books', data),
   update: (id, data) => api.put(`/api/books/${id}`, data),
   delete: (id) => api.delete(`/api/books/${id}`),
+  downloadBulkTemplate: () =>
+    api.get('/api/books/bulk-import/template', { responseType: 'blob' }),
+  bulkImport: ({ file, schoolId, gradeId, subgradeId, dryRun }) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('schoolId', schoolId);
+    formData.append('gradeId', gradeId);
+    if (subgradeId) formData.append('subgradeId', subgradeId);
+    formData.append('dryRun', dryRun ? 'true' : 'false');
+    return api.post('/api/books/bulk-import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+  },
 };
 
 // Upload API
@@ -149,6 +163,11 @@ export const uploadAPI = {
 // Orders API
 export const ordersAPI = {
   getAll: (params) => dedupedGet('/api/orders', { params }),
+  exportExcel: (params) =>
+    api.get('/api/orders/export', {
+      params,
+      responseType: 'blob',
+    }),
   getById: (id) => api.get(`/api/orders/${id}`),
   updateStatus: (id, data) => api.put(`/api/orders/${id}/status`, data),
   createShiprocketOrder: (id) => api.post(`/api/orders/${id}/shiprocket`),

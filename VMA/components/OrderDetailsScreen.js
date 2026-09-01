@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
+import ProductTitle from './ProductTitle';
 
 const OrderDetailsScreen = ({ onTabPress, onBack, orderId }) => {
   const [orderData, setOrderData] = useState(null);
@@ -404,9 +405,9 @@ const OrderDetailsScreen = ({ onTabPress, onBack, orderId }) => {
                             )}
                           </View>
                           <View style={[styles.orderDetailsItemContent, { flex: 1 }]}>
-                            <Text style={styles.orderDetailsItemTitle} numberOfLines={2}>
+                            <ProductTitle style={styles.orderDetailsItemTitle}>
                               {item.title || item.bookTitle || item.name || 'Unknown Product'}
-                            </Text>
+                            </ProductTitle>
                             <Text style={styles.orderDetailsItemQuantity}>
                               Quantity: {itemQuantity} × ₹{itemPrice.toFixed(2)}
                             </Text>

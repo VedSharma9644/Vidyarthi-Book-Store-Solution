@@ -37,15 +37,30 @@ const updateUser = async (req, res) => {
     delete updateData.id;
     delete updateData.createdAt;
 
-    const updatedUser = await userService.updateUser(id, updateData);
+    const { user: updatedUser, correctedUserId } = await userService.updateUser(id, updateData);
 
     res.json({
       success: true,
       message: 'User updated successfully',
       data: updatedUser,
+      ...(correctedUserId ? { correctedUserId } : {}),
     });
   } catch (error) {
     console.error('Error updating user:', error);
+    if (error.code === 'USER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+        code: error.code,
+      });
+    }
+    if (error.code === 'INVALID_UPDATE') {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        code: error.code,
+      });
+    }
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update user',

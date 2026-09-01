@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Categories from './pages/Categories';
 import UpsertCategory from './pages/UpsertCategory';
 import Books from './pages/Books';
+import BulkUploadBooks from './pages/BulkUploadBooks';
 import UpsertBook from './pages/UpsertBook';
 import Inventory from './pages/Inventory';
 import Schools from './pages/Schools';
@@ -98,6 +99,7 @@ function App() {
                   <Route path="/get-all-categories" element={<Categories />} />
                   <Route path="/upsert-category" element={<UpsertCategory />} />
                   <Route path="/get-all-books" element={<Books />} />
+                  <Route path="/bulk-upload-books" element={<BulkUploadBooks />} />
                   <Route path="/upsert-book" element={<UpsertBook />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/get-all-schools" element={<Schools />} />

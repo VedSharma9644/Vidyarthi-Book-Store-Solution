@@ -2,6 +2,7 @@ const { db } = require('../config/firebase');
 const { Timestamp, FieldValue } = require('firebase-admin/firestore');
 const cartService = require('./cartService');
 const userService = require('./userService');
+const { resolveProductSku } = require('../utils/productSku');
 
 /** Book types that are mandatory: if out of stock, entire grade order is blocked */
 const MANDATORY_BOOK_TYPES = ['TEXTBOOK', 'MANDATORY_NOTEBOOK'];
@@ -37,6 +38,72 @@ function hasMeaningfulShippingFields(addr) {
     );
 }
 
+/** Display name for parent / account holder (matches website profile priority). */
+function buildCustomerDisplayName(user) {
+    if (!user) {
+        return 'Customer';
+    }
+    const parentFull = user.parentFullName != null ? String(user.parentFullName).trim() : '';
+    if (parentFull) {
+        return parentFull;
+    }
+    if (user.firstName && user.lastName) {
+        return `${user.firstName} ${user.lastName}`.trim();
+    }
+    if (user.firstName) {
+        return String(user.firstName).trim();
+    }
+    if (user.lastName) {
+        return String(user.lastName).trim();
+    }
+    if (user.userName) {
+        return String(user.userName).trim();
+    }
+    if (user.email) {
+        return String(user.email).trim();
+    }
+    return 'Customer';
+}
+
+/**
+ * Student this order is for — checkout orderingStudent or legacy shippingAddress.studentName.
+ * @param {object|null} orderingStudent
+ * @param {object|null} shippingAddress
+ * @returns {object|null}
+ */
+function buildOrderingForStudent(orderingStudent, shippingAddress = null) {
+    const fromCheckout =
+        orderingStudent &&
+        typeof orderingStudent.name === 'string' &&
+        orderingStudent.name.trim();
+    const nameSource = fromCheckout
+        ? orderingStudent.name.trim()
+        : shippingAddress?.studentName && String(shippingAddress.studentName).trim();
+    if (!nameSource) {
+        return null;
+    }
+    const source = fromCheckout ? orderingStudent : { id: '', name: nameSource };
+    return {
+        id: source.id != null && String(source.id).trim() ? String(source.id) : null,
+        name: nameSource,
+        age: source.age != null ? String(source.age) : null,
+        gender: source.gender != null ? String(source.gender) : null,
+        schoolLabel: source.schoolLabel != null ? String(source.schoolLabel) : null,
+        gradeLabel: source.gradeLabel != null ? String(source.gradeLabel) : null,
+    };
+}
+
+/** Persist student name on shipping snapshot when checkout supplies it separately. */
+function attachStudentToShippingAddress(shippingAddress, orderingForStudent) {
+    if (!shippingAddress || !orderingForStudent?.name) {
+        return shippingAddress;
+    }
+    return {
+        ...shippingAddress,
+        studentName: orderingForStudent.name,
+    };
+}
+
 /** Default saved address from profile (`addresses[]` or legacy `address`). */
 function pickUserDefaultAddress(user) {
     if (!user) {
@@ -70,12 +137,9 @@ function buildFinalShippingAddress(shippingAddress, user) {
         return null;
     }
 
-    const customerName =
-        user && user.firstName && user.lastName
-            ? `${user.firstName} ${user.lastName}`.trim()
-            : user?.firstName || user?.userName || user?.parentFullName || 'Customer';
+    const customerName = buildCustomerDisplayName(user);
 
-    return {
+    const built = {
         name: String(raw.name || '').trim() || customerName,
         phone: String(raw.phone || user?.phoneNumber || '').trim() || null,
         address: String(raw.address || raw.line1 || raw.street || '').trim() || null,
@@ -86,6 +150,15 @@ function buildFinalShippingAddress(shippingAddress, user) {
         ).trim() || null,
         country: String(raw.country || 'India').trim() || 'India',
     };
+    const studentName = String(raw.studentName || '').trim();
+    if (studentName) {
+        built.studentName = studentName;
+    }
+    const studentRollNumber = String(raw.studentRollNumber || '').trim();
+    if (studentRollNumber) {
+        built.studentRollNumber = studentRollNumber;
+    }
+    return built;
 }
 
 /**
@@ -229,6 +302,7 @@ class OrderService {
 
             // Pre-validate inventory (before transaction). Each cart item consumes (quantity * productQuantity) units.
             const insufficientItems = [];
+            const bookMetaByItemId = {};
             for (const item of cart.items) {
                 const bookDoc = await this.booksRef.doc(item.itemId).get();
                 if (!bookDoc.exists) {
@@ -239,6 +313,10 @@ class OrderService {
                     continue;
                 }
                 const bookData = bookDoc.data();
+                bookMetaByItemId[item.itemId] = {
+                    sku: bookData.sku || '',
+                    isbn: bookData.isbn || '',
+                };
                 const stockQuantity = parseInt(bookData.stockQuantity, 10) || 0;
                 const cartQty = parseInt(item.quantity, 10) || 1;
                 const unitsPerOrder = parseInt(bookData.productQuantity, 10) || 1;
@@ -263,9 +341,16 @@ class OrderService {
             const tax = 0; // No tax applied; order total = amount paid
             const total = subtotal + deliveryCharge;
 
-            const orderNumber = this.generateOrderNumber();
+            const orderNumber = await this.generateOrderNumber();
 
-            const finalShippingAddress = buildFinalShippingAddress(shippingAddress, user);
+            let finalShippingAddress = buildFinalShippingAddress(shippingAddress, user);
+            const orderingForStudent = buildOrderingForStudent(orderingStudent, shippingAddress);
+            if (orderingForStudent) {
+                finalShippingAddress = attachStudentToShippingAddress(
+                    finalShippingAddress,
+                    orderingForStudent
+                );
+            }
             if (finalShippingAddress) {
                 console.log(
                     `✅ Shipping address for order ${orderNumber}: ${finalShippingAddress.name}, ${finalShippingAddress.city || '(no city)'}`
@@ -274,49 +359,41 @@ class OrderService {
                 console.warn(`⚠️ No shipping address available for order ${orderNumber}`);
             }
 
-            const orderingForStudent =
-                orderingStudent &&
-                typeof orderingStudent.name === 'string' &&
-                orderingStudent.name.trim()
-                    ? {
-                        id: orderingStudent.id != null ? String(orderingStudent.id) : null,
-                        name: orderingStudent.name.trim(),
-                        age: orderingStudent.age != null ? String(orderingStudent.age) : null,
-                        gender: orderingStudent.gender != null ? String(orderingStudent.gender) : null,
-                        schoolLabel:
-                            orderingStudent.schoolLabel != null
-                                ? String(orderingStudent.schoolLabel)
-                                : null,
-                        gradeLabel:
-                            orderingStudent.gradeLabel != null
-                                ? String(orderingStudent.gradeLabel)
-                                : null,
-                    }
-                    : null;
-
+            const customerDisplayName = buildCustomerDisplayName(user);
             const orderData = {
                 orderNumber: orderNumber,
                 userId: userId,
                 customerInfo: {
-                    name: user.firstName && user.lastName
-                        ? `${user.firstName} ${user.lastName}`.trim()
-                        : user.firstName || user.userName || 'Customer',
+                    name: customerDisplayName,
+                    parentFullName:
+                        user.parentFullName != null ? String(user.parentFullName).trim() : null,
                     email: user.email || null,
                     phoneNumber: user.phoneNumber || null,
                     schoolName: user.schoolName || null,
                     classStandard: user.classStandard || null,
                 },
                 orderingForStudent,
-                items: cart.items.map((item) => ({
-                    itemId: item.itemId,
-                    title: item.title,
-                    author: item.author,
-                    coverImageUrl: item.coverImageUrl || '',
-                    price: item.price,
-                    quantity: item.quantity,
-                    subtotal: item.subtotal || (item.price * item.quantity),
-                    bookType: item.bookType || '',
-                })),
+                items: cart.items.map((item, index) => {
+                    const meta = bookMetaByItemId[item.itemId] || {};
+                    const sku = resolveProductSku({
+                        sku: meta.sku,
+                        isbn: meta.isbn,
+                        itemId: item.itemId,
+                        index,
+                    });
+                    return {
+                        itemId: item.itemId,
+                        title: item.title,
+                        author: item.author,
+                        coverImageUrl: item.coverImageUrl || '',
+                        price: item.price,
+                        quantity: item.quantity,
+                        subtotal: item.subtotal || item.price * item.quantity,
+                        bookType: item.bookType || '',
+                        isbn: meta.isbn || '',
+                        sku,
+                    };
+                }),
                 subtotal: subtotal,
                 deliveryCharge: deliveryCharge,
                 tax: tax,
@@ -327,6 +404,8 @@ class OrderService {
                 razorpayOrderId: paymentData.razorpayOrderId,
                 razorpayPaymentId: paymentData.razorpayPaymentId,
                 razorpaySignature: paymentData.razorpaySignature,
+                fulfillmentSource: paymentData.fulfillmentSource || 'client',
+                ...(paymentData.orderChannel ? { orderChannel: paymentData.orderChannel } : {}),
                 shippingAddress: finalShippingAddress,
                 trackingNumber: null,
                 createdAt: Timestamp.now(),
@@ -485,6 +564,61 @@ class OrderService {
     }
 
     /**
+     * Backfill website/mobile checkout metadata when webhook created the order first.
+     * @param {string} orderDocId
+     * @param {{ orderingStudent?: object|null, orderChannel?: string|null, shippingAddress?: object|null }} meta
+     * @param {string|null} [userId]
+     * @returns {Promise<object|null>}
+     */
+    async patchOrderCheckoutMetadataIfMissing(orderDocId, meta = {}, userId = null) {
+        if (!orderDocId) {
+            return null;
+        }
+        const orderRef = this.ordersRef.doc(orderDocId);
+        const orderSnap = await orderRef.get();
+        if (!orderSnap.exists) {
+            return null;
+        }
+        const data = orderSnap.data();
+        const updates = {};
+
+        const channel = meta.orderChannel ? String(meta.orderChannel).trim() : '';
+        if (!data.orderChannel && channel) {
+            updates.orderChannel = channel;
+        }
+
+        const hasStudent =
+            data.orderingForStudent?.name && String(data.orderingForStudent.name).trim();
+        const orderingForStudent = buildOrderingForStudent(
+            meta.orderingStudent || null,
+            meta.shippingAddress || null
+        );
+        if (!hasStudent && orderingForStudent) {
+            updates.orderingForStudent = orderingForStudent;
+            const shipBase =
+                data.shippingAddress && hasMeaningfulShippingFields(data.shippingAddress)
+                    ? data.shippingAddress
+                    : buildFinalShippingAddress(meta.shippingAddress, null);
+            if (shipBase) {
+                updates.shippingAddress = attachStudentToShippingAddress(
+                    shipBase,
+                    orderingForStudent
+                );
+            }
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return { id: orderSnap.id, ...data };
+        }
+
+        updates.updatedAt = Timestamp.now();
+        await orderRef.update(updates);
+        console.log(`📋 Patched checkout metadata on order ${orderSnap.id}`);
+        const updated = await orderRef.get();
+        return { id: updated.id, ...updated.data() };
+    }
+
+    /**
      * Normalize client snapshot lines to order line items (enrich from `books` when needed).
      * @param {Array<object>} rawLines
      * @returns {Promise<Array<object>>}
@@ -507,6 +641,8 @@ class OrderService {
             let price = parseFloat(raw.price) || 0;
             let bookType = raw.bookType != null ? String(raw.bookType) : '';
             let productQuantity = raw.productQuantity != null ? parseInt(raw.productQuantity, 10) : null;
+            let isbn = raw.isbn != null ? String(raw.isbn) : '';
+            let skuRaw = raw.sku != null ? String(raw.sku) : '';
 
             const bookSnap = await this.booksRef.doc(itemId).get();
             if (bookSnap.exists) {
@@ -529,11 +665,24 @@ class OrderService {
                 if (productQuantity == null || Number.isNaN(productQuantity)) {
                     productQuantity = parseInt(b.productQuantity, 10) || 1;
                 }
+                if (!isbn && b.isbn) {
+                    isbn = String(b.isbn);
+                }
+                if (!skuRaw && b.sku) {
+                    skuRaw = String(b.sku);
+                }
             } else {
                 if (productQuantity == null || Number.isNaN(productQuantity)) {
                     productQuantity = 1;
                 }
             }
+
+            const sku = resolveProductSku({
+                sku: skuRaw,
+                isbn,
+                itemId,
+                index: out.length,
+            });
 
             out.push({
                 itemId,
@@ -545,6 +694,8 @@ class OrderService {
                 productQuantity,
                 subtotal: price * quantity,
                 bookType,
+                isbn: isbn || '',
+                sku,
             });
         }
         return out;
@@ -604,47 +755,35 @@ class OrderService {
             const deliveryCharge = 300;
             const tax = 0;
             const total = subtotal + deliveryCharge;
-            const orderNumber = this.generateOrderNumber();
+            const orderNumber = await this.generateOrderNumber();
 
-            const finalShippingAddress = buildFinalShippingAddress(shippingAddress, user);
+            let finalShippingAddress = buildFinalShippingAddress(shippingAddress, user);
+            const orderingForStudent = buildOrderingForStudent(orderingStudent, shippingAddress);
+            if (orderingForStudent) {
+                finalShippingAddress = attachStudentToShippingAddress(
+                    finalShippingAddress,
+                    orderingForStudent
+                );
+            }
             if (!finalShippingAddress) {
                 console.warn(`⚠️ No shipping address available for snapshot order ${orderNumber}`);
             }
 
-            const orderingForStudent =
-                orderingStudent &&
-                typeof orderingStudent.name === 'string' &&
-                orderingStudent.name.trim()
-                    ? {
-                        id: orderingStudent.id != null ? String(orderingStudent.id) : null,
-                        name: orderingStudent.name.trim(),
-                        age: orderingStudent.age != null ? String(orderingStudent.age) : null,
-                        gender: orderingStudent.gender != null ? String(orderingStudent.gender) : null,
-                        schoolLabel:
-                            orderingStudent.schoolLabel != null
-                                ? String(orderingStudent.schoolLabel)
-                                : null,
-                        gradeLabel:
-                            orderingStudent.gradeLabel != null
-                                ? String(orderingStudent.gradeLabel)
-                                : null,
-                    }
-                    : null;
-
+            const customerDisplayName = buildCustomerDisplayName(user);
             const orderData = {
                 orderNumber,
                 userId,
                 customerInfo: {
-                    name: user.firstName && user.lastName
-                        ? `${user.firstName} ${user.lastName}`.trim()
-                        : user.firstName || user.userName || 'Customer',
+                    name: customerDisplayName,
+                    parentFullName:
+                        user.parentFullName != null ? String(user.parentFullName).trim() : null,
                     email: user.email || null,
                     phoneNumber: user.phoneNumber || null,
                     schoolName: user.schoolName || null,
                     classStandard: user.classStandard || null,
                 },
                 orderingForStudent,
-                items: lineItems.map((item) => ({
+                items: lineItems.map((item, index) => ({
                     itemId: item.itemId,
                     title: item.title,
                     author: item.author,
@@ -653,6 +792,15 @@ class OrderService {
                     quantity: item.quantity,
                     subtotal: item.subtotal || item.price * item.quantity,
                     bookType: item.bookType || '',
+                    isbn: item.isbn || '',
+                    sku:
+                        item.sku ||
+                        resolveProductSku({
+                            sku: item.sku,
+                            isbn: item.isbn,
+                            itemId: item.itemId,
+                            index,
+                        }),
                 })),
                 subtotal,
                 deliveryCharge,
@@ -669,6 +817,7 @@ class OrderService {
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
                 fulfillmentSource: paymentData.fulfillmentSource || 'server_snapshot',
+                ...(paymentData.orderChannel ? { orderChannel: paymentData.orderChannel } : {}),
             };
 
             const cart = await cartService.getOrCreateCart(userId);
@@ -798,14 +947,37 @@ class OrderService {
     }
 
     /**
-     * Generate unique order number
-     * @returns {string} Order number
+     * Generate unique order number: ORD-YYYYMMDD-00001 (IST date + daily sequence).
+     * Existing orders keep their stored orderNumber; only new creates use this.
+     * @returns {Promise<string>}
      */
-    generateOrderNumber() {
-        const now = new Date();
-        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-        const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-        return `ORD-${dateStr}-${randomStr}`;
+    async generateOrderNumber() {
+        const dateStr = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        })
+            .format(new Date())
+            .replace(/-/g, '');
+
+        const counterRef = db.collection('counters').doc(`orders_${dateStr}`);
+        const seq = await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(counterRef);
+            const next = (snap.exists ? Number(snap.data().seq) || 0 : 0) + 1;
+            transaction.set(
+                counterRef,
+                {
+                    seq: next,
+                    dateKey: dateStr,
+                    updatedAt: Timestamp.now(),
+                },
+                { merge: true }
+            );
+            return next;
+        });
+
+        return `ORD-${dateStr}-${String(seq).padStart(5, '0')}`;
     }
 }
 

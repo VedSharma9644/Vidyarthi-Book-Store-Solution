@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, getApiUrl } from '../config/apiConfig';
+import { getAppPlatform, getAppVersion } from '../utils/appVersion';
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -26,6 +26,15 @@ apiClient.interceptors.request.use(
       if (userId) {
         config.headers['user-id'] = userId;
       }
+
+      const appVersion = getAppVersion();
+      const appPlatform = getAppPlatform();
+      if (appVersion) {
+        config.headers['X-App-Version'] = appVersion;
+      }
+      if (appPlatform) {
+        config.headers['X-App-Platform'] = appPlatform;
+      }
     } catch (error) {
       console.log('Error getting stored data:', error);
     }
@@ -49,6 +58,29 @@ apiClient.interceptors.response.use(
 
 // API Service Class
 class ApiService {
+  // App version policy (public — no auth required)
+  async getVersionPolicy(platform, version) {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.APP.VERSION_POLICY, {
+        params: { platform, version },
+        timeout: API_CONFIG.TIMEOUT,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get version policy API Error:', error.message);
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || 'Failed to load version policy',
+        };
+      }
+      return {
+        success: false,
+        message: 'Cannot connect to server to check app version.',
+      };
+    }
+  }
+
   // Health Check
   async healthCheck() {
     try {

@@ -4,6 +4,57 @@ const { FieldValue } = require('firebase-admin/firestore');
 const COLLECTION = 'payment_checkout_attempts';
 
 /**
+ * @param {object|null|undefined} orderingStudent
+ * @returns {object|null}
+ */
+/**
+ * Firestore rejects `undefined` — always emit numeric productQuantity/subtotal.
+ * @param {object} row
+ * @returns {object|null} null when itemId missing
+ */
+function sanitizeCartSnapshotLine(row) {
+    if (!row || row.itemId == null || row.itemId === '') {
+        return null;
+    }
+    const price = row.price != null ? Number(row.price) : 0;
+    const quantity = Math.max(1, parseInt(row.quantity, 10) || 1);
+    const productQuantity =
+        row.productQuantity != null ? Math.max(1, parseInt(row.productQuantity, 10) || 1) : 1;
+    const subtotal =
+        row.subtotal != null && !Number.isNaN(Number(row.subtotal))
+            ? Number(row.subtotal)
+            : price * quantity;
+
+    return {
+        itemId: String(row.itemId),
+        title: row.title != null ? String(row.title).slice(0, 500) : '',
+        author: row.author != null ? String(row.author).slice(0, 300) : '',
+        coverImageUrl: row.coverImageUrl != null ? String(row.coverImageUrl).slice(0, 2000) : '',
+        price,
+        quantity,
+        bookType: row.bookType != null ? String(row.bookType).slice(0, 80) : '',
+        productQuantity,
+        subtotal,
+    };
+}
+
+function snapshotOrderingForStudent(orderingStudent) {
+    if (!orderingStudent || typeof orderingStudent.name !== 'string' || !orderingStudent.name.trim()) {
+        return null;
+    }
+    return {
+        id: orderingStudent.id != null ? String(orderingStudent.id) : null,
+        name: orderingStudent.name.trim(),
+        age: orderingStudent.age != null ? String(orderingStudent.age) : null,
+        gender: orderingStudent.gender != null ? String(orderingStudent.gender) : null,
+        schoolLabel:
+            orderingStudent.schoolLabel != null ? String(orderingStudent.schoolLabel) : null,
+        gradeLabel:
+            orderingStudent.gradeLabel != null ? String(orderingStudent.gradeLabel) : null,
+    };
+}
+
+/**
  * @param {import('firebase-admin/firestore').Timestamp | Date | object} createdAt
  * @returns {number|null} epoch ms
  */
@@ -38,6 +89,7 @@ class PaymentCheckoutAttemptService {
      * @param {object|null} [params.orderingStudent] - Same shape as order.orderingForStudent (optional)
      * @param {Array<object>|null} [params.cartSnapshot] - Line items at checkout (for webhook/reconcile)
      * @param {object|null} [params.shippingAddress] - Shipping address at checkout (optional)
+     * @param {'website'|'android'|'ios'|null} [params.orderChannel]
      */
     async recordAttempt({
         razorpayOrderId,
@@ -47,6 +99,7 @@ class PaymentCheckoutAttemptService {
         orderingStudent = null,
         cartSnapshot = null,
         shippingAddress = null,
+        orderChannel = null,
     }) {
         if (!razorpayOrderId || !userId) {
             return;
@@ -103,6 +156,22 @@ class PaymentCheckoutAttemptService {
                     }
                 }
             }
+            const existingData = existing.data() || {};
+            const mergeUpdates = {};
+            if (orderChannel && !existingData.orderChannel) {
+                mergeUpdates.orderChannel = orderChannel;
+            }
+            const prevStudent = existingData.orderingForStudent;
+            const prevHasStudent =
+                prevStudent?.name && String(prevStudent.name).trim();
+            const studentSnap = snapshotOrderingForStudent(orderingStudent);
+            if (!prevHasStudent && studentSnap) {
+                mergeUpdates.orderingForStudent = studentSnap;
+            }
+            if (Object.keys(mergeUpdates).length > 0) {
+                mergeUpdates.updatedAt = FieldValue.serverTimestamp();
+                await ref.update(mergeUpdates);
+            }
             return;
         }
 
@@ -110,22 +179,8 @@ class PaymentCheckoutAttemptService {
         if (Array.isArray(cartSnapshot) && cartSnapshot.length > 0) {
             snapshotLines = cartSnapshot
                 .slice(0, 80)
-                .map((row) => ({
-                    itemId: row.itemId != null ? String(row.itemId) : '',
-                    title: row.title != null ? String(row.title).slice(0, 500) : '',
-                    author: row.author != null ? String(row.author).slice(0, 300) : '',
-                    coverImageUrl: row.coverImageUrl != null ? String(row.coverImageUrl).slice(0, 2000) : '',
-                    price: row.price != null ? Number(row.price) : 0,
-                    quantity: Math.max(1, parseInt(row.quantity, 10) || 1),
-                    bookType: row.bookType != null ? String(row.bookType).slice(0, 80) : '',
-                    productQuantity:
-                        row.productQuantity != null ? parseInt(row.productQuantity, 10) || 1 : undefined,
-                    subtotal:
-                        row.subtotal != null
-                            ? Number(row.subtotal)
-                            : undefined,
-                }))
-                .filter((r) => r.itemId);
+                .map((row) => sanitizeCartSnapshotLine(row))
+                .filter(Boolean);
             if (snapshotLines.length === 0) {
                 snapshotLines = null;
             }
@@ -164,17 +219,12 @@ class PaymentCheckoutAttemptService {
         if (shipSnap) {
             payload.shippingAddress = shipSnap;
         }
-        if (orderingStudent && typeof orderingStudent.name === 'string' && orderingStudent.name.trim()) {
-            payload.orderingForStudent = {
-                id: orderingStudent.id != null ? String(orderingStudent.id) : null,
-                name: orderingStudent.name.trim(),
-                age: orderingStudent.age != null ? String(orderingStudent.age) : null,
-                gender: orderingStudent.gender != null ? String(orderingStudent.gender) : null,
-                schoolLabel:
-                    orderingStudent.schoolLabel != null ? String(orderingStudent.schoolLabel) : null,
-                gradeLabel:
-                    orderingStudent.gradeLabel != null ? String(orderingStudent.gradeLabel) : null,
-            };
+        if (orderChannel) {
+            payload.orderChannel = orderChannel;
+        }
+        const studentSnap = snapshotOrderingForStudent(orderingStudent);
+        if (studentSnap) {
+            payload.orderingForStudent = studentSnap;
         }
         await ref.set(payload);
     }

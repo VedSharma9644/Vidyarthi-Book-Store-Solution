@@ -1,5 +1,7 @@
 const orderService = require('../services/orderService');
-const paymentCheckoutAttemptService = require('../services/paymentCheckoutAttemptService');
+const { fulfillCapturedPaymentIfNeeded } = require('../services/capturedPaymentFulfillmentService');
+const { orderChannelFromRequest } = require('../utils/orderChannel');
+const { mobileStudentNameUpgradeGate } = require('../utils/mobileCheckoutGate');
 
 /**
  * Validate cart for checkout (inventory check only).
@@ -45,7 +47,7 @@ const validateCartForCheckout = async (req, res) => {
 };
 
 /**
- * Create order after payment
+ * Create order after payment (atomic — same path as webhook / reconciliation).
  * @route POST /api/orders/create
  */
 const createOrder = async (req, res) => {
@@ -58,6 +60,7 @@ const createOrder = async (req, res) => {
 
         const userId = req.headers['user-id'] || req.body.userId;
         const { paymentData, shippingAddress, orderingStudent } = req.body;
+        const orderChannel = orderChannelFromRequest(req);
 
         if (!userId) {
             console.error('❌ Order creation failed: User ID is missing');
@@ -79,12 +82,63 @@ const createOrder = async (req, res) => {
             });
         }
 
-        const existing = await orderService.findOrderByRazorpayOrderId(paymentData.razorpayOrderId);
-        if (existing) {
-            let orderPayload = existing;
+        const upgradeGate = mobileStudentNameUpgradeGate(req, {
+            orderingStudent,
+            shippingAddress,
+        });
+        if (upgradeGate) {
+            return res.status(upgradeGate.status).json(upgradeGate.body);
+        }
+
+        console.log(
+            `📦 Fulfilling order for user: ${userId}, Razorpay Order: ${paymentData.razorpayOrderId}`
+        );
+
+        const result = await fulfillCapturedPaymentIfNeeded({
+            razorpayOrderId: paymentData.razorpayOrderId,
+            razorpayPaymentId: paymentData.razorpayPaymentId,
+            source: 'client',
+            razorpaySignature: paymentData.razorpaySignature,
+            clientUserId: userId,
+            shippingAddress: shippingAddress || null,
+            orderingStudent: orderingStudent || null,
+            orderChannel,
+        });
+
+        if (!result.ok) {
+            const reason = result.reason || 'fulfillment_failed';
+            if (reason === 'user_mismatch') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Payment does not belong to this account',
+                });
+            }
+            if (reason.startsWith('payment_not_captured')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Payment has not been captured yet',
+                });
+            }
+            if (reason === 'fulfillment_in_progress') {
+                return res.status(503).json({
+                    success: false,
+                    message: 'Order is being created. Please check My Orders in a moment.',
+                    code: 'FULFILLMENT_IN_PROGRESS',
+                });
+            }
+            console.error('❌ Order fulfillment failed:', reason);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to create order',
+                reason,
+            });
+        }
+
+        let orderPayload = result.order;
+        if (orderPayload?.id) {
             try {
                 const patched = await orderService.patchShippingAddressIfMissing(
-                    existing.id,
+                    orderPayload.id,
                     shippingAddress,
                     userId
                 );
@@ -95,54 +149,34 @@ const createOrder = async (req, res) => {
                 console.error('patchShippingAddressIfMissing (non-fatal):', patchErr.message);
             }
             try {
-                await paymentCheckoutAttemptService.markFulfilled(paymentData.razorpayOrderId, {
-                    source: 'client_idempotent',
-                    orderDocId: existing.id,
-                });
-            } catch (e) {
-                console.error('paymentCheckoutAttemptService.markFulfilled (non-fatal):', e.message);
+                const metaPatched = await orderService.patchOrderCheckoutMetadataIfMissing(
+                    orderPayload.id,
+                    { orderingStudent, orderChannel, shippingAddress },
+                    userId
+                );
+                if (metaPatched) {
+                    orderPayload = metaPatched;
+                }
+            } catch (metaErr) {
+                console.error('patchOrderCheckoutMetadataIfMissing (non-fatal):', metaErr.message);
             }
-            return res.json({
-                success: true,
-                data: orderPayload,
-                message: 'Order already exists',
-            });
         }
 
-        // Log shipping address information
-        console.log(`📦 Creating order for user: ${userId}, Razorpay Order: ${paymentData.razorpayOrderId}`);
-        if (shippingAddress) {
-            console.log(`📍 Shipping address provided:`, {
-                hasName: !!shippingAddress.name,
-                hasPhone: !!shippingAddress.phone,
-                hasAddress: !!shippingAddress.address,
-                hasCity: !!shippingAddress.city,
-                hasState: !!shippingAddress.state,
-                hasPostalCode: !!shippingAddress.postalCode,
-                hasCountry: !!shippingAddress.country,
-            });
+        const message = result.created ? 'Order created successfully' : 'Order already exists';
+        if (result.created) {
+            console.log(
+                `✅ Order created successfully: ${orderPayload.orderNumber} (${orderPayload.id})`
+            );
         } else {
-            console.log(`⚠️ No shipping address provided, will use user's default address`);
-        }
-
-        const order = await orderService.createOrder(userId, paymentData, shippingAddress, orderingStudent || null);
-        console.log(`✅ Order created successfully: ${order.orderNumber} (${order.id})`);
-
-        if (paymentData?.razorpayOrderId) {
-            try {
-                await paymentCheckoutAttemptService.markFulfilled(paymentData.razorpayOrderId, {
-                    source: 'client',
-                    orderDocId: order.id,
-                });
-            } catch (e) {
-                console.error('paymentCheckoutAttemptService.markFulfilled (non-fatal):', e.message);
-            }
+            console.log(
+                `✅ Returning existing order: ${orderPayload.orderNumber} (${orderPayload.id})`
+            );
         }
 
         res.json({
             success: true,
-            data: order,
-            message: 'Order created successfully',
+            data: orderPayload,
+            message,
         });
     } catch (error) {
         if (error.code === 'INSUFFICIENT_STOCK') {
@@ -151,6 +185,13 @@ const createOrder = async (req, res) => {
                 message: error.message || 'Insufficient stock',
                 code: 'INSUFFICIENT_STOCK',
                 insufficientBundles: error.insufficientBundles || null,
+            });
+        }
+        if (error.code === 'FULFILLMENT_LOCK_TIMEOUT') {
+            return res.status(503).json({
+                success: false,
+                message: 'Order is being created. Please check My Orders in a moment.',
+                code: 'FULFILLMENT_IN_PROGRESS',
             });
         }
         console.error('❌ Error in createOrder controller:', error);
@@ -229,4 +270,3 @@ module.exports = {
     getOrders,
     getOrderById,
 };
-

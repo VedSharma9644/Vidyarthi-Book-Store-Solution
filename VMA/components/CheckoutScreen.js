@@ -59,26 +59,34 @@ import {
   getOptionalBundlesRest,
   mergeHiddenOptionalBundleGroups,
 } from '../utils/categoryNames';
-import { normalizeStudentsFromUser, toOrderingStudentPayload } from '../utils/students';
-import { getGradeDisplayLabel } from '../utils/gradeUtils';
+import {
+  readCheckoutStudentName,
+  persistCheckoutStudentName,
+  orderingStudentFromName,
+} from '../utils/students';
 
 /** Line items sent with create-payment-order for server-side fulfillment (webhook / reconcile). */
 function buildCartSnapshotForPayment(items) {
-  return (items || []).map((item) => ({
-    itemId: item.itemId,
-    title: item.title,
-    author: item.author,
-    coverImageUrl: item.coverImageUrl || '',
-    price: Number(item.price) || 0,
-    quantity: parseInt(item.quantity, 10) || 1,
-    bookType: item.bookType || '',
-    productQuantity:
-      item.productQuantity != null ? parseInt(item.productQuantity, 10) || 1 : undefined,
-    subtotal: item.subtotal != null ? Number(item.subtotal) : undefined,
-  }));
+  return (items || []).map((item) => {
+    const quantity = parseInt(item.quantity, 10) || 1;
+    const price = Number(item.price) || 0;
+    const productQuantity =
+      item.productQuantity != null ? parseInt(item.productQuantity, 10) || 1 : 1;
+    return {
+      itemId: item.itemId,
+      title: item.title,
+      author: item.author || '',
+      coverImageUrl: item.coverImageUrl || item.image || '',
+      price,
+      quantity,
+      bookType: item.bookType || '',
+      productQuantity,
+      subtotal: item.subtotal != null ? Number(item.subtotal) : price * quantity,
+    };
+  });
 }
 
-const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
+const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
   const { user } = useAuth();
   const [cartItems, setCartItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,6 +102,7 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   const [expandedBundles, setExpandedBundles] = useState({});
   const [showRazorpayWebView, setShowRazorpayWebView] = useState(false);
   const [razorpayOrderData, setRazorpayOrderData] = useState(null);
+  const [isOrderProcessing, setIsOrderProcessing] = useState(false);
   const [showAddressSelectionModal, setShowAddressSelectionModal] = useState(false);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [pendingAddAddress, setPendingAddAddress] = useState(false);
@@ -119,29 +128,35 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
     postalCode: '',
     country: 'India',
   });
-  const [students, setStudents] = useState([]);
-  const [selectedStudentId, setSelectedStudentId] = useState(null);
-  const [showStudentPickerModal, setShowStudentPickerModal] = useState(false);
+  const [studentName, setStudentName] = useState('');
+  const [studentNameReady, setStudentNameReady] = useState(false);
   const webViewRef = useRef(null);
   const orderingForOrderRef = useRef(null);
+  const studentMissingAlertShown = useRef(false);
+  const orderProcessingShownRef = useRef(false);
 
   // Delivery charge per package (in INR) - same as CartScreen
   const DELIVERY_CHARGE = 300;
 
-  // Load saved addresses and set default
+  // Load saved addresses and checkout student name
   useEffect(() => {
     loadSavedAddresses();
-    loadStudents();
+    readCheckoutStudentName().then((name) => {
+      if (name) setStudentName(name);
+      setStudentNameReady(true);
+    });
   }, []);
 
   useEffect(() => {
-    if (students.length === 1) {
-      setSelectedStudentId(students[0].id);
-    }
-    if (students.length === 0) {
-      setSelectedStudentId(null);
-    }
-  }, [students]);
+    if (!studentNameReady || isLoading || cartItems.length === 0) return;
+    if (studentName.trim() || studentMissingAlertShown.current) return;
+    studentMissingAlertShown.current = true;
+    Alert.alert(
+      'Student name required',
+      'Please enter the student name on the cart page before checkout.',
+      [{ text: 'OK', onPress: () => (onBackToCart ? onBackToCart() : onBack?.()) }]
+    );
+  }, [studentNameReady, isLoading, cartItems.length, studentName]);
 
   // Handle opening add address modal after selection modal closes
   useEffect(() => {
@@ -231,51 +246,18 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
     }
   };
 
-  const loadStudents = async () => {
-    try {
-      let userData = await ApiService.getUserData();
-      const userId = userData?.id || (await AsyncStorage.getItem('userId'));
-      if (userId) {
-        const res = await ApiService.getUserById(userId);
-        if (res?.success && res.data) {
-          userData = res.data;
-          await ApiService.storeUserData(res.data);
-        }
-      }
-      setStudents(normalizeStudentsFromUser(userData));
-    } catch (e) {
-      console.warn('Checkout loadStudents:', e?.message);
-      setStudents([]);
-    }
+  const handleStudentNameChange = async (value) => {
+    setStudentName(value);
+    await persistCheckoutStudentName(value);
   };
 
-  const selectedStudentLabel = () => {
-    if (!students.length) return '';
-    const s = students.find((x) => x.id === selectedStudentId);
-    return s ? s.name : 'Select student';
-  };
-
-  const needsStudentSelection = students.length > 0;
-  const addressBlockedUntilStudent =
-    needsStudentSelection && !selectedStudentId;
-
-  const ensureStudentSelectedForAddress = () => {
-    if (addressBlockedUntilStudent) {
-      Alert.alert(
-        'Select student first',
-        'Please choose which student this order is for before adding or editing a shipping address.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Select student',
-            onPress: () => setShowStudentPickerModal(true),
-          },
-        ]
-      );
-      return false;
-    }
-    return true;
-  };
+  const isShippingAddressComplete = () =>
+    Boolean(
+      shippingAddress.name?.trim() &&
+        shippingAddress.phone?.trim() &&
+        shippingAddress.address?.trim() &&
+        shippingAddress.city?.trim()
+    );
 
   // Load cart data from API
   useEffect(() => {
@@ -403,14 +385,24 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   };
 
   const handlePlaceOrder = async () => {
+    if (isOrderProcessing) {
+      return;
+    }
     if (cartItems.length === 0) {
       Alert.alert('Empty Cart', 'Your cart is empty. Please add items before placing an order.');
       return;
     }
 
-    // Validate shipping address before proceeding to payment
-    if (!shippingAddress.name || !shippingAddress.address || !shippingAddress.city || 
-        !shippingAddress.state || !shippingAddress.postalCode || !shippingAddress.phone) {
+    if (!studentName.trim()) {
+      Alert.alert(
+        'Student name required',
+        'Please enter the student name on the cart page before checkout.',
+        [{ text: 'OK', onPress: () => (onBackToCart ? onBackToCart() : onBack?.()) }]
+      );
+      return;
+    }
+
+    if (!isShippingAddressComplete()) {
       Alert.alert(
         'Shipping Address Required',
         'Please add a shipping address before placing your order.',
@@ -422,20 +414,11 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
           {
             text: 'Add Address',
             onPress: () => {
-              if (!ensureStudentSelectedForAddress()) return;
               loadSavedAddresses();
               setShowAddressSelectionModal(true);
             },
           },
         ]
-      );
-      return;
-    }
-
-    if (students.length > 0 && !selectedStudentId) {
-      Alert.alert(
-        'Select student',
-        'Please choose which student this order is for.'
       );
       return;
     }
@@ -458,11 +441,7 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
       const totalAmount = calculateTotal();
       const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const selected = students.find((s) => s.id === selectedStudentId);
-      const orderingPayload =
-        students.length > 0 && selected
-          ? toOrderingStudentPayload(selected)
-          : null;
+      const orderingPayload = orderingStudentFromName(studentName);
       orderingForOrderRef.current = orderingPayload;
 
       console.log('Creating payment order:', { totalAmount, receipt, hasStudent: !!orderingPayload });
@@ -511,7 +490,6 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   };
 
   const handleEditShipping = () => {
-    if (!ensureStudentSelectedForAddress()) return;
     loadSavedAddresses();
     setShowAddressSelectionModal(true);
   };
@@ -557,7 +535,6 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
   };
 
   const handleAddNewAddress = () => {
-    if (!ensureStudentSelectedForAddress()) return;
     setShowAddressSelectionModal(false);
     // Set flag to open add modal after selection modal closes
     setPendingAddAddress(true);
@@ -872,36 +849,40 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
             </>
           )}
 
-          {/* Student selection (required when profile has students) */}
-          {!isLoading && !error && students.length > 0 && (
+          {/* Student name (from cart; editable here) */}
+          {!isLoading && !error && cartItems.length > 0 && (
             <View style={styles.checkoutSection}>
-              <Text style={styles.checkoutSectionTitle}>Ordering for</Text>
-              <TouchableOpacity
-                style={styles.infoCard}
-                onPress={() => setShowStudentPickerModal(true)}
-              >
-                <View style={styles.infoCardLeft}>
-                  <View style={styles.infoCardIcon}>
-                    <Text style={styles.infoCardIconText}>🎓</Text>
-                  </View>
-                  <View style={styles.infoCardDetails}>
-                    <Text style={styles.infoCardTitle}>{selectedStudentLabel()}</Text>
-                    <Text style={styles.infoCardSubtitle} numberOfLines={2}>
-                      Tap to choose which student this order is for
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.chevronIcon}>›</Text>
-              </TouchableOpacity>
+              <Text style={styles.checkoutSectionTitle}>
+                Student name <Text style={{ color: '#ef4444' }}>*</Text>
+              </Text>
+              <TextInput
+                value={studentName}
+                onChangeText={handleStudentNameChange}
+                placeholder="Enter student name"
+                placeholderTextColor="#999"
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#dee2e6',
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 12,
+                  fontSize: 15,
+                  color: '#0e1b16',
+                  backgroundColor: '#fff',
+                }}
+              />
+              <Text style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                You can update the student name here if needed.
+              </Text>
             </View>
           )}
 
-          {/* Shipping Address Section - Always show if not loading and no error */}
+          {/* Shipping Address Section */}
           {!isLoading && !error && (
             <View style={styles.checkoutSection}>
             <Text style={styles.checkoutSectionTitle}>Shipping Address</Text>
             <TouchableOpacity
-              style={[styles.infoCard, addressBlockedUntilStudent && { opacity: 0.65 }]}
+              style={styles.infoCard}
               onPress={handleEditShipping}
             >
               <View style={styles.infoCardLeft}>
@@ -913,11 +894,9 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                     {shippingAddress.name || 'Add Shipping Address'}
                   </Text>
                   <Text style={styles.infoCardSubtitle} numberOfLines={2}>
-                    {addressBlockedUntilStudent
-                      ? 'Select a student above, then add your shipping address'
-                      : shippingAddress.address && shippingAddress.city && shippingAddress.state
-                        ? `${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`
-                        : 'Tap to add shipping address'}
+                    {shippingAddress.address && shippingAddress.city && shippingAddress.state
+                      ? `${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`
+                      : 'Tap to add shipping address'}
                   </Text>
                 </View>
               </View>
@@ -967,11 +946,58 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
       {/* Place Order Button - Only show if cart has items */}
       {!isLoading && !error && cartItems.length > 0 && (
         <View style={styles.placeOrderContainer}>
-          <TouchableOpacity style={styles.placeOrderButton} onPress={handlePlaceOrder}>
-            <Text style={styles.placeOrderButtonText}>Place Order</Text>
+          <TouchableOpacity
+            style={[styles.placeOrderButton, isOrderProcessing && { opacity: 0.7 }]}
+            onPress={handlePlaceOrder}
+            disabled={isOrderProcessing}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.placeOrderButtonText}>
+              {isOrderProcessing ? 'Processing...' : 'Place Order'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Order processing overlay (after payment success) */}
+      <Modal visible={isOrderProcessing} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              padding: 22,
+              alignItems: 'center',
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={{ marginTop: 14, fontSize: 18, fontWeight: '700', color: '#0e1b16' }}>
+              Order is being processed
+            </Text>
+            <Text
+              style={{
+                marginTop: 6,
+                fontSize: 14,
+                color: '#666',
+                textAlign: 'center',
+                lineHeight: 20,
+              }}
+            >
+              Please don’t close the app. This may take up to 30 seconds.
+            </Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* Razorpay WebView Modal */}
       <Modal
@@ -1075,6 +1101,9 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                   
                   if (message.type === 'payment_success') {
                     setShowRazorpayWebView(false);
+                    setRazorpayOrderData(null);
+                    orderProcessingShownRef.current = true;
+                    setIsOrderProcessing(true);
                     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = message.data;
                     
                     // Verify payment
@@ -1089,6 +1118,7 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                       const userId = user?.id || await AsyncStorage.getItem('userId');
                       console.log('📦 Creating order - User ID:', userId);
                       if (!userId) {
+                        setIsOrderProcessing(false);
                         Alert.alert('Error', 'User not found. Please login again.');
                         return;
                       }
@@ -1117,6 +1147,7 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                         message: orderResult.message,
                       });
 
+                      setIsOrderProcessing(false);
                       if (orderResult.success) {
                         Alert.alert(
                           'Payment Successful!',
@@ -1158,13 +1189,17 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
                         );
                       }
                     } else {
+                      setIsOrderProcessing(false);
                       Alert.alert('Payment Verification Failed', verifyResult.message || 'Please contact support.');
                     }
                   } else if (message.type === 'payment_cancelled') {
                     setShowRazorpayWebView(false);
+                    setRazorpayOrderData(null);
+                    setIsOrderProcessing(false);
                     console.log('Payment cancelled by user');
                   }
                 } catch (error) {
+                  setIsOrderProcessing(false);
                   console.error('Error processing payment message:', error);
                 }
               }}
@@ -1172,56 +1207,6 @@ const CheckoutScreen = ({ onBack, onPlaceOrder }) => {
             />
           )}
         </SafeAreaView>
-      </Modal>
-
-      {/* Student picker */}
-      <Modal
-        visible={showStudentPickerModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowStudentPickerModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-            <View style={styles.addressSelectionModalContent}>
-              <View style={styles.addressModalHeader}>
-                <Text style={styles.addressModalTitle}>Who is this order for?</Text>
-                <TouchableOpacity onPress={() => setShowStudentPickerModal(false)}>
-                  <Text style={styles.modalCloseButton}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.addressSelectionModalBody} showsVerticalScrollIndicator={false}>
-                {students.map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[
-                      styles.addressSelectionCard,
-                      selectedStudentId === s.id && styles.addressSelectionCardSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedStudentId(s.id);
-                      setShowStudentPickerModal(false);
-                    }}
-                  >
-                    <View style={styles.addressSelectionCardContent}>
-                      <Text style={styles.addressSelectionCardName}>{s.name}</Text>
-                      <Text style={styles.addressSelectionCardAddress}>
-                        {[s.gradeLabel ? getGradeDisplayLabel(s.gradeLabel) : '', s.schoolLabel]
-                          .filter(Boolean)
-                          .join(' · ') || 'Student'}
-                      </Text>
-                    </View>
-                    {selectedStudentId === s.id && (
-                      <View style={styles.selectedIndicator}>
-                        <Text style={styles.selectedIndicatorText}>✓</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </SafeAreaView>
-        </View>
       </Modal>
 
       {/* Address Selection Modal */}

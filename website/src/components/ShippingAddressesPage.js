@@ -361,6 +361,7 @@ const ShippingAddressesPage = () => {
                 setEditingAddress(null);
               }}
               isEditing={!!editingAddress}
+              includeStudentFields
             />
           </div>
         )}

@@ -16,6 +16,8 @@ import {
   buildDefaultSelectedBundles,
 } from '../utils/categoryNames';
 import { getGradeScreenTitle } from '../utils/gradeUtils';
+
+const GradeBooksPage = () => {
   const { gradeId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();

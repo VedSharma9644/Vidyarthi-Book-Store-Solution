@@ -29,7 +29,6 @@ const ProfileScreen = ({
   onLogout,
   onGoToOrderHistory,
   onGoToShippingAddresses,
-  onGoToStudents,
   onGoToManageGrades,
 }) => {
   const { logout } = useAuth();
@@ -339,12 +338,6 @@ const ProfileScreen = ({
       } else {
         Alert.alert(option, `${option} functionality will be implemented`);
       }
-    } else if (option === 'Students') {
-      if (onGoToStudents) {
-        onGoToStudents();
-      } else {
-        Alert.alert(option, `${option} is not available.`);
-      }
     } else if (option === 'Manage grades') {
       if (onGoToManageGrades) {
         onGoToManageGrades();
@@ -566,21 +559,6 @@ const ProfileScreen = ({
               </View>
               <Text style={styles.chevronIcon}>›</Text>
             </TouchableOpacity>
-
-            {onGoToStudents && (
-              <TouchableOpacity
-                style={styles.optionItem}
-                onPress={() => handleAccountOption('Students')}
-              >
-                <View style={styles.optionLeft}>
-                  <View style={styles.optionIconContainer}>
-                    <Text style={styles.optionIcon}>🎓</Text>
-                  </View>
-                  <Text style={styles.optionTitle}>Students</Text>
-                </View>
-                <Text style={styles.chevronIcon}>›</Text>
-              </TouchableOpacity>
-            )}
 
             {onGoToManageGrades && (
               <TouchableOpacity

@@ -910,6 +910,7 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: 4,
+    flexShrink: 1,
   },
   itemPrice: {
     fontSize: 14,
@@ -1957,6 +1958,7 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.gray800,
     marginBottom: 4,
+    flexShrink: 1,
   },
   orderDetailsItemQuantity: {
     fontSize: 14,

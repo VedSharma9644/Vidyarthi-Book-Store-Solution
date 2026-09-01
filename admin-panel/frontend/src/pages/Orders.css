@@ -7,3 +7,22 @@
   overflow-x: auto;
 }
 
+.orders-export-row {
+  margin-bottom: 0.25rem;
+}
+
+.orders-export-card {
+  border: 1px solid #dee2e6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.orders-export-card .card-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.orders-export-card input[type='date'],
+.orders-export-card input[type='time'] {
+  min-width: 10.5rem;
+}
+

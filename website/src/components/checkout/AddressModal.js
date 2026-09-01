@@ -271,6 +271,7 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
                 setEditingAddress(null);
               }}
               isEditing={!!editingAddress}
+              includeStudentFields={false}
             />
           ) : (
             <>

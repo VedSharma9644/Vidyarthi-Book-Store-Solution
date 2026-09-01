@@ -1,6 +1,22 @@
 const { db } = require('../config/database');
 const Book = require('../models/Book');
 const bookInventoryFlags = require('../services/bookInventoryFlagsService');
+const bookBulkImportService = require('../services/bookBulkImportService');
+const multer = require('multer');
+const path = require('path');
+
+const bulkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const allowed = ['.xlsx', '.xls', '.csv'];
+    if (allowed.includes(ext)) {
+      return cb(null, true);
+    }
+    cb(new Error('Only Excel (.xlsx, .xls) or CSV files are allowed'));
+  },
+});
 
 function toCreatedAtIso(value) {
   if (!value) return null;
@@ -86,6 +102,7 @@ const createBook = async (req, res) => {
       author: req.body.Author || req.body.author,
       publisher: req.body.Publisher || req.body.publisher || '',
       isbn: req.body.ISBN || req.body.isbn,
+      sku: req.body.SKU || req.body.sku || '',
       description: req.body.Description || req.body.description || '',
       price: req.body.Price || req.body.price,
       productQuantity: req.body.ProductQuantity || req.body.productQuantity || '',
@@ -202,6 +219,7 @@ const updateBook = async (req, res) => {
       author: req.body.Author !== undefined ? req.body.Author : (req.body.author !== undefined ? req.body.author : existingBook.author),
       publisher: req.body.Publisher !== undefined ? req.body.Publisher : (req.body.publisher !== undefined ? req.body.publisher : existingBook.publisher),
       isbn: req.body.ISBN !== undefined ? req.body.ISBN : (req.body.isbn !== undefined ? req.body.isbn : existingBook.isbn),
+      sku: req.body.SKU !== undefined ? req.body.SKU : (req.body.sku !== undefined ? req.body.sku : existingBook.sku || ''),
       description: req.body.Description !== undefined ? req.body.Description : (req.body.description !== undefined ? req.body.description : existingBook.description),
       price: req.body.Price !== undefined ? req.body.Price : (req.body.price !== undefined ? req.body.price : existingBook.price),
       productQuantity:
@@ -464,6 +482,81 @@ const getLowInventoryBooks = async (req, res) => {
   }
 };
 
+/** Download Excel template for bulk product upload */
+const downloadBulkImportTemplate = async (req, res) => {
+  try {
+    const buffer = bookBulkImportService.buildTemplateBuffer();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="bulk-books-template.xlsx"'
+    );
+    return res.send(buffer);
+  } catch (error) {
+    console.error('Error generating bulk import template:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate template',
+      error: error.message,
+    });
+  }
+};
+
+/** Preview or import books from Excel/CSV */
+const bulkImportBooks = async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({
+        success: false,
+        message: 'Spreadsheet file is required (.xlsx, .xls, or .csv)',
+      });
+    }
+
+    const schoolId = String(req.body.schoolId || '').trim();
+    const gradeId = String(req.body.gradeId || '').trim();
+    const subgradeId = String(req.body.subgradeId || '').trim();
+    const dryRun =
+      req.body.dryRun === true ||
+      req.body.dryRun === 'true' ||
+      req.body.dryRun === '1';
+
+    if (!schoolId || !gradeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'schoolId and gradeId are required',
+      });
+    }
+
+    const result = await bookBulkImportService.importBooksFromSpreadsheet(req.file.buffer, {
+      schoolId,
+      gradeId,
+      subgradeId: subgradeId || '',
+      dryRun,
+    });
+
+    return res.json({
+      success: true,
+      message: dryRun
+        ? 'Preview ready'
+        : `Created ${result.createdCount} product(s)${
+            result.invalidCount ? `, ${result.invalidCount} row(s) skipped` : ''
+          }`,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in bulkImportBooks:', error);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || 'Failed to import books',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
 module.exports = {
   getAllBooks,
   getBookById,
@@ -471,5 +564,8 @@ module.exports = {
   updateBook,
   deleteBook,
   getLowInventoryBooks,
+  downloadBulkImportTemplate,
+  bulkImportBooks,
+  bulkUpload,
 };
 

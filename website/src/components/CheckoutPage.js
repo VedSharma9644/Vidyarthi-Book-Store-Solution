@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { checkoutStyles, colors } from '../css/checkoutStyles';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
@@ -8,10 +8,14 @@ import { useModal } from '../contexts/ModalContext';
 import LoadingScreen from './common/LoadingScreen';
 import OrderSummary from './checkout/OrderSummary';
 import AddressSection from './checkout/AddressSection';
+import CheckoutStudentSection from './checkout/CheckoutStudentSection';
 import CartTable from './cart/CartTable';
 import CartItem from './cart/CartItem';
-import { normalizeStudentsFromUser, toOrderingStudentPayload } from '../utils/students';
-import { getGradeDisplayLabel } from '../utils/gradeUtils';
+import {
+  readCheckoutStudentName,
+  persistCheckoutStudentName,
+  orderingStudentFromName,
+} from '../utils/students';
 import {
   getCategoryDisplayName,
   getOptionalBundlesFirst,
@@ -36,22 +40,32 @@ const loadRazorpayScript = () => {
 };
 
 function buildCartSnapshotForPayment(items) {
-  return (items || []).map((item) => ({
-    itemId: item.itemId,
-    title: item.title,
-    author: item.author,
-    coverImageUrl: item.coverImageUrl || '',
-    price: Number(item.price) || 0,
-    quantity: parseInt(item.quantity, 10) || 1,
-    bookType: item.bookType || '',
-    productQuantity:
-      item.productQuantity != null ? parseInt(item.productQuantity, 10) || 1 : undefined,
-    subtotal: item.subtotal != null ? Number(item.subtotal) : undefined,
-  }));
+  return (items || []).map((item) => {
+    const quantity = parseInt(item.quantity, 10) || 1;
+    const price = Number(item.price) || 0;
+    const productQuantity =
+      item.productQuantity != null
+        ? parseInt(item.productQuantity, 10) || 1
+        : item.bundlePieceCount != null
+          ? parseInt(item.bundlePieceCount, 10) || 1
+          : 1;
+    return {
+      itemId: item.itemId,
+      title: item.title,
+      author: item.author || '',
+      coverImageUrl: item.coverImageUrl || item.image || '',
+      price,
+      quantity,
+      bookType: item.bookType || '',
+      productQuantity,
+      subtotal: item.subtotal != null ? Number(item.subtotal) : price * quantity,
+    };
+  });
 }
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { showError, showSuccess, showWarning } = useModal();
   const isMobile = useIsMobile();
@@ -69,43 +83,39 @@ const CheckoutPage = () => {
     postalCode: '',
     country: 'India',
   });
-  const [students, setStudents] = useState([]);
-  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [studentName, setStudentName] = useState(() => readCheckoutStudentName(location.state));
   const orderingForOrderRef = useRef(null);
+
+  const isShippingAddressComplete = (addr) =>
+    Boolean(
+      addr?.name?.trim() &&
+        addr?.phone?.trim() &&
+        addr?.address?.trim() &&
+        addr?.city?.trim()
+    );
+
+  const canPlaceOrder = Boolean(studentName.trim()) && isShippingAddressComplete(shippingAddress);
+
+  useEffect(() => {
+    const name = readCheckoutStudentName(location.state);
+    if (name) {
+      setStudentName(name);
+      persistCheckoutStudentName(name);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (!isLoading && cartItems.length > 0 && !studentName.trim()) {
+      navigate('/cart', { replace: true });
+    }
+  }, [isLoading, cartItems.length, studentName, navigate]);
 
   useEffect(() => {
     loadCart();
-    loadStudents();
     loadRazorpayScript().catch(err => {
       console.error('Failed to load Razorpay:', err);
     });
   }, []);
-
-  const loadStudents = async () => {
-    try {
-      let userData = ApiService.getUserData();
-      const userId = user?.id || localStorage.getItem('userId');
-      if (userId) {
-        const res = await ApiService.getUserById(userId);
-        if (res?.success && res.data) {
-          userData = res.data;
-          ApiService.storeUserData(res.data);
-        }
-      }
-      const list = normalizeStudentsFromUser(userData);
-      setStudents(list);
-      if (list.length === 1) {
-        setSelectedStudentId(list[0].id);
-      }
-      if (list.length === 0) {
-        setSelectedStudentId('');
-      }
-    } catch (e) {
-      console.warn('Checkout loadStudents failed:', e?.message);
-      setStudents([]);
-      setSelectedStudentId('');
-    }
-  };
 
   const loadCart = async () => {
     try {
@@ -115,18 +125,32 @@ const CheckoutPage = () => {
       const result = await ApiService.getCart();
       
       if (result.success && result.data) {
-        const items = (result.data.items || []).map(item => ({
-          id: item.itemId,
-          itemId: item.itemId,
-          name: item.title || 'Unknown Item',
-          title: item.title || 'Unknown Item', // Keep for backward compatibility
-          price: item.price || 0,
-          quantity: item.quantity || 1,
-          bundlePieceCount: item.bundlePieceCount || item.piecesInBundle || null,
-          image: item.coverImageUrl || '',
-          subtotal: item.subtotal || (item.price || 0) * (item.quantity || 1),
-          bookType: item.bookType || 'OTHER',
-        }));
+        const items = (result.data.items || []).map(item => {
+          const quantity = item.quantity || 1;
+          const productQuantity =
+            item.productQuantity != null
+              ? Number(item.productQuantity)
+              : item.bundlePieceCount != null
+                ? Number(item.bundlePieceCount)
+                : item.piecesInBundle != null
+                  ? Number(item.piecesInBundle)
+                  : 1;
+          return {
+            id: item.itemId,
+            itemId: item.itemId,
+            name: item.title || 'Unknown Item',
+            title: item.title || 'Unknown Item',
+            author: item.author || '',
+            price: item.price || 0,
+            quantity,
+            productQuantity,
+            bundlePieceCount: item.bundlePieceCount || item.piecesInBundle || productQuantity,
+            image: item.coverImageUrl || '',
+            coverImageUrl: item.coverImageUrl || '',
+            subtotal: item.subtotal || (item.price || 0) * quantity,
+            bookType: item.bookType || 'OTHER',
+          };
+        });
         
         setCartItems(items);
         
@@ -207,14 +231,14 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (students.length > 0 && !selectedStudentId) {
-      showWarning('Please select which student this order is for.');
+    if (!studentName.trim()) {
+      showWarning('Please enter the student name on the cart page before checkout.');
+      navigate('/cart');
       return;
     }
 
-    // Validate shipping address
-    if (!shippingAddress.name || !shippingAddress.address || !shippingAddress.city) {
-      showWarning('Please select a shipping address before placing your order.');
+    if (!isShippingAddressComplete(shippingAddress)) {
+      showWarning('Please add a complete shipping address before placing your order.');
       return;
     }
 
@@ -238,14 +262,13 @@ const CheckoutPage = () => {
       const receipt = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Create Razorpay order
-      const selectedStudent = students.find((s) => s.id === selectedStudentId);
-      const orderingStudentPayload = selectedStudent ? toOrderingStudentPayload(selectedStudent) : null;
+      const orderingStudentPayload = orderingStudentFromName(studentName);
       orderingForOrderRef.current = orderingStudentPayload;
 
       const orderResult = await ApiService.createPaymentOrder(
         totalAmount,
         receipt,
-        orderingStudentPayload || undefined,
+        orderingStudentPayload,
         buildCartSnapshotForPayment(cartItems),
         shippingAddress
       );
@@ -397,6 +420,11 @@ const CheckoutPage = () => {
     });
   };
 
+  const handleStudentNameChange = (value) => {
+    setStudentName(value);
+    persistCheckoutStudentName(value);
+  };
+
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -462,6 +490,60 @@ const CheckoutPage = () => {
 
   return (
     <div style={checkoutStyles.checkoutPageContainer}>
+      {isProcessing ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div
+            style={{
+              width: 'min(520px, 92vw)',
+              backgroundColor: colors.white,
+              borderRadius: 16,
+              border: `1px solid ${colors.borderLight}`,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+              padding: 22,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 54,
+                height: 54,
+                borderRadius: '50%',
+                border: `6px solid ${colors.gray200}`,
+                borderTopColor: colors.primary,
+                margin: '6px auto 14px',
+                animation: 'vmaSpin 1s linear infinite',
+              }}
+            />
+            <div style={{ fontSize: 18, fontWeight: 700, color: colors.textPrimary }}>
+              Order is being processed
+            </div>
+            <div style={{ marginTop: 6, fontSize: 14, color: colors.textSecondary, lineHeight: 1.4 }}>
+              Please don’t close this tab or browser. This may take up to 30 seconds.
+            </div>
+
+            <style>{`
+              @keyframes vmaSpin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        </div>
+      ) : null}
+
       {/* Page Header */}
       <div style={checkoutStyles.checkoutPageHeader}>
         <div style={checkoutStyles.checkoutPageHeaderContent}>
@@ -638,70 +720,30 @@ const CheckoutPage = () => {
           </div>
         </div>
 
-        {/* Right Column - Order Summary & Shipping Address */}
+        {/* Right Column — student, address, then payment */}
         <div style={checkoutStyles.checkoutSidebar}>
+          <CheckoutStudentSection
+            studentName={studentName}
+            onStudentNameChange={handleStudentNameChange}
+            description="You can update the student name here if needed."
+          />
+
+          <AddressSection
+            shippingAddress={shippingAddress}
+            onAddressChange={handleAddressChange}
+          />
+
           <OrderSummary
             cartItems={cartItems}
             onPlaceOrder={handlePlaceOrder}
             isProcessing={isProcessing}
-          />
-          
-          {/* Student selection — required before shipping address when profile has students */}
-          {students.length > 0 && (
-            <div
-              style={{
-                backgroundColor: colors.white,
-                borderRadius: '12px',
-                padding: '16px',
-                border: `1px solid ${colors.borderLight}`,
-                marginTop: '16px',
-              }}
-            >
-              <h3 style={{ margin: 0, marginBottom: '12px', color: colors.textPrimary }}>
-                Ordering for
-              </h3>
-              <select
-                value={selectedStudentId}
-                onChange={(e) => setSelectedStudentId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  border: `1px solid ${colors.borderLight}`,
-                  fontSize: '15px',
-                }}
-              >
-                <option value="">Select student</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.gradeLabel || s.schoolLabel
-                      ? ` (${[
-                          s.gradeLabel ? getGradeDisplayLabel(s.gradeLabel) : '',
-                          s.schoolLabel,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')})`
-                      : ''}
-                  </option>
-                ))}
-              </select>
-              <div style={{ marginTop: 10, fontSize: 13, color: colors.textSecondary }}>
-                Select a student before adding your shipping address.
-              </div>
-            </div>
-          )}
-
-          {/* Shipping Address */}
-          <AddressSection
-            shippingAddress={shippingAddress}
-            onAddressChange={handleAddressChange}
-            requireStudentSelection={students.length > 0}
-            selectedStudentId={selectedStudentId}
-            onStudentRequired={() =>
-              showWarning(
-                'Please select which student this order is for before adding or editing a shipping address.'
-              )
+            placeOrderDisabled={!canPlaceOrder}
+            placeOrderHint={
+              !studentName.trim()
+                ? 'Enter student name on the cart page to continue'
+                : !isShippingAddressComplete(shippingAddress)
+                  ? 'Add a shipping address to continue to payment'
+                  : ''
             }
           />
         </div>

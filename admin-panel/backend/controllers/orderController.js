@@ -1,12 +1,28 @@
 const { db } = require('../config/database');
 const shiprocketService = require('../services/shiprocketService');
 const invoicePdfService = require('../services/invoicePdfService');
+const orderExportService = require('../services/orderExportService');
+const {
+  resolveStudentName,
+  resolveOrderingForStudent,
+  resolveParentNameFromOrder,
+} = require('../services/orderPartyResolver');
+const { resolveOrderChannel } = require('../services/orderChannelResolver');
+const { resolveProductSku } = require('../utils/productSku');
 
 // Helper function to get customer name
 const getCustomerName = async (data) => {
-  // First, try to get name from customerInfo
+  const fromOrder = resolveParentNameFromOrder(data);
+  if (fromOrder && fromOrder.toLowerCase() !== 'customer') {
+    return fromOrder;
+  }
+
+  // Legacy: customerInfo.name may be the literal "Customer" while parentFullName lives on the user doc
   if (data.customerInfo?.name && data.customerInfo.name.trim() !== '') {
-    return data.customerInfo.name.trim();
+    const stored = data.customerInfo.name.trim();
+    if (stored.toLowerCase() !== 'customer') {
+      return stored;
+    }
   }
 
   // If customerInfo.name is missing, try to fetch from users collection
@@ -15,7 +31,9 @@ const getCustomerName = async (data) => {
       const userDoc = await db.collection('users').doc(data.userId).get();
       if (userDoc.exists) {
         const userData = userDoc.data();
-        // Build name from firstName, lastName, or userName
+        if (userData.parentFullName && String(userData.parentFullName).trim()) {
+          return String(userData.parentFullName).trim();
+        }
         if (userData.firstName && userData.lastName) {
           return `${userData.firstName} ${userData.lastName}`.trim();
         } else if (userData.firstName) {
@@ -24,8 +42,6 @@ const getCustomerName = async (data) => {
           return userData.lastName.trim();
         } else if (userData.userName) {
           return userData.userName.trim();
-        } else if (userData.parentFullName) {
-          return userData.parentFullName.trim();
         } else if (userData.phoneNumber) {
           return `Customer (${userData.phoneNumber})`;
         }
@@ -132,8 +148,9 @@ const enrichOrderItemsWithSchoolGradeSection = async (items) => {
 
 /** Customer display name from order document only (no extra user fetch). */
 function getCustomerNameFast(data) {
-  if (data.customerInfo?.name && String(data.customerInfo.name).trim()) {
-    return String(data.customerInfo.name).trim();
+  const fromOrder = resolveParentNameFromOrder(data);
+  if (fromOrder && fromOrder.toLowerCase() !== 'customer') {
+    return fromOrder;
   }
   if (data.shippingAddress?.name && String(data.shippingAddress.name).trim()) {
     return String(data.shippingAddress.name).trim();
@@ -293,9 +310,8 @@ async function buildEnrichmentMapsForDocs(docs) {
 }
 
 function resolveOrderListMeta(data, bookMetaByItemId) {
-  const student = data.orderingForStudent;
-  const studentName =
-    student?.name && String(student.name).trim() ? String(student.name).trim() : '—';
+  const student = resolveOrderingForStudent(data) || data.orderingForStudent;
+  const studentName = resolveStudentName(data) || '—';
 
   let className =
     (student?.gradeLabel && String(student.gradeLabel).trim()) ||
@@ -477,6 +493,45 @@ const getAllOrders = async (req, res) => {
   }
 };
 
+/** GET /api/orders/export?date=YYYY-MM-DD or ?from=&to= */
+const exportOrdersExcel = async (req, res) => {
+  try {
+    const { buffer, filename, orderCount, lineCount } = await orderExportService.buildOrdersExcel(
+      req.query
+    );
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Export-Order-Count', String(orderCount));
+    res.setHeader('X-Export-Line-Count', String(lineCount));
+    return res.send(buffer);
+  } catch (error) {
+    if (error.code === 'INVALID_DATE' || error.code === 'RANGE_TOO_LARGE') {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        code: error.code,
+      });
+    }
+    if (error.code === 'TOO_MANY_ORDERS') {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        code: error.code,
+      });
+    }
+    console.error('Error exporting orders:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to export orders',
+      error: error.message,
+    });
+  }
+};
+
 // Get order by ID
 const getOrderById = async (req, res) => {
   try {
@@ -492,6 +547,7 @@ const getOrderById = async (req, res) => {
 
     const data = orderDoc.data();
     const customerName = await getCustomerName(data);
+    const orderChannelMeta = resolveOrderChannel(data);
     const rawItems = data.items || [];
     const enrichedItems = await enrichOrderItemsWithSchoolGradeSection(rawItems);
     const firstItem = enrichedItems[0];
@@ -539,6 +595,9 @@ const getOrderById = async (req, res) => {
       schoolName: firstItem?.schoolName || '',
       gradeName: firstItem?.gradeName || '',
       sectionName: firstItem?.sectionName || '',
+      orderChannel: orderChannelMeta.channel,
+      orderChannelLabel: orderChannelMeta.label,
+      fulfillmentSource: data.fulfillmentSource || '',
     };
 
     res.json({
@@ -570,6 +629,8 @@ const generateInvoicePdf = async (req, res) => {
 
     const data = orderDoc.data();
     const customerName = await getCustomerName(data);
+    const parentName = customerName || resolveParentNameFromOrder(data) || 'Customer';
+    const orderingForStudent = resolveOrderingForStudent(data);
     const enrichedItems = await enrichOrderItemsWithSchoolGradeSection(data.items || []);
 
     const dateLabel = data.createdAt?.toDate
@@ -593,11 +654,13 @@ const generateInvoicePdf = async (req, res) => {
     const orderForPdf = {
       orderNumber: data.orderNumber || orderDoc.id,
       dateLabel,
-      customerName,
+      customerName: parentName,
+      parentName,
+      studentName: resolveStudentName(data),
       customerInfo: data.customerInfo || null,
       shippingAddress: data.shippingAddress || null,
       paymentStatus: data.paymentStatus || '—',
-      orderingForStudent: data.orderingForStudent || null,
+      orderingForStudent,
       items: enrichedItems,
       subtotal: data.subtotal ?? 0,
       deliveryCharge: data.deliveryCharge ?? 0,
@@ -756,15 +819,38 @@ const createShiprocketOrder = async (req, res) => {
       billing_email: (shippingAddress.email || orderData.customerInfo?.email || '').trim() || '',
       billing_phone: phone,
       shipping_is_billing: true,
-      order_items: items.map((item, index) => ({
-        name: (item.title || `Product ${index + 1}`).toString().substring(0, 255),
-        sku: (item.itemId || `SKU-${Date.now()}-${index}`).toString().replace(/[^a-zA-Z0-9\-_]/g, '-').substring(0, 100),
-        units: Math.max(1, parseInt(item.quantity, 10) || 1),
-        selling_price: Math.round(Number(item.price) || 0),
-        discount: 0,
-        tax: 0,
-        hsn: 0,
-      })),
+      order_items: await Promise.all(
+        items.map(async (item, index) => {
+          let sku = item.sku || '';
+          let isbn = item.isbn || '';
+          if ((!sku || !isbn) && item.itemId) {
+            try {
+              const bookDoc = await db.collection('books').doc(String(item.itemId)).get();
+              if (bookDoc.exists) {
+                const b = bookDoc.data() || {};
+                if (!sku && b.sku) sku = String(b.sku);
+                if (!isbn && b.isbn) isbn = String(b.isbn);
+              }
+            } catch (_) {
+              /* non-fatal */
+            }
+          }
+          return {
+            name: (item.title || `Product ${index + 1}`).toString().substring(0, 255),
+            sku: resolveProductSku({
+              sku,
+              isbn,
+              itemId: item.itemId,
+              index,
+            }),
+            units: Math.max(1, parseInt(item.quantity, 10) || 1),
+            selling_price: Math.round(Number(item.price) || 0),
+            discount: 0,
+            tax: 0,
+            hsn: 0,
+          };
+        })
+      ),
       payment_method: orderData.paymentStatus === 'paid' ? 'prepaid' : 'cod',
       shipping_charges: Math.round(Number(orderData.deliveryCharge) || 0),
       giftwrap_charges: 0,
@@ -1120,6 +1206,7 @@ const handleShiprocketWebhook = async (req, res) => {
 
 module.exports = {
   getAllOrders,
+  exportOrdersExcel,
   getOrderById,
   generateInvoicePdf,
   updateOrderStatus,

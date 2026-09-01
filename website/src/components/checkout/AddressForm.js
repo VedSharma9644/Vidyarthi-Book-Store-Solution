@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { checkoutStyles, colors } from '../../css/checkoutStyles';
 import { borderRadius } from '../../css/theme';
 
-const AddressForm = ({ address, onSave, onCancel, isEditing = false }) => {
+const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStudentFields = false }) => {
   const [formData, setFormData] = useState({
     name: address?.name || '',
     phone: address?.phone || '',
@@ -55,7 +55,12 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSave(formData);
+      const payload = { ...formData };
+      if (!includeStudentFields) {
+        delete payload.studentName;
+        delete payload.studentRollNumber;
+      }
+      onSave(payload);
     }
   };
 
@@ -138,6 +143,8 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false }) => {
         )}
       </div>
 
+      {includeStudentFields ? (
+        <>
       {/* Student Name */}
       <div>
         <label style={{
@@ -195,6 +202,8 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false }) => {
           placeholder="Enter student roll number (optional)"
         />
       </div>
+        </>
+      ) : null}
 
       {/* Address */}
       <div>

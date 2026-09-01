@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "reconcile-payments": "node scripts/reconcile-payment-attempts.js",
+    "backfill-order-metadata": "node scripts/backfill-order-checkout-metadata.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {

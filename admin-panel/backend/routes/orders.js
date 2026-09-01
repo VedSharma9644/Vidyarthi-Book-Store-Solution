@@ -5,6 +5,9 @@ const orderController = require('../controllers/orderController');
 // GET /api/orders - Get all orders
 router.get('/', orderController.getAllOrders);
 
+// GET /api/orders/export - Excel export by date or range (before /:id)
+router.get('/export', orderController.exportOrdersExcel);
+
 // PUT /api/orders/:id/status - Update order status (must be before /:id route)
 router.put('/:id/status', orderController.updateOrderStatus);
 

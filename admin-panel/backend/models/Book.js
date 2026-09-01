@@ -6,6 +6,7 @@ class Book {
     this.author = data.author || '';
     this.publisher = data.publisher || '';
     this.isbn = data.isbn || '';
+    this.sku = data.sku || '';
     this.description = data.description || '';
     this.price = data.price !== undefined ? parseFloat(data.price) : 0;
     
@@ -56,6 +57,7 @@ class Book {
       author: this.author,
       publisher: this.publisher,
       isbn: this.isbn,
+      sku: this.sku || '',
       description: this.description,
       price: this.price,
       productQuantity: this.productQuantity,
@@ -106,6 +108,10 @@ class Book {
       errors.push('ISBN is required.');
     } else if (this.isbn.length > 20) {
       errors.push('ISBN cannot exceed 20 characters.');
+    }
+
+    if (this.sku && String(this.sku).length > 50) {
+      errors.push('SKU cannot exceed 50 characters.');
     }
 
     if (this.description && this.description.length > 2000) {

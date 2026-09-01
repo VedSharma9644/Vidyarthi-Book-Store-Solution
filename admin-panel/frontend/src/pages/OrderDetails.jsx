@@ -81,6 +81,8 @@ const OrderDetails = () => {
               quantity: item.quantity || 1,
               price: item.price || 0,
               total: item.subtotal || (item.price * (item.quantity || 1)),
+              productQuantity: item.productQuantity != null ? item.productQuantity : 1,
+              perProductPrice: item.perProductPrice != null ? item.perProductPrice : null,
             })),
             // Additional fields for reference
             subtotal: orderData.subtotal || 0,
@@ -95,6 +97,13 @@ const OrderDetails = () => {
             shiprocketAWB: orderData.shiprocketAWB || null,
             shiprocketStatus: orderData.shiprocketStatus || null,
             orderingForStudent: orderData.orderingForStudent || null,
+            studentName:
+              orderData.orderingForStudent?.name?.trim() ||
+              orderData.shippingAddress?.studentName?.trim() ||
+              '',
+            studentRollNumber: orderData.shippingAddress?.studentRollNumber?.trim() || '',
+            orderChannel: orderData.orderChannel || 'mobile',
+            orderChannelLabel: orderData.orderChannelLabel || 'Mobile app',
           };
           
           setOrder(transformedOrder);
@@ -114,6 +123,30 @@ const OrderDetails = () => {
 
     loadOrder();
   }, [orderId]);
+
+  const resolveLineItemPricing = (item) => {
+    const cartQty = Math.max(1, parseInt(item.quantity, 10) || 1);
+    const bundlePrice = Number(item.price) || 0;
+    let lineTotal = Number(item.total);
+    if (!Number.isFinite(lineTotal) || lineTotal <= 0) {
+      lineTotal = bundlePrice * cartQty;
+    }
+
+    const unitsPerBundle = Math.max(1, parseInt(item.productQuantity, 10) || 1);
+    if (unitsPerBundle > 1) {
+      const perUnitFromBook = Number(item.perProductPrice);
+      const unitPrice =
+        Number.isFinite(perUnitFromBook) && perUnitFromBook > 0
+          ? perUnitFromBook
+          : bundlePrice > 0
+            ? bundlePrice / unitsPerBundle
+            : lineTotal / (cartQty * unitsPerBundle);
+      const qty = cartQty * unitsPerBundle;
+      return { qty, unitPrice, lineTotal };
+    }
+
+    return { qty: cartQty, unitPrice: bundlePrice, lineTotal };
+  };
 
   const fetchShiprocketStatus = async () => {
     if (!orderId) return;
@@ -437,6 +470,9 @@ const OrderDetails = () => {
                 <strong>Order Date:</strong> {order.orderDate}
               </p>
               <p>
+                <strong>Order placed via:</strong> {order.orderChannelLabel}
+              </p>
+              <p>
                 <strong>Subtotal:</strong> {formatCurrency(order.subtotal || 0)}
               </p>
               <p>
@@ -504,7 +540,7 @@ const OrderDetails = () => {
             <div className="card-header bg-secondary text-white">Shipping Details</div>
             <div className="card-body">
               <p>
-                <strong>Name:</strong> {order.customerName}
+                <strong>Parent / guardian:</strong> {order.customerName}
               </p>
               <p>
                 <strong>Phone:</strong> {order.phone}
@@ -512,14 +548,15 @@ const OrderDetails = () => {
               <p>
                 <strong>Address:</strong> {order.address}
               </p>
-              {order.orderingForStudent?.name && (
+              {order.studentName ? (
                 <p>
-                  <strong>Student (order for):</strong> {order.orderingForStudent.name}
-                  {order.orderingForStudent.gradeLabel || order.orderingForStudent.schoolLabel
+                  <strong>Student name:</strong> {order.studentName}
+                  {order.studentRollNumber ? ` · Roll No: ${order.studentRollNumber}` : ''}
+                  {order.orderingForStudent?.gradeLabel || order.orderingForStudent?.schoolLabel
                     ? ` (${[order.orderingForStudent.gradeLabel, order.orderingForStudent.schoolLabel].filter(Boolean).join(' · ')})`
                     : ''}
                 </p>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -535,20 +572,23 @@ const OrderDetails = () => {
                 <th>#</th>
                 <th>Product</th>
                 <th>Qty</th>
-                <th>Price (₹)</th>
+                <th>Pr Unit (₹)</th>
                 <th>Total (₹)</th>
               </tr>
             </thead>
             <tbody>
-              {order.items.map((item, index) => (
-                <tr key={item.id}>
-                  <td>{index + 1}</td>
-                  <td>{item.product}</td>
-                  <td>{item.quantity}</td>
-                  <td>{formatCurrency(item.price)}</td>
-                  <td>{formatCurrency(item.total)}</td>
-                </tr>
-              ))}
+              {order.items.map((item, index) => {
+                const { qty, unitPrice, lineTotal } = resolveLineItemPricing(item);
+                return (
+                  <tr key={item.id}>
+                    <td>{index + 1}</td>
+                    <td>{item.product}</td>
+                    <td>{qty}</td>
+                    <td>{formatCurrency(unitPrice)}</td>
+                    <td>{formatCurrency(lineTotal)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

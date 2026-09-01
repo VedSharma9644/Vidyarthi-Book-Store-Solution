@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
@@ -19,6 +20,11 @@ import {
   getOptionalBundlesRest,
   mergeHiddenOptionalBundleGroups,
 } from '../utils/categoryNames';
+import {
+  readCheckoutStudentName,
+  persistCheckoutStudentName,
+} from '../utils/students';
+import ProductTitle from './ProductTitle';
 
 const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   const [cartItems, setCartItems] = useState([]);
@@ -26,7 +32,9 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  
+  const [studentName, setStudentName] = useState('');
+  const [studentError, setStudentError] = useState('');
+
   // State for dropdown expansion (open by default)
   const [expandedCategories, setExpandedCategories] = useState({
     mandatoryTextbooks: true,
@@ -85,6 +93,12 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   // Load cart on mount
   useEffect(() => {
     loadCart();
+  }, []);
+
+  useEffect(() => {
+    readCheckoutStudentName().then((name) => {
+      if (name) setStudentName(name);
+    });
   }, []);
 
   // Initialize expanded bundles when cart items change
@@ -258,12 +272,19 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
     }));
   };
 
-  // Handle place order
-  const handlePlaceOrder = () => {
+  const handleProceedToCheckout = async () => {
     if (cartItems.length === 0) {
       Alert.alert('Empty Cart', 'Your cart is empty. Please add items before placing an order.');
       return;
     }
+
+    const trimmed = studentName.trim();
+    if (!trimmed) {
+      setStudentError('Please enter the student name before checkout.');
+      return;
+    }
+    setStudentError('');
+    await persistCheckoutStudentName(trimmed);
 
     if (onGoToCheckout) {
       onGoToCheckout();
@@ -436,7 +457,7 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                                         {imageUri ? <Image source={{ uri: imageUri }} style={{ width: 80, height: 80 }} resizeMode="cover" onError={() => {}} /> : <Text style={{ color: '#4d997e', fontSize: 32 }}>📦</Text>}
                                       </View>
                                       <View style={styles.itemDetails}>
-                                        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                                        <ProductTitle style={styles.itemName}>{item.name}</ProductTitle>
                                         <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
                                           Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
                                         </Text>
@@ -510,9 +531,9 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                         )}
                       </View>
                       <View style={styles.itemDetails}>
-                        <Text style={styles.itemName} numberOfLines={2}>
+                        <ProductTitle style={styles.itemName}>
                           {item.name}
-                        </Text>
+                        </ProductTitle>
                         <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
                           Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
                         </Text>
@@ -597,9 +618,9 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                                     )}
                                   </View>
                                   <View style={styles.itemDetails}>
-                                    <Text style={styles.itemName} numberOfLines={2}>
+                                    <ProductTitle style={styles.itemName}>
                                       {item.name}
-                                    </Text>
+                                    </ProductTitle>
                                     <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
                                       Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
                                     </Text>
@@ -715,9 +736,9 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
                                           )}
                                         </View>
                                         <View style={styles.itemDetails}>
-                                          <Text style={styles.itemName} numberOfLines={2}>
+                                          <ProductTitle style={styles.itemName}>
                                             {item.name}
-                                          </Text>
+                                          </ProductTitle>
                                           <Text style={{ color: '#666', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
                                             Qty: {item.productQuantity != null && item.productQuantity > 1 ? item.productQuantity : item.quantity}
                                           </Text>
@@ -764,6 +785,42 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
           elevation: 5,
         }}>
           <Text style={styles.orderSummaryTitle}>Order Summary</Text>
+
+          <View style={{ marginBottom: 14 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#0e1b16', marginBottom: 8 }}>
+          Order Placing for:<Text style={{ color: '#ef4444' }}>*</Text>
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#0e1b16', marginBottom: 8 }}>
+              Student name <Text style={{ color: '#ef4444' }}>*</Text>
+            </Text>
+            <TextInput
+              value={studentName}
+              onChangeText={(value) => {
+                setStudentName(value);
+                if (studentError) setStudentError('');
+              }}
+              placeholder="Enter student name"
+              placeholderTextColor="#999"
+              style={{
+                borderWidth: 1,
+                borderColor: studentError ? '#ef4444' : '#dee2e6',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 15,
+                color: '#0e1b16',
+                backgroundColor: '#fff',
+              }}
+            />
+            {studentError ? (
+              <Text style={{ marginTop: 6, fontSize: 13, color: '#ef4444' }}>{studentError}</Text>
+            ) : (
+              <Text style={{ marginTop: 6, fontSize: 13, color: '#666' }}>
+                Required before you proceed to checkout.
+              </Text>
+            )}
+          </View>
+
           <View style={styles.orderSummaryDetails}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
@@ -789,13 +846,13 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
               styles.placeOrderButton,
               isUpdating && { opacity: 0.6 }
             ]} 
-            onPress={handlePlaceOrder}
+            onPress={handleProceedToCheckout}
             disabled={isUpdating}
           >
             {isUpdating ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.placeOrderButtonText}>Place Order</Text>
+              <Text style={styles.placeOrderButtonText}>Proceed to Checkout</Text>
             )}
           </TouchableOpacity>
         </View>

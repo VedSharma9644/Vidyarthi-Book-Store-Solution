@@ -21,6 +21,15 @@ const Sidebar = ({ isOpen }) => {
     if (location.pathname === '/change-password') {
       setOpenMenus((prev) => ({ ...prev, pages: true }));
     }
+    if (
+      location.pathname === '/get-all-books' ||
+      location.pathname === '/bulk-upload-books' ||
+      location.pathname === '/upsert-book' ||
+      location.pathname === '/inventory' ||
+      location.pathname === '/get-all-categories'
+    ) {
+      setOpenMenus((prev) => ({ ...prev, books: true }));
+    }
   }, [location.pathname]);
 
   return (
@@ -90,6 +99,11 @@ const Sidebar = ({ isOpen }) => {
               <li className={`sidebar-item ${isActive('/get-all-books') ? 'active' : ''}`}>
                 <Link to="/get-all-books" className="sidebar-link">
                   <i className="fas fa-book-open me-2"></i>Products
+                </Link>
+              </li>
+              <li className={`sidebar-item ${isActive('/bulk-upload-books') ? 'active' : ''}`}>
+                <Link to="/bulk-upload-books" className="sidebar-link">
+                  <i className="fas fa-file-excel me-2"></i>Bulk Upload
                 </Link>
               </li>
               <li className={`sidebar-item ${isActive('/inventory') ? 'active' : ''}`}>
