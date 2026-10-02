@@ -6,10 +6,9 @@ import {
   readCheckoutStudentName,
   persistCheckoutStudentName,
 } from '../../utils/students';
+import { resolveClientDeliveryCharge } from '../../utils/deliveryCharge';
 
-const DELIVERY_CHARGE = 300;
-
-const CartSummary = ({ cartItems }) => {
+const CartSummary = ({ cartItems, deliveryCharge }) => {
   const navigate = useNavigate();
   const [studentName, setStudentName] = useState(() => readCheckoutStudentName());
   const [studentError, setStudentError] = useState('');
@@ -21,7 +20,7 @@ const CartSummary = ({ cartItems }) => {
   };
 
   const calculateDelivery = () => {
-    return cartItems.length > 0 ? DELIVERY_CHARGE : 0;
+    return resolveClientDeliveryCharge(deliveryCharge, cartItems.length);
   };
 
   const calculateTotal = () => {

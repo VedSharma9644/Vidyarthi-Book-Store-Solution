@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
+import ScreenHeader from './ScreenHeader';
+import ScrollingNoticeBanner from './ScrollingNoticeBanner';
 
 const SchoolSearchScreen = ({ onTabPress, onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,16 +37,16 @@ const SchoolSearchScreen = ({ onTabPress, onClose }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.searchHeader}>
-        <View style={styles.searchHeaderContent}>
-          <View style={styles.searchHeaderSpacer} />
-          <Text style={styles.searchHeaderTitle}>Advanced Search</Text>
+      <ScreenHeader
+        title="Search Schools"
+        right={
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
+
+      <ScrollingNoticeBanner />
 
       {/* Main Content */}
       <ScrollView style={styles.searchMainContent} showsVerticalScrollIndicator={false}>

@@ -22,6 +22,8 @@ import {
   getOptionalBundlesRest,
   mergeHiddenOptionalBundleGroups,
 } from '../utils/categoryNames';
+import { resolveClientDeliveryCharge } from '../utils/deliveryCharge';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 // Load Razorpay script
 const loadRazorpayScript = () => {
@@ -69,7 +71,9 @@ const CheckoutPage = () => {
   const { user } = useAuth();
   const { showError, showSuccess, showWarning } = useModal();
   const isMobile = useIsMobile();
+  usePageTitle('Checkout');
   const [cartItems, setCartItems] = useState([]);
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -77,7 +81,9 @@ const CheckoutPage = () => {
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
     phone: '',
+    alternativeMobile: '',
     address: '',
+    landmark: '',
     city: '',
     state: '',
     postalCode: '',
@@ -153,6 +159,9 @@ const CheckoutPage = () => {
         });
         
         setCartItems(items);
+        setDeliveryCharge(
+          resolveClientDeliveryCharge(result.data.deliveryCharge, items.length)
+        );
         
         const categories = {};
         items.forEach(item => {
@@ -168,6 +177,7 @@ const CheckoutPage = () => {
         });
       } else {
         setCartItems([]);
+        setDeliveryCharge(0);
         if (result.message) {
           setError(result.message);
         }
@@ -176,6 +186,7 @@ const CheckoutPage = () => {
       console.error('Error loading cart:', error);
       setError('Failed to load cart. Please try again.');
       setCartItems([]);
+      setDeliveryCharge(0);
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +197,7 @@ const CheckoutPage = () => {
   };
 
   const calculateDelivery = () => {
-    return cartItems.length > 0 ? 300 : 0;
+    return resolveClientDeliveryCharge(deliveryCharge, cartItems.length);
   };
 
   const calculateTotal = () => {
@@ -274,12 +285,28 @@ const CheckoutPage = () => {
       );
 
       if (!orderResult.success || !orderResult.data) {
+        if (
+          orderResult.code === 'AMOUNT_MISMATCH' &&
+          orderResult.data?.deliveryCharge != null
+        ) {
+          setDeliveryCharge(
+            resolveClientDeliveryCharge(
+              orderResult.data.deliveryCharge,
+              cartItems.length
+            )
+          );
+        }
         showError(orderResult.message || 'Failed to create payment order');
         setIsProcessing(false);
         return;
       }
 
       const orderData = orderResult.data;
+      if (orderData.deliveryCharge != null) {
+        setDeliveryCharge(
+          resolveClientDeliveryCharge(orderData.deliveryCharge, cartItems.length)
+        );
+      }
 
       if (!orderData.keyId || !orderData.orderId || !orderData.amount) {
         showError('Invalid payment order data. Please try again.');
@@ -412,7 +439,9 @@ const CheckoutPage = () => {
     setShippingAddress({
       name: address.name || '',
       phone: address.phone || '',
+      alternativeMobile: address.alternativeMobile || '',
       address: address.address || '',
+      landmark: address.landmark || '',
       city: address.city || '',
       state: address.state || '',
       postalCode: address.postalCode || '',
@@ -735,6 +764,7 @@ const CheckoutPage = () => {
 
           <OrderSummary
             cartItems={cartItems}
+            deliveryCharge={deliveryCharge}
             onPlaceOrder={handlePlaceOrder}
             isProcessing={isProcessing}
             placeOrderDisabled={!canPlaceOrder}

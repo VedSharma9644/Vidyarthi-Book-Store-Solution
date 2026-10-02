@@ -4,6 +4,7 @@ import { styles } from '../css/styles';
 import { profileStyles, colors } from '../css/profileStyles';
 import { useAuth } from '../contexts/AuthContext';
 import ApiService from '../services/apiService';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 /**
  * Shown after first-time registration. User can optionally complete profile (e.g. class) then continue to home.
@@ -11,6 +12,7 @@ import ApiService from '../services/apiService';
 const ProfileCompletePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  usePageTitle('Complete Profile');
   const [classStandard, setClassStandard] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

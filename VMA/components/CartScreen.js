@@ -25,9 +25,12 @@ import {
   persistCheckoutStudentName,
 } from '../utils/students';
 import ProductTitle from './ProductTitle';
+import ScreenHeader from './ScreenHeader';
+import { resolveClientDeliveryCharge } from '../utils/deliveryCharge';
 
 const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
   const [cartItems, setCartItems] = useState([]);
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -74,8 +77,12 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
         });
         
         setCartItems(items);
+        setDeliveryCharge(
+          resolveClientDeliveryCharge(result.data.deliveryCharge, items.length)
+        );
       } else {
         setCartItems([]);
+        setDeliveryCharge(0);
         if (result.message) {
           setError(result.message);
         }
@@ -84,6 +91,7 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
       console.error('Error loading cart:', error);
       setError('Failed to load cart. Please try again.');
       setCartItems([]);
+      setDeliveryCharge(0);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -204,9 +212,6 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
     );
   };
 
-  // Delivery charge per package (in INR)
-  const DELIVERY_CHARGE = 300;
-
   // Calculate subtotal from cart items
   const calculateSubtotal = () => {
     return cartItems.reduce(
@@ -214,12 +219,10 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
       0
     );
   };
-  
 
-  // Calculate delivery charge (300 INR per package/order)
+  // Delivery from cart API (school-based); 0 when cart empty
   const calculateDelivery = () => {
-    // One delivery charge per order/package
-    return cartItems.length > 0 ? DELIVERY_CHARGE : 0;
+    return cartItems.length > 0 ? deliveryCharge : 0;
   };
 
   // Calculate total (subtotal + delivery only, no taxes)
@@ -332,39 +335,28 @@ const CartScreen = ({ onTabPress, onBack, onGoToCheckout }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.cartHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.cartHeaderTitle}>Review Order</Text>
-        <TouchableOpacity
-          onPress={handleClearCart}
-          style={{
-            borderWidth: 1,
-            borderColor: '#e74c3c',
-            borderRadius: 20,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={{ fontSize: 14, marginRight: 4 }}>🗑️</Text>
-          <Text
+      <ScreenHeader
+        title="Cart"
+        onBack={onBack}
+        right={
+          <TouchableOpacity
+            onPress={handleClearCart}
             style={{
-              color: '#ffffff',
-              fontSize: 13,
-              fontWeight: '600',
+              borderWidth: 1,
+              borderColor: '#e74c3c',
+              borderRadius: 20,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              flexDirection: 'row',
+              alignItems: 'center',
             }}
+            activeOpacity={0.7}
           >
-            Clear
-          </Text>
-        </TouchableOpacity>
-
-
-      </View>
+            <Text style={{ fontSize: 12, marginRight: 2 }}>🗑️</Text>
+            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>Clear</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Main Content */}
       <ScrollView 

@@ -10,6 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../css/styles';
 import ApiService from '../services/apiService';
 import BottomNavigation from './BottomNavigation';
+import ScreenHeader from './ScreenHeader';
+import { getGradeScreenTitle } from '../utils/gradeUtils';
 
 const GradeSectionsScreen = ({
   onTabPress,
@@ -66,36 +68,10 @@ const GradeSectionsScreen = ({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#e8f4fc' }}>
-      {/* Header - same style as School Details */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        shadowColor: colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-      }}>
-        <TouchableOpacity
-          style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
-          onPress={onBack}
-        >
-          <Text style={{ fontSize: 24, color: colors.white }}>←</Text>
-        </TouchableOpacity>
-        <Text style={{
-          flex: 1,
-          textAlign: 'center',
-          fontSize: 20,
-          fontWeight: 'bold',
-          color: colors.white,
-          paddingRight: 48,
-        }}>
-          Select section
-        </Text>
-      </View>
+      <ScreenHeader
+        title={getGradeScreenTitle(gradeName) || 'Select Section'}
+        onBack={onBack}
+      />
 
       <ScrollView
         style={{ flex: 1 }}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { booksStyles, colors } from '../../css/booksStyles';
 import { getProductImageByCategory, DEFAULT_IMAGES } from '../../config/imagePaths';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import ProductTitle from '../common/ProductTitle';
 
 const BookCard = ({ book }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -59,7 +60,7 @@ const BookCard = ({ book }) => {
 
         {/* Book Content - Right Side */}
         <div style={booksStyles.bookCardContentMobile}>
-          <h3 style={booksStyles.bookTitleMobile}>{book.title}</h3>
+          <ProductTitle as="h3" style={booksStyles.bookTitleMobile}>{book.title}</ProductTitle>
 
           {/* Price Information Table */}
           <div style={booksStyles.bookPriceTableMobile}>
@@ -132,7 +133,7 @@ const BookCard = ({ book }) => {
 
       {/* Book Content */}
       <div style={booksStyles.bookCardContent}>
-        <h3 style={booksStyles.bookTitle}>{book.title}</h3>
+        <ProductTitle as="h3" style={booksStyles.bookTitle}>{book.title}</ProductTitle>
 
         {/* Price Information */}
         <div style={booksStyles.bookPriceInfo}>

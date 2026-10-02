@@ -6,11 +6,11 @@ import {
   getOptionalBundlesRest,
   mergeHiddenOptionalBundleGroups,
 } from '../../utils/categoryNames';
-
-const DELIVERY_CHARGE = 300;
+import { resolveClientDeliveryCharge } from '../../utils/deliveryCharge';
 
 const OrderSummary = ({
   cartItems,
+  deliveryCharge,
   onPlaceOrder,
   isProcessing,
   placeOrderDisabled = false,
@@ -47,7 +47,7 @@ const OrderSummary = ({
   };
 
   const calculateDelivery = () => {
-    return cartItems.length > 0 ? DELIVERY_CHARGE : 0;
+    return resolveClientDeliveryCharge(deliveryCharge, cartItems.length);
   };
 
   const calculateTotal = () => {

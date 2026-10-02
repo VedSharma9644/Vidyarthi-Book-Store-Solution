@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
+import ScreenHeader from './ScreenHeader';
 import { API_CONFIG } from '../config/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -29,7 +30,6 @@ const ProfileScreen = ({
   onLogout,
   onGoToOrderHistory,
   onGoToShippingAddresses,
-  onGoToManageGrades,
 }) => {
   const { logout } = useAuth();
   const defaultProfileImage = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBpjxEfE7ea34iS2cRGSWsmeaKsAFJRhbMGl69cHfVqKLFhPihowan-DypyvXbvvn0088j2FSLVvnYQccFUXJ73y1eNXuGDz7KAWV5_t5tguQ_78LpNELkmN9zjgxGwv15mYEGnQ2BLbuOaM5v3bB4ZqMjmnvbwFuvNwUatcbej9LbHH92_fwVOMKk2vqSYRmMUXx-d7urQeB4sjVbew1-CARvegFPvB4-ifYUqGvVa0YgVIlUqEF2rkCV3WZX3WmnVstFVlPqbGTI';
@@ -338,12 +338,6 @@ const ProfileScreen = ({
       } else {
         Alert.alert(option, `${option} functionality will be implemented`);
       }
-    } else if (option === 'Manage grades') {
-      if (onGoToManageGrades) {
-        onGoToManageGrades();
-      } else {
-        Alert.alert(option, `${option} is not available.`);
-      }
     } else {
       Alert.alert(option, `${option} functionality will be implemented`);
     }
@@ -400,14 +394,7 @@ const ProfileScreen = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.profileHeader}>
-        <View style={styles.profileHeaderContent}>
-          <View style={styles.profileHeaderSpacer} />
-          <Text style={styles.profileHeaderTitle}>Profile</Text>
-          <View style={styles.profileHeaderSpacer} />
-        </View>
-      </View>
+      <ScreenHeader title="Profile" />
 
       {/* Main Content */}
       <KeyboardAvoidingView
@@ -559,21 +546,6 @@ const ProfileScreen = ({
               </View>
               <Text style={styles.chevronIcon}>›</Text>
             </TouchableOpacity>
-
-            {onGoToManageGrades && (
-              <TouchableOpacity
-                style={styles.optionItem}
-                onPress={() => handleAccountOption('Manage grades')}
-              >
-                <View style={styles.optionLeft}>
-                  <View style={styles.optionIconContainer}>
-                    <Text style={styles.optionIcon}>📚</Text>
-                  </View>
-                  <Text style={styles.optionTitle}>Manage grades</Text>
-                </View>
-                <Text style={styles.chevronIcon}>›</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Orders Section */}

@@ -6,10 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 import ApiService from '../services/apiService';
 import AddressForm from './checkout/AddressForm';
 import LoadingScreen from './common/LoadingScreen';
+import { toTenDigitPhone } from '../utils/phone';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const ShippingAddressesPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const registeredPhone = toTenDigitPhone(user?.phoneNumber || user?.mobileNumber);
+  usePageTitle('Shipping Addresses');
   const [addresses, setAddresses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -61,8 +65,10 @@ const ShippingAddressesPage = () => {
           name: user.firstName && user.lastName 
             ? `${user.firstName} ${user.lastName}`.trim()
             : user.firstName || user.userName || '',
-          phone: user.phoneNumber || '',
+          phone: toTenDigitPhone(user.phoneNumber || ''),
+          alternativeMobile: '',
           address: userAddress.address || '',
+          landmark: '',
           city: userAddress.city || '',
           state: userAddress.state || '',
           postalCode: userAddress.postalCode || '',
@@ -275,6 +281,7 @@ const ShippingAddressesPage = () => {
   const formatAddressDisplay = (address) => {
     const parts = [];
     if (address.address) parts.push(address.address);
+    if (address.landmark) parts.push(address.landmark);
     if (address.city) parts.push(address.city);
     if (address.state) parts.push(address.state);
     if (address.postalCode) parts.push(address.postalCode);
@@ -354,7 +361,9 @@ const ShippingAddressesPage = () => {
               {editingAddress ? 'Edit Address' : 'Add New Address'}
             </h2>
             <AddressForm
+              key={editingAddress?.id || 'new-address'}
               address={editingAddress}
+              defaultPhone={registeredPhone}
               onSave={handleSaveAddress}
               onCancel={() => {
                 setShowAddForm(false);
@@ -451,6 +460,15 @@ const ShippingAddressesPage = () => {
                     }}>
                       {address.phone}
                     </p>
+                    {!!address.alternativeMobile && (
+                      <p style={{
+                        fontSize: '14px',
+                        color: colors.textSecondary,
+                        margin: '4px 0',
+                      }}>
+                        Alt: {address.alternativeMobile}
+                      </p>
+                    )}
                     {formatStudentInfo(address) && (
                       <p style={{
                         fontSize: '13px',

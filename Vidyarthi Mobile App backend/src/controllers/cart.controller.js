@@ -1,4 +1,19 @@
 const cartService = require('../services/cartService');
+const { resolveDeliveryChargeForCartItems } = require('../utils/deliveryCharge');
+
+/**
+ * Attach school-based deliveryCharge to a cart payload for clients.
+ * @param {object} cart
+ * @returns {Promise<object>}
+ */
+async function withDeliveryCharge(cart) {
+    const items = cart?.items || [];
+    if (items.length === 0) {
+        return { ...cart, deliveryCharge: 0 };
+    }
+    const { deliveryCharge } = await resolveDeliveryChargeForCartItems(items);
+    return { ...cart, deliveryCharge };
+}
 
 /**
  * Get user's cart
@@ -16,10 +31,11 @@ const getCart = async (req, res) => {
         }
 
         const cart = await cartService.getOrCreateCart(userId);
+        const data = await withDeliveryCharge(cart);
 
         res.json({
             success: true,
-            data: cart,
+            data,
         });
     } catch (error) {
         console.error('Error in getCart controller:', error);
@@ -63,11 +79,12 @@ const updateCartItem = async (req, res) => {
         }
 
         const cart = await cartService.updateCartItem(userId, itemId, quantityNum);
+        const data = await withDeliveryCharge(cart);
 
         res.json({
             success: true,
             message: 'Cart updated successfully',
-            data: cart,
+            data,
         });
     } catch (error) {
         if (error.code === 'INSUFFICIENT_STOCK') {
@@ -111,11 +128,12 @@ const removeCartItem = async (req, res) => {
         }
 
         const cart = await cartService.removeCartItem(userId, itemId);
+        const data = await withDeliveryCharge(cart);
 
         res.json({
             success: true,
             message: 'Item removed from cart',
-            data: cart,
+            data,
         });
     } catch (error) {
         console.error('Error in removeCartItem controller:', error);
@@ -183,11 +201,12 @@ const addItemsToCart = async (req, res) => {
         }
 
         const { cart, addedCount } = await cartService.addItemsToCart(userId, items);
+        const data = await withDeliveryCharge(cart);
 
         res.json({
             success: true,
             message: 'Items added to cart',
-            data: cart,
+            data,
             addedCount,
         });
     } catch (error) {
@@ -224,11 +243,12 @@ const clearCart = async (req, res) => {
         }
 
         const cart = await cartService.clearCart(userId);
+        const data = await withDeliveryCharge(cart);
 
         res.json({
             success: true,
             message: 'Cart cleared successfully',
-            data: cart,
+            data,
         });
     } catch (error) {
         console.error('Error in clearCart controller:', error);
@@ -248,4 +268,3 @@ module.exports = {
     getCartCount,
     clearCart,
 };
-

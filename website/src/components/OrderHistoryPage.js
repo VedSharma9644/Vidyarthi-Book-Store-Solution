@@ -4,9 +4,11 @@ import { orderStyles, colors } from '../css/orderStyles';
 import { getProductImageByCategory } from '../config/imagePaths';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const OrderHistoryPage = () => {
   const navigate = useNavigate();
+  usePageTitle('Order History');
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);

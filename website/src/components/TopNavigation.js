@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { styles, colors } from '../css/styles';
+import { Link, useLocation, useNavigate, matchPath } from 'react-router-dom';
 import { getResponsiveNavigationStyles } from '../css/navigationStyles';
 import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
 import { LOGO_IMAGES } from '../config/imagePaths';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitleContext } from '../contexts/PageTitleContext';
 
-const TopNavigation = ({ onLogout }) => {
+const TOP_LEVEL_PATHS = ['/', '/search', '/cart', '/profile'];
+
+const TopNavigation = () => {
   const { isLoggedIn, user } = useAuth();
+  const { pageTitle } = usePageTitleContext();
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const navStyles = getResponsiveNavigationStyles(isMobile, isTablet);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
+
   const tabs = [
     { id: 'home', label: 'Home', icon: '🏠', path: '/' },
     { id: 'search', label: 'School Zone', icon: '🔍', path: '/search' },
@@ -23,76 +27,108 @@ const TopNavigation = ({ onLogout }) => {
 
   const getActiveTab = () => {
     const currentPath = location.pathname;
-    const activeTab = tabs.find(tab => tab.path === currentPath);
+    if (currentPath === '/') return 'home';
+    if (currentPath.startsWith('/search') || matchPath('/school/:schoolId', currentPath) || matchPath('/grade/:gradeId', currentPath) || matchPath('/grade/:gradeId/sections', currentPath)) {
+      return 'search';
+    }
+    if (currentPath.startsWith('/cart') || currentPath.startsWith('/checkout')) return 'cart';
+    if (currentPath.startsWith('/profile') || currentPath.startsWith('/orders')) return 'profile';
+    const activeTab = tabs.find((tab) => tab.path === currentPath);
     return activeTab ? activeTab.id : 'home';
   };
 
   if (!isLoggedIn) {
-    return null; // Don't show navigation if not logged in
+    return null;
   }
 
   const activeTab = getActiveTab();
+  const showBack = !TOP_LEVEL_PATHS.includes(location.pathname);
+  const displayTitle = pageTitle || '';
 
   return (
     <div style={navStyles.topNavigation}>
-      <div style={navStyles.topNavContent}>
-        {/* Logo Section */}
+      <div style={{ ...navStyles.topNavContent, position: 'relative' }}>
         <div style={navStyles.topNavLeft}>
-          <img
-            src={LOGO_IMAGES.MAIN}
-            alt="Vidyarthi Kart Logo"
-            style={{
-              height: isMobile ? '40px' : isTablet ? '50px' : '50px',
-              width: 'auto',
-              objectFit: 'contain',
-              marginRight: isMobile ? '8px' : '12px',
-            }}
-            onError={(e) => {
-              // Fallback to text if image fails
-              e.target.style.display = 'none';
-            }}
-          />
-        </div>
-
-        {/* Navigation Links */}
-        <div style={navStyles.topNavCenter}>
-          {!isMobile && tabs.map((tab) => (
-            <Link
-              key={tab.id}
-              to={tab.path}
-              style={{
-                ...navStyles.topNavItem,
-                ...(activeTab === tab.id && navStyles.topNavItemActive),
-                textDecoration: 'none',
-              }}
+          {showBack ? (
+            <button
+              type="button"
+              style={navStyles.backButton}
+              onClick={() => navigate(-1)}
+              aria-label="Go back"
             >
-              <span
-                style={{
-                  ...navStyles.topNavIcon,
-                  ...(activeTab === tab.id && navStyles.topNavIconActive),
-                }}
-              >
-                {tab.icon}
-              </span>
-              <span
-                style={{
-                  ...navStyles.topNavLabel,
-                  ...(activeTab === tab.id && navStyles.topNavLabelActive),
-                }}
-              >
-                {tab.label}
-              </span>
-            </Link>
-          ))}
+              ←
+            </button>
+          ) : null}
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img
+              src={LOGO_IMAGES.MAIN}
+              alt="Vidyarthi Kart Logo"
+              style={{
+                height: isMobile ? '36px' : isTablet ? '50px' : '50px',
+                width: 'auto',
+                objectFit: 'contain',
+                marginRight: isMobile ? '0' : '12px',
+                display: isMobile && displayTitle ? 'none' : 'block',
+              }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          </Link>
+          {!isMobile && displayTitle ? (
+            <span style={navStyles.pageTitleDesktop} title={displayTitle}>
+              {displayTitle}
+            </span>
+          ) : null}
         </div>
 
-        {/* Right Section - Icons & User */}
+        {isMobile && displayTitle ? (
+          <div style={navStyles.pageTitleWrap} aria-live="polite">
+            <span style={navStyles.pageTitleText} title={displayTitle}>
+              {displayTitle}
+            </span>
+          </div>
+        ) : null}
+
+        <div style={navStyles.topNavCenter}>
+          {!isMobile &&
+            tabs.map((tab) => (
+              <Link
+                key={tab.id}
+                to={tab.path}
+                style={{
+                  ...navStyles.topNavItem,
+                  ...(activeTab === tab.id && navStyles.topNavItemActive),
+                  textDecoration: 'none',
+                }}
+              >
+                <span
+                  style={{
+                    ...navStyles.topNavIcon,
+                    ...(activeTab === tab.id && navStyles.topNavIconActive),
+                  }}
+                >
+                  {tab.icon}
+                </span>
+                <span
+                  style={{
+                    ...navStyles.topNavLabel,
+                    ...(activeTab === tab.id && navStyles.topNavLabelActive),
+                  }}
+                >
+                  {tab.label}
+                </span>
+              </Link>
+            ))}
+        </div>
+
         <div style={navStyles.topNavRight}>
           {isMobile && (
             <button
               style={navStyles.mobileMenuToggle}
               onClick={() => setIsMenuOpen((prev) => !prev)}
               aria-label="Toggle menu"
+              type="button"
             >
               {isMenuOpen ? '✕' : '☰'}
             </button>
@@ -117,7 +153,6 @@ const TopNavigation = ({ onLogout }) => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isMobile && isMenuOpen && (
         <div style={navStyles.mobileMenuPanel}>
           {tabs.map((tab) => (
@@ -141,5 +176,3 @@ const TopNavigation = ({ onLogout }) => {
 };
 
 export default TopNavigation;
-
-

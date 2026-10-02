@@ -3,6 +3,7 @@ const { Timestamp, FieldValue } = require('firebase-admin/firestore');
 const cartService = require('./cartService');
 const userService = require('./userService');
 const { resolveProductSku } = require('../utils/productSku');
+const { resolveDeliveryChargeForCartItems } = require('../utils/deliveryCharge');
 
 /** Book types that are mandatory: if out of stock, entire grade order is blocked */
 const MANDATORY_BOOK_TYPES = ['TEXTBOOK', 'MANDATORY_NOTEBOOK'];
@@ -150,6 +151,14 @@ function buildFinalShippingAddress(shippingAddress, user) {
         ).trim() || null,
         country: String(raw.country || 'India').trim() || 'India',
     };
+    const alternativeMobile = String(raw.alternativeMobile || '').trim();
+    if (alternativeMobile) {
+        built.alternativeMobile = alternativeMobile;
+    }
+    const landmark = String(raw.landmark || '').trim();
+    if (landmark) {
+        built.landmark = landmark;
+    }
     const studentName = String(raw.studentName || '').trim();
     if (studentName) {
         built.studentName = studentName;
@@ -332,12 +341,12 @@ class OrderService {
                 throwInventoryError(insufficientItems);
             }
 
-            // Calculate totals (subtotal + delivery only; no tax — matches amount customer pays via Razorpay)
+            // Calculate totals (subtotal + per-school delivery; no tax — matches amount customer pays via Razorpay)
             const subtotal = cart.items.reduce((sum, item) => {
                 return sum + (item.price * item.quantity);
             }, 0);
 
-            const deliveryCharge = 300; // Fixed delivery charge
+            const { deliveryCharge } = await resolveDeliveryChargeForCartItems(cart.items);
             const tax = 0; // No tax applied; order total = amount paid
             const total = subtotal + deliveryCharge;
 
@@ -752,7 +761,7 @@ class OrderService {
             }
 
             const subtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            const deliveryCharge = 300;
+            const { deliveryCharge } = await resolveDeliveryChargeForCartItems(lineItems);
             const tax = 0;
             const total = subtotal + deliveryCharge;
             const orderNumber = await this.generateOrderNumber();

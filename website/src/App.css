@@ -2,3 +2,53 @@
   min-height: 100vh;
   background-color: #ffffff;
 }
+
+/* Policy notice marquee (matches mobile ScrollingNoticeBanner) */
+.scrolling-notice-banner {
+  height: 34px;
+  background-color: #fef3c7;
+  border-bottom: 1px solid #f59e0b;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.scrolling-notice-track {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+  animation: scrolling-notice-marquee 28s linear infinite;
+}
+
+.scrolling-notice-text {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  padding-right: 0;
+  line-height: 34px;
+}
+
+@keyframes scrolling-notice-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrolling-notice-track {
+    animation: none;
+    padding-left: 12px;
+  }
+
+  .scrolling-notice-text[aria-hidden='true'] {
+    display: none;
+  }
+}
+

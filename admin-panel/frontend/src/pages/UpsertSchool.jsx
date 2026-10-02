@@ -20,6 +20,7 @@ const UpsertSchool = () => {
     State: '',
     PhoneNumber: '',
     Email: '',
+    DeliveryCharge: '300',
   });
 
   const [errors, setErrors] = useState({});
@@ -36,6 +37,10 @@ const UpsertSchool = () => {
           const response = await schoolsAPI.getById(schoolId);
           if (response.data.success) {
             const school = response.data.data;
+            const charge =
+              school.deliveryCharge !== undefined && school.deliveryCharge !== null
+                ? school.deliveryCharge
+                : 300;
             setFormData({
               Id: school.id,
               SchoolLogo: school.schoolLogo || '',
@@ -48,6 +53,7 @@ const UpsertSchool = () => {
               State: school.state || '',
               PhoneNumber: school.phoneNumber || '',
               Email: school.email || '',
+              DeliveryCharge: String(charge),
             });
             // Set logo preview if logo exists
             if (school.schoolLogo) {
@@ -169,6 +175,20 @@ const UpsertSchool = () => {
         newErrors.Email = 'Email address is not valid.';
       }
     }
+
+    const deliveryRaw = String(formData.DeliveryCharge ?? '').trim();
+    if (deliveryRaw === '') {
+      newErrors.DeliveryCharge = 'Delivery charge is required.';
+    } else {
+      const deliveryNum = Number(deliveryRaw);
+      if (!Number.isFinite(deliveryNum)) {
+        newErrors.DeliveryCharge = 'Delivery charge must be a valid number.';
+      } else if (deliveryNum < 0) {
+        newErrors.DeliveryCharge = 'Delivery charge cannot be negative.';
+      } else if (deliveryNum > 100000) {
+        newErrors.DeliveryCharge = 'Delivery charge cannot exceed ₹100,000.';
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -226,6 +246,7 @@ const UpsertSchool = () => {
         phoneNumber: formData.PhoneNumber,
         email: formData.Email,
         schoolLogo: logoUrl, // Use uploaded logo URL or existing one
+        deliveryCharge: Number(formData.DeliveryCharge),
       };
 
       let response;
@@ -255,6 +276,7 @@ const UpsertSchool = () => {
             else if (err.toLowerCase().includes('state')) apiErrors.State = err;
             else if (err.toLowerCase().includes('phone')) apiErrors.PhoneNumber = err;
             else if (err.toLowerCase().includes('email')) apiErrors.Email = err;
+            else if (err.toLowerCase().includes('delivery')) apiErrors.DeliveryCharge = err;
           });
           setErrors(apiErrors);
         }
@@ -274,6 +296,7 @@ const UpsertSchool = () => {
           else if (err.toLowerCase().includes('state')) apiErrors.State = err;
           else if (err.toLowerCase().includes('phone')) apiErrors.PhoneNumber = err;
           else if (err.toLowerCase().includes('email')) apiErrors.Email = err;
+          else if (err.toLowerCase().includes('delivery')) apiErrors.DeliveryCharge = err;
         });
         setErrors(apiErrors);
       }
@@ -511,6 +534,30 @@ const UpsertSchool = () => {
                   />
                   {errors.Email && (
                     <span className="text-danger">{errors.Email}</span>
+                  )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="DeliveryCharge">
+                    Delivery Charge (₹) <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    className={`form-control ${errors.DeliveryCharge ? 'is-invalid' : ''}`}
+                    type="number"
+                    id="DeliveryCharge"
+                    name="DeliveryCharge"
+                    min="0"
+                    max="100000"
+                    step="1"
+                    value={formData.DeliveryCharge}
+                    onChange={handleChange}
+                    required
+                  />
+                  <small className="form-text text-muted">
+                    Charge added at checkout for orders from this school. Use 0 for free delivery. Default is ₹300.
+                  </small>
+                  {errors.DeliveryCharge && (
+                    <span className="text-danger d-block">{errors.DeliveryCharge}</span>
                   )}
                 </div>
 

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { styles, colors } from '../css/styles';
 import ApiService from '../services/apiService';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const SearchScreen = () => {
   const navigate = useNavigate();
+  usePageTitle('Search Schools');
   const [schoolCode, setSchoolCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);

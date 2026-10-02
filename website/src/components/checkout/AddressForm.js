@@ -1,14 +1,43 @@
 import React, { useState } from 'react';
-import { checkoutStyles, colors } from '../../css/checkoutStyles';
+import { colors } from '../../css/checkoutStyles';
 import { borderRadius } from '../../css/theme';
+import { digitsOnlyPhone, toTenDigitPhone } from '../../utils/phone';
 
-const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStudentFields = false }) => {
+const inputStyle = (hasError) => ({
+  width: '100%',
+  padding: '12px 16px',
+  fontSize: '16px',
+  border: `1px solid ${hasError ? '#ef4444' : colors.borderLight}`,
+  borderRadius: borderRadius.md,
+  backgroundColor: colors.white,
+  color: colors.textPrimary,
+  boxSizing: 'border-box',
+});
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '14px',
+  fontWeight: '600',
+  color: colors.textPrimary,
+  marginBottom: '8px',
+};
+
+const AddressForm = ({
+  address,
+  onSave,
+  onCancel,
+  isEditing = false,
+  includeStudentFields = false,
+  defaultPhone = '',
+}) => {
   const [formData, setFormData] = useState({
     name: address?.name || '',
-    phone: address?.phone || '',
+    phone: toTenDigitPhone(address?.phone || defaultPhone || ''),
+    alternativeMobile: toTenDigitPhone(address?.alternativeMobile || ''),
     studentName: address?.studentName || '',
     studentRollNumber: address?.studentRollNumber || '',
     address: address?.address || '',
+    landmark: address?.landmark || '',
     city: address?.city || '',
     state: address?.state || '',
     postalCode: address?.postalCode || '',
@@ -30,6 +59,13 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
       newErrors.phone = 'Please enter a valid 10-digit phone number';
     }
 
+    if (
+      formData.alternativeMobile.trim() &&
+      !/^[0-9]{10}$/.test(formData.alternativeMobile.trim())
+    ) {
+      newErrors.alternativeMobile = 'Please enter a valid 10-digit alternative mobile number';
+    }
+
     if (!formData.address.trim()) {
       newErrors.address = 'Address is required';
     }
@@ -43,9 +79,9 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
     }
 
     if (!formData.postalCode.trim()) {
-      newErrors.postalCode = 'Postal code is required';
+      newErrors.postalCode = 'Pin Code is required';
     } else if (!/^[0-9]{6}$/.test(formData.postalCode.trim())) {
-      newErrors.postalCode = 'Please enter a valid 6-digit postal code';
+      newErrors.postalCode = 'Please enter a valid 6-digit Pin Code';
     }
 
     setErrors(newErrors);
@@ -55,7 +91,12 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      const payload = { ...formData };
+      const payload = {
+        ...formData,
+        phone: toTenDigitPhone(formData.phone),
+        alternativeMobile: toTenDigitPhone(formData.alternativeMobile),
+        landmark: formData.landmark.trim(),
+      };
       if (!includeStudentFields) {
         delete payload.studentName;
         delete payload.studentRollNumber;
@@ -65,40 +106,23 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Name */}
       <div>
-        <label style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: colors.textPrimary,
-          marginBottom: '8px',
-        }}>
+        <label style={labelStyle}>
           Full Name <span style={{ color: '#ef4444' }}>*</span>
         </label>
         <input
           type="text"
           value={formData.name}
           onChange={(e) => handleChange('name', e.target.value)}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: `1px solid ${errors.name ? '#ef4444' : colors.borderLight}`,
-            borderRadius: borderRadius.md,
-            backgroundColor: colors.white,
-            color: colors.textPrimary,
-            boxSizing: 'border-box',
-          }}
+          style={inputStyle(!!errors.name)}
           placeholder="Enter full name"
         />
         {errors.name && (
@@ -108,33 +132,18 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         )}
       </div>
 
-      {/* Phone */}
       <div>
-        <label style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: colors.textPrimary,
-          marginBottom: '8px',
-        }}>
+        <label style={labelStyle}>
           Phone Number <span style={{ color: '#ef4444' }}>*</span>
         </label>
         <input
           type="tel"
           value={formData.phone}
-          onChange={(e) => handleChange('phone', e.target.value)}
+          onChange={(e) => handleChange('phone', digitsOnlyPhone(e.target.value))}
           maxLength={10}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: `1px solid ${errors.phone ? '#ef4444' : colors.borderLight}`,
-            borderRadius: borderRadius.md,
-            backgroundColor: colors.white,
-            color: colors.textPrimary,
-            boxSizing: 'border-box',
-          }}
-          placeholder="Enter 10-digit phone number"
+          inputMode="numeric"
+          style={inputStyle(!!errors.phone)}
+          placeholder="10-digit mobile number"
         />
         {errors.phone && (
           <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', margin: '4px 0 0 0' }}>
@@ -143,77 +152,52 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         )}
       </div>
 
-      {includeStudentFields ? (
-        <>
-      {/* Student Name */}
       <div>
-        <label style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: colors.textPrimary,
-          marginBottom: '8px',
-        }}>
-          Student Name
-        </label>
+        <label style={labelStyle}>Alternative Mobile Number</label>
         <input
-          type="text"
-          value={formData.studentName}
-          onChange={(e) => handleChange('studentName', e.target.value)}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: `1px solid ${colors.borderLight}`,
-            borderRadius: borderRadius.md,
-            backgroundColor: colors.white,
-            color: colors.textPrimary,
-            boxSizing: 'border-box',
-          }}
-          placeholder="Enter student name (optional)"
+          type="tel"
+          value={formData.alternativeMobile}
+          onChange={(e) => handleChange('alternativeMobile', digitsOnlyPhone(e.target.value))}
+          maxLength={10}
+          inputMode="numeric"
+          style={inputStyle(!!errors.alternativeMobile)}
+          placeholder="Optional 10-digit mobile number"
         />
+        {errors.alternativeMobile && (
+          <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', margin: '4px 0 0 0' }}>
+            {errors.alternativeMobile}
+          </p>
+        )}
       </div>
 
-      {/* Student Roll Number */}
-      <div>
-        <label style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: colors.textPrimary,
-          marginBottom: '8px',
-        }}>
-          Student Roll Number
-        </label>
-        <input
-          type="text"
-          value={formData.studentRollNumber}
-          onChange={(e) => handleChange('studentRollNumber', e.target.value)}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: `1px solid ${colors.borderLight}`,
-            borderRadius: borderRadius.md,
-            backgroundColor: colors.white,
-            color: colors.textPrimary,
-            boxSizing: 'border-box',
-          }}
-          placeholder="Enter student roll number (optional)"
-        />
-      </div>
+      {includeStudentFields ? (
+        <>
+          <div>
+            <label style={labelStyle}>Student Name</label>
+            <input
+              type="text"
+              value={formData.studentName}
+              onChange={(e) => handleChange('studentName', e.target.value)}
+              style={inputStyle(false)}
+              placeholder="Enter student name (optional)"
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Student Roll Number</label>
+            <input
+              type="text"
+              value={formData.studentRollNumber}
+              onChange={(e) => handleChange('studentRollNumber', e.target.value)}
+              style={inputStyle(false)}
+              placeholder="Enter student roll number (optional)"
+            />
+          </div>
         </>
       ) : null}
 
-      {/* Address */}
       <div>
-        <label style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: colors.textPrimary,
-          marginBottom: '8px',
-        }}>
+        <label style={labelStyle}>
           Street Address <span style={{ color: '#ef4444' }}>*</span>
         </label>
         <textarea
@@ -221,14 +205,7 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
           onChange={(e) => handleChange('address', e.target.value)}
           rows={3}
           style={{
-            width: '100%',
-            padding: '12px 16px',
-            fontSize: '16px',
-            border: `1px solid ${errors.address ? '#ef4444' : colors.borderLight}`,
-            borderRadius: borderRadius.md,
-            backgroundColor: colors.white,
-            color: colors.textPrimary,
-            boxSizing: 'border-box',
+            ...inputStyle(!!errors.address),
             resize: 'vertical',
             fontFamily: 'inherit',
           }}
@@ -241,32 +218,27 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         )}
       </div>
 
-      {/* City and State Row */}
+      <div>
+        <label style={labelStyle}>Landmark</label>
+        <input
+          type="text"
+          value={formData.landmark}
+          onChange={(e) => handleChange('landmark', e.target.value)}
+          style={inputStyle(false)}
+          placeholder="Nearby landmark (optional)"
+        />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: colors.textPrimary,
-            marginBottom: '8px',
-          }}>
+          <label style={labelStyle}>
             City <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
             type="text"
             value={formData.city}
             onChange={(e) => handleChange('city', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              fontSize: '16px',
-              border: `1px solid ${errors.city ? '#ef4444' : colors.borderLight}`,
-              borderRadius: borderRadius.md,
-              backgroundColor: colors.white,
-              color: colors.textPrimary,
-              boxSizing: 'border-box',
-            }}
+            style={inputStyle(!!errors.city)}
             placeholder="Enter city"
           />
           {errors.city && (
@@ -277,29 +249,14 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         </div>
 
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: colors.textPrimary,
-            marginBottom: '8px',
-          }}>
+          <label style={labelStyle}>
             State <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
             type="text"
             value={formData.state}
             onChange={(e) => handleChange('state', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              fontSize: '16px',
-              border: `1px solid ${errors.state ? '#ef4444' : colors.borderLight}`,
-              borderRadius: borderRadius.md,
-              backgroundColor: colors.white,
-              color: colors.textPrimary,
-              boxSizing: 'border-box',
-            }}
+            style={inputStyle(!!errors.state)}
             placeholder="Enter state"
           />
           {errors.state && (
@@ -310,34 +267,22 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         </div>
       </div>
 
-      {/* Postal Code and Country Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: colors.textPrimary,
-            marginBottom: '8px',
-          }}>
-            Postal Code <span style={{ color: '#ef4444' }}>*</span>
+          <label style={labelStyle}>
+            Pin Code <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <input
             type="text"
+            name="pinCode"
+            autoComplete="postal-code"
+            aria-label="Pin Code"
             value={formData.postalCode}
-            onChange={(e) => handleChange('postalCode', e.target.value)}
+            onChange={(e) => handleChange('postalCode', digitsOnlyPhone(e.target.value, 6))}
             maxLength={6}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              fontSize: '16px',
-              border: `1px solid ${errors.postalCode ? '#ef4444' : colors.borderLight}`,
-              borderRadius: borderRadius.md,
-              backgroundColor: colors.white,
-              color: colors.textPrimary,
-              boxSizing: 'border-box',
-            }}
-            placeholder="Enter 6-digit postal code"
+            inputMode="numeric"
+            style={inputStyle(!!errors.postalCode)}
+            placeholder="Enter 6-digit Pin Code"
           />
           {errors.postalCode && (
             <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', margin: '4px 0 0 0' }}>
@@ -347,35 +292,17 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         </div>
 
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: colors.textPrimary,
-            marginBottom: '8px',
-          }}>
-            Country
-          </label>
+          <label style={labelStyle}>Country</label>
           <input
             type="text"
             value={formData.country}
             onChange={(e) => handleChange('country', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              fontSize: '16px',
-              border: `1px solid ${colors.borderLight}`,
-              borderRadius: borderRadius.md,
-              backgroundColor: colors.white,
-              color: colors.textPrimary,
-              boxSizing: 'border-box',
-            }}
+            style={inputStyle(false)}
             placeholder="Enter country"
           />
         </div>
       </div>
 
-      {/* Default Address Checkbox */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <input
           type="checkbox"
@@ -400,7 +327,6 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
         </label>
       </div>
 
-      {/* Form Actions */}
       <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
         <button
           type="submit"
@@ -454,4 +380,3 @@ const AddressForm = ({ address, onSave, onCancel, isEditing = false, includeStud
 };
 
 export default AddressForm;
-

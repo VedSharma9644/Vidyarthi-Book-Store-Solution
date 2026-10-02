@@ -4,12 +4,14 @@ import { styles, colors } from '../css/styles';
 import { getResponsiveHomeStyles } from '../css/homeStyles';
 import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
 import { BANNER_IMAGES } from '../config/imagePaths';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const HomeScreen = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const homeStyles = getResponsiveHomeStyles(isMobile, isTablet);
+  usePageTitle('Home');
 
   const handleSchoolZone = () => {
     navigate('/search');

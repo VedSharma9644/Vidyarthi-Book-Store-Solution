@@ -1,8 +1,17 @@
 const paymentService = require('../services/paymentService');
 const paymentCheckoutAttemptService = require('../services/paymentCheckoutAttemptService');
+const cartService = require('../services/cartService');
 const { orderChannelFromRequest } = require('../utils/orderChannel');
 const { mobileStudentNameUpgradeGate } = require('../utils/mobileCheckoutGate');
 const { buildRazorpayCheckoutNotes } = require('../utils/checkoutMetadata');
+const {
+    resolveDeliveryChargeForCartItems,
+    computeItemsSubtotal,
+    roundInr,
+} = require('../utils/deliveryCharge');
+
+/** Allow ±1 ₹ between client amount and server-computed total (float / rounding). */
+const AMOUNT_TOLERANCE_INR = 1;
 
 /**
  * Create Razorpay order
@@ -49,13 +58,48 @@ const createOrder = async (req, res) => {
             }
         }
 
+        // Prefer checkout snapshot lines; fall back to live cart for amount validation
+        let lineItems =
+            Array.isArray(cartSnapshot) && cartSnapshot.length > 0 ? cartSnapshot : null;
+        if (!lineItems) {
+            const cart = await cartService.getOrCreateCart(String(userId));
+            lineItems = cart.items || [];
+        }
+        if (!lineItems.length) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cart is empty',
+                code: 'CART_EMPTY',
+            });
+        }
+
+        const subtotal = roundInr(computeItemsSubtotal(lineItems));
+        const { deliveryCharge } = await resolveDeliveryChargeForCartItems(lineItems);
+        const expectedTotal = roundInr(subtotal + deliveryCharge);
+        const clientAmount = roundInr(Number(amount));
+
+        if (Math.abs(clientAmount - expectedTotal) > AMOUNT_TOLERANCE_INR) {
+            return res.status(400).json({
+                success: false,
+                message: `Order amount mismatch. Expected ₹${expectedTotal.toFixed(2)} (subtotal ₹${subtotal.toFixed(2)} + delivery ₹${deliveryCharge.toFixed(2)}).`,
+                code: 'AMOUNT_MISMATCH',
+                data: {
+                    expectedTotal,
+                    subtotal,
+                    deliveryCharge,
+                    receivedAmount: clientAmount,
+                },
+            });
+        }
+
         const rzNotes = buildRazorpayCheckoutNotes({
             userId: String(userId),
             orderChannel,
             orderingStudent,
             shippingAddress,
         });
-        const order = await paymentService.createOrder(amount, receipt, rzNotes);
+        // Charge the server-computed total so Razorpay matches order.deliveryCharge
+        const order = await paymentService.createOrder(expectedTotal, receipt, rzNotes);
 
         if (!order?.orderId) {
             return res.status(500).json({
@@ -67,7 +111,7 @@ const createOrder = async (req, res) => {
         await paymentCheckoutAttemptService.recordAttempt({
             razorpayOrderId: order.orderId,
             userId: String(userId),
-            amountInr: Number(amount),
+            amountInr: expectedTotal,
             receipt: receipt || '',
             orderingStudent: orderingStudent || null,
             cartSnapshot: cartSnapshot || null,
@@ -77,7 +121,12 @@ const createOrder = async (req, res) => {
 
         res.json({
             success: true,
-            data: order,
+            data: {
+                ...order,
+                deliveryCharge,
+                subtotal,
+                expectedTotal,
+            },
         });
     } catch (error) {
         console.error('Error in createOrder controller:', error);

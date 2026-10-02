@@ -904,6 +904,8 @@ export const styles = StyleSheet.create({
   },
   itemDetails: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   itemName: {
     fontSize: 16,
@@ -1397,6 +1399,41 @@ export const styles = StyleSheet.create({
   addressSelectionCardWrapper: {
     marginBottom: 12,
   },
+  addressSelectionActionsRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
+  },
+  addressSelectionEditButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+  },
+  addressSelectionEditButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addressSelectionDeleteButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    backgroundColor: colors.white,
+    alignItems: 'center',
+  },
+  addressSelectionDeleteButtonText: {
+    color: '#e74c3c',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   addressSelectionCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
@@ -1448,21 +1485,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  addressDeleteButton: {
-    marginTop: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#e74c3c',
-    backgroundColor: colors.white,
-    alignItems: 'center',
-  },
-  addressDeleteButtonText: {
-    color: '#e74c3c',
-    fontSize: 14,
-    fontWeight: '600',
   },
   // Checkout Screen Styles
   checkoutHeader: {

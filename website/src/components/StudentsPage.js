@@ -6,6 +6,7 @@ import ApiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { normalizeStudentsFromUser, newStudentId } from '../utils/students';
 import { getGradeDisplayLabel } from '../utils/gradeUtils';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 function buildStudentsUpdatePayload(userData, studentsList) {
   return {
@@ -20,6 +21,7 @@ const StudentsPage = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const returnTo = location.state?.returnTo;
+  usePageTitle('Students');
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState(null);
   const [students, setStudents] = useState([]);

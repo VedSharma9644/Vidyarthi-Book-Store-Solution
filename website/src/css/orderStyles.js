@@ -259,6 +259,7 @@ export const orderStyles = {
   },
   orderItemCardDetails: {
     flex: 1,
+    minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
@@ -268,6 +269,10 @@ export const orderStyles = {
     fontWeight: '600',
     color: colors.textPrimary,
     margin: 0,
+    lineHeight: '1.4',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    whiteSpace: 'normal',
   },
   orderItemCardInfo: {
     fontSize: '14px',

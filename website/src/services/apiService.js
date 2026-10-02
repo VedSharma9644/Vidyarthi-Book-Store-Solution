@@ -811,6 +811,8 @@ class ApiService {
         return {
           success: false,
           message: error.response.data?.message || 'Failed to create payment order',
+          code: error.response.data?.code,
+          data: error.response.data?.data,
         };
       } else if (error.request) {
         return {

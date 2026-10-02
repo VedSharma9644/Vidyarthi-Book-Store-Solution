@@ -16,10 +16,20 @@ const AddressSection = ({ shippingAddress, onAddressChange }) => {
     }
     const parts = [];
     if (shippingAddress.address) parts.push(shippingAddress.address);
+    if (shippingAddress.landmark) parts.push(shippingAddress.landmark);
     if (shippingAddress.city) parts.push(shippingAddress.city);
     if (shippingAddress.state) parts.push(shippingAddress.state);
     if (shippingAddress.postalCode) parts.push(shippingAddress.postalCode);
     return parts.join(', ');
+  };
+
+  const formatContactInfo = () => {
+    const parts = [];
+    if (shippingAddress.phone) parts.push(shippingAddress.phone);
+    if (shippingAddress.alternativeMobile) {
+      parts.push(`Alt: ${shippingAddress.alternativeMobile}`);
+    }
+    return parts.length > 0 ? parts.join(' | ') : null;
   };
 
   const formatStudentInfo = () => {
@@ -58,6 +68,16 @@ const AddressSection = ({ shippingAddress, onAddressChange }) => {
               <h3 style={checkoutStyles.infoCardTitle}>
                 {shippingAddress.name || 'Add Shipping Address'}
               </h3>
+              {formatContactInfo() && (
+                <p style={{
+                  fontSize: '13px',
+                  color: colors.textSecondary,
+                  fontWeight: '500',
+                  margin: '4px 0',
+                }}>
+                  {formatContactInfo()}
+                </p>
+              )}
               {formatStudentInfo() && (
                 <p style={{
                   fontSize: '13px',

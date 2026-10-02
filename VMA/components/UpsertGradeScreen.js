@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
+import ScreenHeader from './ScreenHeader';
 
 const UpsertGradeScreen = ({ onTabPress, onBack, gradeId }) => {
   const [gradeName, setGradeName] = useState('');
@@ -127,17 +128,11 @@ const UpsertGradeScreen = ({ onTabPress, onBack, gradeId }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.upsertGradeHeader}>
-          <View style={styles.upsertGradeHeaderContent}>
-            <TouchableOpacity style={styles.backButton} onPress={onBack}>
-              <Text style={styles.backButtonText}>‹</Text>
-            </TouchableOpacity>
-            <Text style={styles.upsertGradeHeaderTitle}>
-              {isEditMode ? 'Edit Grade' : 'Add Grade'}
-            </Text>
-            <View style={styles.headerSpacer} />
-          </View>
-        </View>
+        <ScreenHeader
+          title={isEditMode ? 'Edit Grade' : 'Add Grade'}
+          onBack={onBack}
+          backLabel="‹"
+        />
         <View style={styles.upsertGradeLoadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.upsertGradeLoadingText}>Loading...</Text>
@@ -148,18 +143,11 @@ const UpsertGradeScreen = ({ onTabPress, onBack, gradeId }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.upsertGradeHeader}>
-        <View style={styles.upsertGradeHeaderContent}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.upsertGradeHeaderTitle}>
-            {isEditMode ? 'Edit Grade' : 'Add Grade'}
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-      </View>
+      <ScreenHeader
+        title={isEditMode ? 'Edit Grade' : 'Add Grade'}
+        onBack={onBack}
+        backLabel="‹"
+      />
 
       {/* Main Content */}
       <KeyboardAvoidingView

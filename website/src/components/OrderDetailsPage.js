@@ -4,10 +4,12 @@ import { orderStyles, colors } from '../css/orderStyles';
 import { getProductImageByCategory } from '../config/imagePaths';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const OrderDetailsPage = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  usePageTitle('Order Details');
   const [orderData, setOrderData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -207,10 +209,10 @@ const OrderDetailsPage = () => {
               </div>
             )}
             
-            {orderData.deliveryCharge && (
+            {orderData.deliveryCharge != null && (
               <div style={orderStyles.orderDetailsRow}>
                 <span style={orderStyles.orderDetailsLabel}>Delivery Charge</span>
-                <span style={orderStyles.orderDetailsValue}>₹{orderData.deliveryCharge.toFixed(2)}</span>
+                <span style={orderStyles.orderDetailsValue}>₹{Number(orderData.deliveryCharge).toFixed(2)}</span>
               </div>
             )}
             

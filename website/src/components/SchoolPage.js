@@ -7,6 +7,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
 import { sortGrades, getGradeDisplayLabel } from '../utils/gradeUtils';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const SchoolPage = () => {
   const { schoolId } = useParams();
@@ -18,6 +19,8 @@ const SchoolPage = () => {
   const [sectionsByGradeId, setSectionsByGradeId] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  usePageTitle(school?.name || school?.branchName || 'School');
 
   useEffect(() => {
     loadSchool();

@@ -15,6 +15,7 @@ import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
 import { API_CONFIG } from '../config/apiConfig';
 import { useAuth } from '../contexts/AuthContext';
+import ScrollingNoticeBanner from './ScrollingNoticeBanner';
 
 
 const HomeScreen = ({ onTabPress, onGoToSearch, onGoToOrderHistory }) => {
@@ -183,6 +184,8 @@ const HomeScreen = ({ onTabPress, onGoToSearch, onGoToOrderHistory }) => {
           </View>
         </View>
       </View>
+
+      <ScrollingNoticeBanner />
 
       {/* Main Content */}
       <ScrollView style={styles.homeMainContent} showsVerticalScrollIndicator={false}>

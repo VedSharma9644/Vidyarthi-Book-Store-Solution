@@ -13,6 +13,7 @@ import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
 import ProductTitle from './ProductTitle';
+import ScreenHeader from './ScreenHeader';
 
 const OrderDetailsScreen = ({ onTabPress, onBack, orderId }) => {
   const [orderData, setOrderData] = useState(null);
@@ -176,22 +177,7 @@ const OrderDetailsScreen = ({ onTabPress, onBack, orderId }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.orderDetailsHeader}>
-        <View style={styles.orderDetailsHeaderContent}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.orderDetailsHeaderTitle}>Order Details</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        {/* Debug: Show orderId in header if in development */}
-        {__DEV__ && orderId && (
-          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, paddingHorizontal: 16, paddingBottom: 4 }}>
-            Order ID: {orderId}
-          </Text>
-        )}
-      </View>
+      <ScreenHeader title="Order Details" onBack={onBack} backLabel="‹" />
 
       {/* Main Content */}
       <ScrollView style={styles.orderDetailsMainContent} showsVerticalScrollIndicator={false}>

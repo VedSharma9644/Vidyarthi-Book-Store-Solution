@@ -4,9 +4,11 @@ import { borderRadius } from '../../css/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import ApiService from '../../services/apiService';
 import AddressForm from './AddressForm';
+import { toTenDigitPhone } from '../../utils/phone';
 
 const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
   const { user } = useAuth();
+  const registeredPhone = toTenDigitPhone(user?.phoneNumber || user?.mobileNumber);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -57,8 +59,10 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
           name: user.firstName && user.lastName 
             ? `${user.firstName} ${user.lastName}`.trim()
             : user.firstName || user.userName || '',
-          phone: user.phoneNumber || '',
+          phone: toTenDigitPhone(user.phoneNumber || ''),
+          alternativeMobile: '',
           address: userAddress.address || '',
+          landmark: '',
           city: userAddress.city || '',
           state: userAddress.state || '',
           postalCode: userAddress.postalCode || '',
@@ -226,6 +230,7 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
   const formatAddressDisplay = (address) => {
     const parts = [];
     if (address.address) parts.push(address.address);
+    if (address.landmark) parts.push(address.landmark);
     if (address.city) parts.push(address.city);
     if (address.state) parts.push(address.state);
     if (address.postalCode) parts.push(address.postalCode);
@@ -264,7 +269,9 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
         <div style={checkoutStyles.addressModalBody}>
           {showAddForm ? (
             <AddressForm
+              key={editingAddress?.id || 'new-address'}
               address={editingAddress}
+              defaultPhone={registeredPhone}
               onSave={handleSaveAddress}
               onCancel={() => {
                 setShowAddForm(false);
@@ -330,6 +337,11 @@ const AddressModal = ({ onClose, onSelectAddress, selectedAddress }) => {
                     >
                       <h3 style={checkoutStyles.addressCardName}>{address.name}</h3>
                       <p style={checkoutStyles.addressCardPhone}>{address.phone}</p>
+                      {!!address.alternativeMobile && (
+                        <p style={checkoutStyles.addressCardPhone}>
+                          Alt: {address.alternativeMobile}
+                        </p>
+                      )}
                       {formatAddressCard(address) && (
                         <p style={{
                           fontSize: '13px',

@@ -64,6 +64,30 @@ import {
   persistCheckoutStudentName,
   orderingStudentFromName,
 } from '../utils/students';
+import { resolveClientDeliveryCharge } from '../utils/deliveryCharge';
+import ScreenHeader from './ScreenHeader';
+
+/** Normalize registered/account phone to 10 digits for address forms. */
+function toTenDigitPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits;
+}
+
+/** Map a saved address into checkout shippingAddress shape. */
+function toShippingAddress(address = {}, fallbackPhone = '') {
+  return {
+    name: address.name || '',
+    phone: toTenDigitPhone(address.phone || fallbackPhone),
+    alternativeMobile: toTenDigitPhone(address.alternativeMobile || ''),
+    address: address.address || '',
+    landmark: address.landmark || '',
+    city: address.city || '',
+    state: address.state || '',
+    postalCode: address.postalCode || '',
+    country: address.country || 'India',
+  };
+}
 
 /** Line items sent with create-payment-order for server-side fulfillment (webhook / reconcile). */
 function buildCartSnapshotForPayment(items) {
@@ -89,6 +113,7 @@ function buildCartSnapshotForPayment(items) {
 const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
   const { user } = useAuth();
   const [cartItems, setCartItems] = useState([]);
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -106,13 +131,16 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
   const [showAddressSelectionModal, setShowAddressSelectionModal] = useState(false);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [pendingAddAddress, setPendingAddAddress] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState(null);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [addressFormData, setAddressFormData] = useState({
     name: '',
     phone: '',
+    alternativeMobile: '',
     address: '',
+    landmark: '',
     city: '',
     state: '',
     postalCode: '',
@@ -122,7 +150,9 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
     phone: '',
+    alternativeMobile: '',
     address: '',
+    landmark: '',
     city: '',
     state: '',
     postalCode: '',
@@ -134,9 +164,6 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
   const orderingForOrderRef = useRef(null);
   const studentMissingAlertShown = useRef(false);
   const orderProcessingShownRef = useRef(false);
-
-  // Delivery charge per package (in INR) - same as CartScreen
-  const DELIVERY_CHARGE = 300;
 
   // Load saved addresses and checkout student name
   useEffect(() => {
@@ -203,43 +230,33 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
         const defaultAddress = addresses.find(addr => addr.isDefault);
         if (defaultAddress) {
           setSelectedAddressId(defaultAddress.id);
-          setShippingAddress({
-            name: defaultAddress.name || '',
-            phone: defaultAddress.phone || '',
-            address: defaultAddress.address || '',
-            city: defaultAddress.city || '',
-            state: defaultAddress.state || '',
-            postalCode: defaultAddress.postalCode || '',
-            country: defaultAddress.country || 'India',
-          });
+          setShippingAddress(toShippingAddress(defaultAddress));
         } else if (addresses.length > 0) {
           // If no default, select first address
           const firstAddress = addresses[0];
           setSelectedAddressId(firstAddress.id);
-          setShippingAddress({
-            name: firstAddress.name || '',
-            phone: firstAddress.phone || '',
-            address: firstAddress.address || '',
-            city: firstAddress.city || '',
-            state: firstAddress.state || '',
-            postalCode: firstAddress.postalCode || '',
-            country: firstAddress.country || 'India',
-          });
+          setShippingAddress(toShippingAddress(firstAddress));
         }
       } else if (user) {
         // Fallback to user data if no saved addresses
         const userAddress = user.address || {};
-        setShippingAddress({
-          name: user.firstName && user.lastName 
-            ? `${user.firstName} ${user.lastName}`.trim()
-            : user.firstName || user.userName || '',
-          phone: user.phoneNumber || '',
-          address: userAddress.address || '',
-          city: userAddress.city || '',
-          state: userAddress.state || '',
-          postalCode: userAddress.postalCode || '',
-          country: userAddress.country || 'India',
-        });
+        setShippingAddress(
+          toShippingAddress(
+            {
+              name:
+                user.firstName && user.lastName
+                  ? `${user.firstName} ${user.lastName}`.trim()
+                  : user.firstName || user.userName || '',
+              phone: user.phoneNumber || '',
+              address: userAddress.address || '',
+              city: userAddress.city || '',
+              state: userAddress.state || '',
+              postalCode: userAddress.postalCode || '',
+              country: userAddress.country || 'India',
+            },
+            user.phoneNumber
+          )
+        );
       }
     } catch (error) {
       console.error('Error loading saved addresses:', error);
@@ -304,8 +321,12 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
         });
         
         setCartItems(items);
+        setDeliveryCharge(
+          resolveClientDeliveryCharge(result.data.deliveryCharge, items.length)
+        );
       } else {
         setCartItems([]);
+        setDeliveryCharge(0);
         if (result.message) {
           setError(result.message);
         }
@@ -314,6 +335,7 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
       console.error('Error loading cart:', error);
       setError('Failed to load cart. Please try again.');
       setCartItems([]);
+      setDeliveryCharge(0);
     } finally {
       setIsLoading(false);
     }
@@ -324,9 +346,9 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
     return cartItems.reduce((total, item) => total + (item.subtotal || (item.price * item.quantity)), 0);
   };
 
-  // Calculate delivery charge (300 INR per package/order)
+  // Delivery from cart API (school-based); 0 when cart empty
   const calculateDelivery = () => {
-    return cartItems.length > 0 ? DELIVERY_CHARGE : 0;
+    return cartItems.length > 0 ? deliveryCharge : 0;
   };
 
   // Calculate total (subtotal + delivery only, no taxes)
@@ -536,18 +558,39 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
 
   const handleAddNewAddress = () => {
     setShowAddressSelectionModal(false);
+    setEditingAddressId(null);
     // Set flag to open add modal after selection modal closes
     setPendingAddAddress(true);
-    // Reset form data
+    // Reset form data (prefill registered phone)
     setAddressFormData({
       name: '',
-      phone: '',
+      phone: toTenDigitPhone(user?.phoneNumber),
+      alternativeMobile: '',
       address: '',
+      landmark: '',
       city: '',
       state: '',
       postalCode: '',
       country: 'India',
       isDefault: savedAddresses.length === 0,
+    });
+  };
+
+  const handleEditAddress = (address) => {
+    setShowAddressSelectionModal(false);
+    setEditingAddressId(address.id);
+    setPendingAddAddress(true);
+    setAddressFormData({
+      name: address.name || '',
+      phone: toTenDigitPhone(address.phone),
+      alternativeMobile: toTenDigitPhone(address.alternativeMobile),
+      address: address.address || '',
+      landmark: address.landmark || '',
+      city: address.city || '',
+      state: address.state || '',
+      postalCode: address.postalCode || '',
+      country: address.country || 'India',
+      isDefault: !!address.isDefault,
     });
   };
 
@@ -572,7 +615,9 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                 setShippingAddress({
                   name: '',
                   phone: '',
+                  alternativeMobile: '',
                   address: '',
+                  landmark: '',
                   city: '',
                   state: '',
                   postalCode: '',
@@ -601,6 +646,13 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
+    if (
+      addressFormData.alternativeMobile.trim() &&
+      addressFormData.alternativeMobile.trim().length !== 10
+    ) {
+      Alert.alert('Error', 'Please enter a valid 10-digit alternative mobile number');
+      return;
+    }
     if (!addressFormData.address.trim()) {
       Alert.alert('Error', 'Please enter your address');
       return;
@@ -614,47 +666,53 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
       return;
     }
     if (!addressFormData.postalCode.trim()) {
-      Alert.alert('Error', 'Please enter your postal code');
+      Alert.alert('Error', 'Please enter your pin code');
       return;
     }
 
     try {
       setIsSavingAddress(true);
       let updatedAddresses;
+      let savedAddress;
 
-      // Add new address
-      const newAddress = {
-        ...addressFormData,
-        id: Date.now().toString(),
-      };
-      
-      // If this is set as default, remove default from others
-      if (addressFormData.isDefault) {
-        updatedAddresses = savedAddresses.map(addr => ({ ...addr, isDefault: false }));
+      if (editingAddressId) {
+        updatedAddresses = savedAddresses.map((addr) => {
+          if (addr.id !== editingAddressId) {
+            return addressFormData.isDefault ? { ...addr, isDefault: false } : addr;
+          }
+          return {
+            ...addressFormData,
+            id: editingAddressId,
+          };
+        });
+        savedAddress = updatedAddresses.find((addr) => addr.id === editingAddressId);
       } else {
-        updatedAddresses = [...savedAddresses];
+        savedAddress = {
+          ...addressFormData,
+          id: Date.now().toString(),
+        };
+        if (addressFormData.isDefault) {
+          updatedAddresses = savedAddresses.map((addr) => ({ ...addr, isDefault: false }));
+        } else {
+          updatedAddresses = [...savedAddresses];
+        }
+        updatedAddresses.push(savedAddress);
       }
-      updatedAddresses.push(newAddress);
 
       await saveAddresses(updatedAddresses);
       setSavedAddresses(updatedAddresses);
-      
-      // Select the newly added address
-      setSelectedAddressId(newAddress.id);
-      setShippingAddress({
-        name: newAddress.name || '',
-        phone: newAddress.phone || '',
-        address: newAddress.address || '',
-        city: newAddress.city || '',
-        state: newAddress.state || '',
-        postalCode: newAddress.postalCode || '',
-        country: newAddress.country || 'India',
-      });
-      
+
+      if (savedAddress) {
+        setSelectedAddressId(savedAddress.id);
+        setShippingAddress(toShippingAddress(savedAddress));
+      }
+
       setShowAddAddressModal(false);
       setShowAddressSelectionModal(false);
       setPendingAddAddress(false);
-      Alert.alert('Success', 'Address added successfully');
+      const wasEditing = Boolean(editingAddressId);
+      setEditingAddressId(null);
+      Alert.alert('Success', wasEditing ? 'Address updated successfully' : 'Address added successfully');
     } catch (error) {
       console.error('Error saving address:', error);
       Alert.alert('Error', 'Failed to save address. Please try again.');
@@ -665,21 +723,14 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
 
   const handleSelectAddress = (address) => {
     setSelectedAddressId(address.id);
-    setShippingAddress({
-      name: address.name || '',
-      phone: address.phone || '',
-      address: address.address || '',
-      city: address.city || '',
-      state: address.state || '',
-      postalCode: address.postalCode || '',
-      country: address.country || 'India',
-    });
+    setShippingAddress(toShippingAddress(address));
     setShowAddressSelectionModal(false);
   };
 
   const formatAddressDisplay = (address) => {
     const parts = [];
     if (address.address) parts.push(address.address);
+    if (address.landmark) parts.push(address.landmark);
     if (address.city) parts.push(address.city);
     if (address.state) parts.push(address.state);
     if (address.postalCode) parts.push(address.postalCode);
@@ -690,14 +741,7 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.checkoutHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.checkoutHeaderTitle}>Checkout</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenHeader title="Checkout" onBack={onBack} />
 
       {/* Main Content */}
       <ScrollView 
@@ -895,7 +939,15 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                   </Text>
                   <Text style={styles.infoCardSubtitle} numberOfLines={2}>
                     {shippingAddress.address && shippingAddress.city && shippingAddress.state
-                      ? `${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`
+                      ? [
+                          shippingAddress.address,
+                          shippingAddress.landmark,
+                          shippingAddress.city,
+                          shippingAddress.state,
+                          shippingAddress.postalCode,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')
                       : 'Tap to add shipping address'}
                   </Text>
                 </View>
@@ -1275,6 +1327,11 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                       <View style={styles.addressSelectionCardContent}>
                         <Text style={styles.addressSelectionCardName}>{address.name}</Text>
                         <Text style={styles.addressSelectionCardPhone}>{address.phone}</Text>
+                        {!!address.alternativeMobile && (
+                          <Text style={styles.addressSelectionCardPhone}>
+                            Alt: {address.alternativeMobile}
+                          </Text>
+                        )}
                         <Text style={styles.addressSelectionCardAddress}>{formatAddressDisplay(address)}</Text>
                         {address.country && (
                           <Text style={styles.addressSelectionCardCountry}>{address.country}</Text>
@@ -1286,12 +1343,20 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                         </View>
                       )}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.addressDeleteButton}
-                      onPress={() => handleDeleteAddress(address.id)}
-                    >
-                      <Text style={styles.addressDeleteButtonText}>Delete</Text>
-                    </TouchableOpacity>
+                    <View style={styles.addressSelectionActionsRow}>
+                      <TouchableOpacity
+                        style={styles.addressSelectionEditButton}
+                        onPress={() => handleEditAddress(address)}
+                      >
+                        <Text style={styles.addressSelectionEditButtonText}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.addressSelectionDeleteButton}
+                        onPress={() => handleDeleteAddress(address.id)}
+                      >
+                        <Text style={styles.addressSelectionDeleteButtonText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))
               )}
@@ -1301,7 +1366,7 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
         </View>
       </Modal>
 
-      {/* Add New Address Modal */}
+      {/* Add/Edit Address Modal */}
       <Modal
         visible={showAddAddressModal}
         transparent={true}
@@ -1309,6 +1374,7 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
         onRequestClose={() => {
           setShowAddAddressModal(false);
           setPendingAddAddress(false);
+          setEditingAddressId(null);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1320,10 +1386,13 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
             >
               <View style={styles.addressModalContent}>
                 <View style={styles.addressModalHeader}>
-                  <Text style={styles.addressModalTitle}>Add New Address</Text>
+                  <Text style={styles.addressModalTitle}>
+                    {editingAddressId ? 'Edit Address' : 'Add New Address'}
+                  </Text>
                   <TouchableOpacity onPress={() => {
                     setShowAddAddressModal(false);
                     setPendingAddAddress(false);
+                    setEditingAddressId(null);
                   }}>
                     <Text style={styles.modalCloseButton}>✕</Text>
                   </TouchableOpacity>
@@ -1360,6 +1429,24 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                 </View>
 
                 <View style={styles.formFieldContainer}>
+                  <Text style={styles.formLabel}>Alternative Mobile Number</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Optional 10-digit mobile number"
+                    placeholderTextColor={`${colors.textPrimary}60`}
+                    value={addressFormData.alternativeMobile}
+                    onChangeText={(text) =>
+                      setAddressFormData({
+                        ...addressFormData,
+                        alternativeMobile: text.replace(/[^0-9]/g, '').slice(0, 10),
+                      })
+                    }
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                </View>
+
+                <View style={styles.formFieldContainer}>
                   <Text style={styles.formLabel}>Address *</Text>
                   <TextInput
                     style={[styles.formInput, { height: 80, textAlignVertical: 'top' }]}
@@ -1368,6 +1455,17 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                     value={addressFormData.address}
                     onChangeText={(text) => setAddressFormData({ ...addressFormData, address: text })}
                     multiline
+                  />
+                </View>
+
+                <View style={styles.formFieldContainer}>
+                  <Text style={styles.formLabel}>Landmark</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Nearby landmark (optional)"
+                    placeholderTextColor={`${colors.textPrimary}60`}
+                    value={addressFormData.landmark}
+                    onChangeText={(text) => setAddressFormData({ ...addressFormData, landmark: text })}
                   />
                 </View>
 
@@ -1394,10 +1492,10 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                 </View>
 
                 <View style={styles.formFieldContainer}>
-                  <Text style={styles.formLabel}>Postal Code *</Text>
+                  <Text style={styles.formLabel}>Pin Code *</Text>
                   <TextInput
                     style={styles.formInput}
-                    placeholder="Enter postal code"
+                    placeholder="Enter pin code"
                     placeholderTextColor={`${colors.textPrimary}60`}
                     value={addressFormData.postalCode}
                     onChangeText={(text) => setAddressFormData({ ...addressFormData, postalCode: text })}
@@ -1434,7 +1532,9 @@ const CheckoutScreen = ({ onBack, onBackToCart, onPlaceOrder }) => {
                   {isSavingAddress ? (
                     <ActivityIndicator size="small" color={colors.white} />
                   ) : (
-                    <Text style={styles.saveAddressButtonText}>Save Address</Text>
+                    <Text style={styles.saveAddressButtonText}>
+                      {editingAddressId ? 'Update Address' : 'Save Address'}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>

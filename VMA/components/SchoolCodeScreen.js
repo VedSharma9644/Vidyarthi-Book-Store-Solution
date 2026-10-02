@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
+import ScreenHeader from './ScreenHeader';
+import ScrollingNoticeBanner from './ScrollingNoticeBanner';
 
 const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
   const [schoolCode, setSchoolCode] = useState('');
@@ -133,14 +135,8 @@ const SchoolCodeScreen = ({ onTabPress, onBack, onSchoolSelected }) => {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[{ flex: 1 }, { opacity: fadeAnimation }]}>
-      {/* Header */}
-      <View style={styles.schoolCodeHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.schoolCodeHeaderTitle}>School Code</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenHeader title="School Code" onBack={onBack} />
+      <ScrollingNoticeBanner />
 
       {/* Main Content */}
       <KeyboardAvoidingView 

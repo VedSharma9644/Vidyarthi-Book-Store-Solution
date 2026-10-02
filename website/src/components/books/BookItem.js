@@ -1,5 +1,6 @@
 import React from 'react';
 import { colors } from '../../css/styles';
+import ProductTitle from '../common/ProductTitle';
 
 const BookItem = ({ book }) => {
   const imageUri = book.coverImageUrl && book.coverImageUrl.trim() !== '' 
@@ -57,17 +58,17 @@ const BookItem = ({ book }) => {
 
       {/* Book Details */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h4 style={{
-          color: colors.textPrimary,
-          fontSize: '16px',
-          fontWeight: '500',
-          margin: '0 0 6px 0',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
+        <ProductTitle
+          as="h4"
+          style={{
+            color: colors.textPrimary,
+            fontSize: '16px',
+            fontWeight: '500',
+            margin: '0 0 6px 0',
+          }}
+        >
           {book.title}
-        </h4>
+        </ProductTitle>
 
         {/* Price Details */}
         <div style={{ marginTop: '6px' }}>

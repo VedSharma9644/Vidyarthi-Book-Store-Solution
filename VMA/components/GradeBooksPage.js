@@ -22,6 +22,8 @@ import {
 } from '../utils/categoryNames';
 import { getGradeScreenTitle } from '../utils/gradeUtils';
 import ProductTitle from './ProductTitle';
+import ScreenHeader from './ScreenHeader';
+import ScrollingNoticeBanner from './ScrollingNoticeBanner';
 
 const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName, schoolId, subgradeId, subgradeName }) => {
   const [textbooks, setTextbooks] = useState([]);
@@ -387,6 +389,11 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
   if (isLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
+        <ScreenHeader
+          title={getGradeScreenTitle(gradeName) || 'Grade Books'}
+          onBack={onBack}
+        />
+        <ScrollingNoticeBanner />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#06412c" />
           <Text style={{ marginTop: 16, color: '#0e1b16' }}>
@@ -400,6 +407,11 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
   if (error) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
+        <ScreenHeader
+          title={getGradeScreenTitle(gradeName) || 'Grade Books'}
+          onBack={onBack}
+        />
+        <ScrollingNoticeBanner />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <Text style={{ fontSize: 18, color: '#0e1b16', marginBottom: 10, textAlign: 'center' }}>
             {error}
@@ -423,73 +435,43 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
-      {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        justifyContent: 'space-between',
-        shadowColor: colors.black,
-        shadowOffset: {
-          width: 0,
-          height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-      }}>
-        <TouchableOpacity
-          style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
-          onPress={onBack}
-        >
-          <Text style={{ fontSize: 24, color: colors.white }}>←</Text>
-        </TouchableOpacity>
-        <Text style={{
-          flex: 1,
-          textAlign: 'center',
-          fontSize: 20,
-          fontWeight: 'bold',
-          color: colors.white,
-        }}>
-          {getGradeScreenTitle(gradeName) || 'Grade Books'}
-        </Text>
-        <TouchableOpacity
-          style={{ 
-            width: 48, 
-            height: 48, 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            position: 'relative',
-          }}
-          onPress={() => onTabPress('cart')}
-        >
-          <Text style={{ fontSize: 24, color: colors.white }}>🛒</Text>
-          {cartCount > 0 && (
-            <View style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              backgroundColor: '#e74c3c',
-              borderRadius: 10,
-              minWidth: 20,
-              height: 20,
+      <ScreenHeader
+        title={getGradeScreenTitle(gradeName) || 'Grade Books'}
+        onBack={onBack}
+        right={
+          <TouchableOpacity
+            style={{
+              width: 44,
+              height: 44,
               justifyContent: 'center',
               alignItems: 'center',
-              paddingHorizontal: 6,
-            }}>
-              <Text style={{
-                color: '#ffffff',
-                fontSize: 12,
-                fontWeight: 'bold',
+              position: 'relative',
+            }}
+            onPress={() => onTabPress('cart')}
+          >
+            <Text style={{ fontSize: 22, color: colors.white }}>🛒</Text>
+            {cartCount > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 6,
+                right: 4,
+                backgroundColor: '#e74c3c',
+                borderRadius: 10,
+                minWidth: 18,
+                height: 18,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingHorizontal: 4,
               }}>
-                {cartCount > 99 ? '99+' : cartCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        }
+      />
+      <ScrollingNoticeBanner />
 
       {/* Main Content */}
       <ScrollView
@@ -582,7 +564,7 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                               <Text style={{ fontSize: 18 }}>📦</Text>
                             )}
                           </View>
-                          <View style={{ flex: 1, marginLeft: 12 }}>
+                          <View style={{ flex: 1, marginLeft: 12, flexShrink: 1, minWidth: 0 }}>
                             <ProductTitle style={{ color: '#0e1b16', fontSize: 15, fontWeight: '500' }}>
                               {item.title}
                             </ProductTitle>
@@ -681,7 +663,7 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                     <Text style={{ color: '#4d997e', fontSize: 20 }}>📚</Text>
                   )}
                 </View>
-                <View style={{ flex: 1, justifyContent: 'center' }}>
+                <View style={{ flex: 1, justifyContent: 'center', flexShrink: 1, minWidth: 0 }}>
                   <ProductTitle
                     style={{
                       color: '#0e1b16',
@@ -790,7 +772,7 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                     <Text style={{ color: '#4d997e', fontSize: 20 }}>📦</Text>
                   )}
                 </View>
-                <View style={{ flex: 1, justifyContent: 'center' }}>
+                <View style={{ flex: 1, justifyContent: 'center', flexShrink: 1, minWidth: 0 }}>
                   <ProductTitle
                     style={{
                       color: '#0e1b16',
@@ -962,7 +944,7 @@ const GradeBooksPage = ({ onTabPress, onBack, onBackToSchool, gradeId, gradeName
                         </View>
 
                         {/* Details */}
-                        <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flex: 1, marginLeft: 12, flexShrink: 1, minWidth: 0 }}>
                           <ProductTitle
                             style={{
                               color: '#0e1b16',

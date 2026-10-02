@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { cartStyles, colors } from '../../css/cartStyles';
 import { getProductImageByCategory } from '../../config/imagePaths';
 import { getCategoryDisplayName } from '../../utils/categoryNames';
+import ProductTitle from '../common/ProductTitle';
 
 const CartItem = ({ item }) => {
   const [imageError, setImageError] = useState(false);
@@ -63,7 +64,7 @@ const CartItem = ({ item }) => {
           </div>
         </div>
         
-        <h3 style={cartStyles.cartItemTitle}>{item.name}</h3>
+        <ProductTitle as="h3" style={cartStyles.cartItemTitle}>{item.name}</ProductTitle>
 
         {/* Price Information */}
         <div style={cartStyles.cartItemPriceInfo}>

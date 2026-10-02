@@ -16,6 +16,7 @@ import {
   buildDefaultSelectedBundles,
 } from '../utils/categoryNames';
 import { getGradeScreenTitle } from '../utils/gradeUtils';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const GradeBooksPage = () => {
   const { gradeId } = useParams();
@@ -28,6 +29,7 @@ const GradeBooksPage = () => {
   const schoolId = location.state?.schoolId;
   const subgradeId = location.state?.subgradeId;
   const subgradeName = location.state?.subgradeName;
+  usePageTitle(getGradeScreenTitle(gradeName) || 'Grade Books');
 
   const [textbooks, setTextbooks] = useState([]);
   const [mandatoryNotebooks, setMandatoryNotebooks] = useState([]);

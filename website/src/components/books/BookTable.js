@@ -124,12 +124,15 @@ const BookTable = ({ books }) => {
               </td>
               
               {/* Product Name */}
-              <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+              <td style={{ padding: '12px 16px', verticalAlign: 'middle', maxWidth: '320px' }}>
                 <div style={{
                   fontSize: '16px',
                   fontWeight: '500',
                   color: colors.textPrimary,
                   lineHeight: '1.4',
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word',
+                  whiteSpace: 'normal',
                 }}>
                   {book.title}
                 </div>

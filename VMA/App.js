@@ -21,6 +21,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { colors } from './css/styles';
 import { getGradeScreenTitle } from './utils/gradeUtils';
 import AppUpdateModal from './components/AppUpdateModal';
+import ContactSupportFab from './components/ContactSupportFab';
 import {
   checkAppVersionPolicy,
   dismissOptionalUpdate,
@@ -122,10 +123,6 @@ function AppContent() {
   const goBackFromOrderDetails = () => {
     setSelectedOrderId(null);
     setCurrentScreen('orderHistory');
-  };
-
-  const goToManageGrades = () => {
-    setCurrentScreen('manageGrades');
   };
 
   const goToShippingAddresses = () => {
@@ -233,7 +230,8 @@ function AppContent() {
 
   return (
     <>
-      {currentScreen === 'login' ? (
+      <View style={{ flex: 1 }}>
+        {currentScreen === 'login' ? (
           <LoginScreen onGoToSearch={goToSchoolCode} />
         ) : currentScreen === 'search' ? (
           <SchoolSearchScreen onTabPress={handleTabPress} onClose={goBack} />
@@ -274,7 +272,7 @@ function AppContent() {
         ) : currentScreen === 'cart' ? (
           <CartScreen onTabPress={handleTabPress} onBack={goBack} onGoToCheckout={goToCheckout} />
         ) : currentScreen === 'profile' ? (
-          <ProfileScreen onTabPress={handleTabPress} onBack={goToLogin} onLogout={goToLogin} onGoToOrderHistory={goToOrderHistory} onGoToManageGrades={goToManageGrades} onGoToShippingAddresses={goToShippingAddresses} />
+          <ProfileScreen onTabPress={handleTabPress} onBack={goToLogin} onLogout={goToLogin} onGoToOrderHistory={goToOrderHistory} onGoToShippingAddresses={goToShippingAddresses} />
         ) : currentScreen === 'checkout' ? (
           <CheckoutScreen onBack={goToCart} onBackToCart={goToCart} onPlaceOrder={handlePlaceOrder} />
         ) : currentScreen === 'orderHistory' ? (
@@ -296,6 +294,8 @@ function AppContent() {
             onGoToOrderHistory={goToOrderHistory}
           />
         )}
+        <ContactSupportFab visible={currentScreen !== 'login'} />
+      </View>
       {updatePrompt?.mode === 'optional' ? (
         <AppUpdateModal
           visible

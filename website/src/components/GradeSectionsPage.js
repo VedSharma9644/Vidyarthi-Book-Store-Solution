@@ -5,7 +5,8 @@ import { getSchoolPageStyles } from '../css/schoolPageStyles';
 import { useHeaderHeight } from '../hooks/useHeaderHeight';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
-import { getGradeDisplayLabel } from '../utils/gradeUtils';
+import { getGradeDisplayLabel, getGradeScreenTitle } from '../utils/gradeUtils';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const GradeSectionsPage = () => {
   const { gradeId } = useParams();
@@ -13,6 +14,7 @@ const GradeSectionsPage = () => {
   const navigate = useNavigate();
   const gradeName = location.state?.gradeName || 'Class';
   const schoolId = location.state?.schoolId;
+  usePageTitle(getGradeScreenTitle(gradeName) || 'Select Section');
 
   const [sections, setSections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);

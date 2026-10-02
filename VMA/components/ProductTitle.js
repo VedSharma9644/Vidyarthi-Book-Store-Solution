@@ -7,7 +7,16 @@ import { Text } from 'react-native';
  */
 export default function ProductTitle({ children, style, ...rest }) {
   return (
-    <Text style={[{ flexShrink: 1 }, style]} {...rest}>
+    <Text
+      style={[
+        {
+          flexShrink: 1,
+          flexWrap: 'wrap',
+        },
+        style,
+      ]}
+      {...rest}
+    >
       {children}
     </Text>
   );

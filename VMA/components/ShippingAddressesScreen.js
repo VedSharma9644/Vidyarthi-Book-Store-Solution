@@ -16,6 +16,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles, colors } from '../css/styles';
 import ApiService from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import ScreenHeader from './ScreenHeader';
+
+/** Normalize registered/account phone to 10 digits for address forms. */
+function toTenDigitPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits;
+}
+
+const emptyAddressForm = (phone = '') => ({
+  name: '',
+  phone: toTenDigitPhone(phone),
+  alternativeMobile: '',
+  address: '',
+  landmark: '',
+  city: '',
+  state: '',
+  postalCode: '',
+  country: 'India',
+  isDefault: false,
+});
 
 const ShippingAddressesScreen = ({ onBack }) => {
   const { user } = useAuth();
@@ -23,16 +44,7 @@ const ShippingAddressesScreen = ({ onBack }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'India',
-    isDefault: false,
-  });
+  const [formData, setFormData] = useState(() => emptyAddressForm());
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -105,16 +117,7 @@ const ShippingAddressesScreen = ({ onBack }) => {
 
   const handleAddNew = () => {
     setEditingAddress(null);
-    setFormData({
-      name: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      postalCode: '',
-      country: 'India',
-      isDefault: false,
-    });
+    setFormData(emptyAddressForm(user?.phoneNumber));
     setShowAddModal(true);
   };
 
@@ -122,8 +125,10 @@ const ShippingAddressesScreen = ({ onBack }) => {
     setEditingAddress(address);
     setFormData({
       name: address.name || '',
-      phone: address.phone || '',
+      phone: toTenDigitPhone(address.phone),
+      alternativeMobile: toTenDigitPhone(address.alternativeMobile),
       address: address.address || '',
+      landmark: address.landmark || '',
       city: address.city || '',
       state: address.state || '',
       postalCode: address.postalCode || '',
@@ -171,6 +176,10 @@ const ShippingAddressesScreen = ({ onBack }) => {
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
+    if (formData.alternativeMobile.trim() && formData.alternativeMobile.trim().length !== 10) {
+      Alert.alert('Error', 'Please enter a valid 10-digit alternative mobile number');
+      return;
+    }
     if (!formData.address.trim()) {
       Alert.alert('Error', 'Please enter your address');
       return;
@@ -184,7 +193,7 @@ const ShippingAddressesScreen = ({ onBack }) => {
       return;
     }
     if (!formData.postalCode.trim()) {
-      Alert.alert('Error', 'Please enter your postal code');
+      Alert.alert('Error', 'Please enter your pin code');
       return;
     }
 
@@ -230,6 +239,7 @@ const ShippingAddressesScreen = ({ onBack }) => {
   const formatAddress = (address) => {
     const parts = [];
     if (address.address) parts.push(address.address);
+    if (address.landmark) parts.push(address.landmark);
     if (address.city) parts.push(address.city);
     if (address.state) parts.push(address.state);
     if (address.postalCode) parts.push(address.postalCode);
@@ -238,16 +248,7 @@ const ShippingAddressesScreen = ({ onBack }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.profileHeader}>
-        <View style={styles.profileHeaderContent}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.profileHeaderTitle}>Shipping Addresses</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-      </View>
+      <ScreenHeader title="Shipping Addresses" onBack={onBack} />
 
       {/* Main Content */}
       <ScrollView style={styles.profileMainContent} showsVerticalScrollIndicator={false}>
@@ -287,6 +288,9 @@ const ShippingAddressesScreen = ({ onBack }) => {
                   <View style={styles.addressCardContent}>
                     <Text style={styles.addressCardName}>{address.name}</Text>
                     <Text style={styles.addressCardPhone}>{address.phone}</Text>
+                    {!!address.alternativeMobile && (
+                      <Text style={styles.addressCardPhone}>Alt: {address.alternativeMobile}</Text>
+                    )}
                     <Text style={styles.addressCardAddress}>{formatAddress(address)}</Text>
                     {address.country && (
                       <Text style={styles.addressCardCountry}>{address.country}</Text>
@@ -376,6 +380,24 @@ const ShippingAddressesScreen = ({ onBack }) => {
               </View>
 
               <View style={styles.formFieldContainer}>
+                <Text style={styles.formLabel}>Alternative Mobile Number</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Optional 10-digit mobile number"
+                  placeholderTextColor={`${colors.textPrimary}60`}
+                  value={formData.alternativeMobile}
+                  onChangeText={(text) =>
+                    setFormData({
+                      ...formData,
+                      alternativeMobile: text.replace(/[^0-9]/g, '').slice(0, 10),
+                    })
+                  }
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+              </View>
+
+              <View style={styles.formFieldContainer}>
                 <Text style={styles.formLabel}>Address *</Text>
                 <TextInput
                   style={[styles.formInput, { height: 80, textAlignVertical: 'top' }]}
@@ -384,6 +406,17 @@ const ShippingAddressesScreen = ({ onBack }) => {
                   value={formData.address}
                   onChangeText={(text) => setFormData({ ...formData, address: text })}
                   multiline
+                />
+              </View>
+
+              <View style={styles.formFieldContainer}>
+                <Text style={styles.formLabel}>Landmark</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Nearby landmark (optional)"
+                  placeholderTextColor={`${colors.textPrimary}60`}
+                  value={formData.landmark}
+                  onChangeText={(text) => setFormData({ ...formData, landmark: text })}
                 />
               </View>
 
@@ -410,10 +443,10 @@ const ShippingAddressesScreen = ({ onBack }) => {
               </View>
 
               <View style={styles.formFieldContainer}>
-                <Text style={styles.formLabel}>Postal Code *</Text>
+                <Text style={styles.formLabel}>Pin Code *</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Enter postal code"
+                  placeholder="Enter pin code"
                   placeholderTextColor={`${colors.textPrimary}60`}
                   value={formData.postalCode}
                   onChangeText={(text) => setFormData({ ...formData, postalCode: text })}

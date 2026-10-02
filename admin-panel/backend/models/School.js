@@ -1,3 +1,23 @@
+/** Default delivery charge (₹) when school has no value set. */
+const DEFAULT_DELIVERY_CHARGE = 300;
+
+/**
+ * Parse delivery charge from API/Firestore. Missing/invalid → default 300.
+ * Explicit 0 is allowed (free delivery).
+ * @param {*} value
+ * @returns {number}
+ */
+function parseDeliveryCharge(value) {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_DELIVERY_CHARGE;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return DEFAULT_DELIVERY_CHARGE;
+  }
+  return n;
+}
+
 // School Model for Firestore
 class School {
   constructor(data) {
@@ -12,6 +32,7 @@ class School {
     this.phoneNumber = data.phoneNumber || '';
     this.email = data.email || '';
     this.schoolLogo = data.schoolLogo || '';
+    this.deliveryCharge = parseDeliveryCharge(data.deliveryCharge);
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
@@ -39,6 +60,7 @@ class School {
       phoneNumber: this.phoneNumber,
       email: this.email,
       schoolLogo: this.schoolLogo,
+      deliveryCharge: this.deliveryCharge,
       isActive: this.isActive,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
@@ -104,9 +126,19 @@ class School {
       }
     }
 
+    if (!Number.isFinite(this.deliveryCharge)) {
+      errors.push('Delivery charge must be a valid number.');
+    } else if (this.deliveryCharge < 0) {
+      errors.push('Delivery charge cannot be negative.');
+    } else if (this.deliveryCharge > 100000) {
+      errors.push('Delivery charge cannot exceed ₹100,000.');
+    }
+
     return errors;
   }
 }
 
 module.exports = School;
+module.exports.DEFAULT_DELIVERY_CHARGE = DEFAULT_DELIVERY_CHARGE;
+module.exports.parseDeliveryCharge = parseDeliveryCharge;
 

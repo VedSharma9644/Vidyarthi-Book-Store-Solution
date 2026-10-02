@@ -14,12 +14,16 @@ import {
   getOptionalBundlesRest,
   mergeHiddenOptionalBundleGroups,
 } from '../utils/categoryNames';
+import { resolveClientDeliveryCharge } from '../utils/deliveryCharge';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const CartPage = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { showSuccess, showError } = useModal();
+  usePageTitle('Cart');
   const [cartItems, setCartItems] = useState([]);
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
   const [error, setError] = useState(null);
@@ -51,6 +55,9 @@ const CartPage = () => {
         }));
         
         setCartItems(items);
+        setDeliveryCharge(
+          resolveClientDeliveryCharge(result.data.deliveryCharge, items.length)
+        );
         
         const categories = {};
         items.forEach(item => {
@@ -62,6 +69,7 @@ const CartPage = () => {
         setExpandedCategories({ mandatoryTextbooks: true, mandatoryNotebooks: true, ...categories });
       } else {
         setCartItems([]);
+        setDeliveryCharge(0);
         if (result.message) {
           setError(result.message);
         }
@@ -70,6 +78,7 @@ const CartPage = () => {
       console.error('Error loading cart:', error);
       setError('Failed to load cart. Please try again.');
       setCartItems([]);
+      setDeliveryCharge(0);
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +128,7 @@ const CartPage = () => {
       
       if (result.success) {
         setCartItems([]);
+        setDeliveryCharge(0);
         showSuccess('Cart cleared successfully');
       } else {
         showError(result.message || 'Failed to clear cart');
@@ -431,7 +441,7 @@ const CartPage = () => {
           </div>
 
           {/* Cart Summary */}
-          <CartSummary cartItems={cartItems} />
+          <CartSummary cartItems={cartItems} deliveryCharge={deliveryCharge} />
         </div>
       )}
     </div>

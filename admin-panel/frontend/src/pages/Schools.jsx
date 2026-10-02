@@ -27,6 +27,10 @@ const Schools = () => {
           code: school.code,
           email: school.email,
           city: school.city,
+          deliveryCharge:
+            school.deliveryCharge !== undefined && school.deliveryCharge !== null
+              ? Number(school.deliveryCharge)
+              : 300,
         }));
         setSchools(transformedSchools);
       }
@@ -120,6 +124,13 @@ const Schools = () => {
       selector: row => row.city,
       sortable: true,
       width: '150px',
+    },
+    {
+      name: 'Delivery (₹)',
+      selector: row => row.deliveryCharge,
+      sortable: true,
+      width: '130px',
+      cell: (row) => `₹${Number(row.deliveryCharge ?? 300).toFixed(0)}`,
     },
     {
       name: 'Actions',

@@ -13,6 +13,8 @@ import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
 import { sortGrades, getGradeDisplayLabel } from '../utils/gradeUtils';
+import ScreenHeader from './ScreenHeader';
+import ScrollingNoticeBanner from './ScrollingNoticeBanner';
 
 // Grade card background image - using local asset
 // Place your grade background image in: assets/images/grade-background.jpg
@@ -199,6 +201,8 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
   if (isLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
+        <ScreenHeader title="School" onBack={onBack} />
+        <ScrollingNoticeBanner />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#06412c" />
           <Text style={{ marginTop: 16, color: '#0e1b16' }}>
@@ -212,6 +216,8 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
   if (error || !school) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
+        <ScreenHeader title="School" onBack={onBack} />
+        <ScrollingNoticeBanner />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <Text style={{ fontSize: 18, color: '#0e1b16', marginBottom: 10, textAlign: 'center' }}>
             {error || 'School not found'}
@@ -235,40 +241,11 @@ const SchoolPage = ({ onTabPress, onBack, schoolId, schoolCode, onSelectSection,
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fcfa' }}>
-      {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        justifyContent: 'space-between',
-        shadowColor: colors.black,
-        shadowOffset: {
-          width: 0,
-          height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-      }}>
-        <TouchableOpacity
-          style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
-          onPress={onBack}
-        >
-          <Text style={{ fontSize: 24, color: colors.white }}>←</Text>
-        </TouchableOpacity>
-        <Text style={{
-          flex: 1,
-          textAlign: 'center',
-          fontSize: 20,
-          fontWeight: 'bold',
-          color: colors.white,
-          paddingRight: 48,
-        }}>
-          School Details
-        </Text>
-      </View>
+      <ScreenHeader
+        title={school?.name || school?.branchName || 'School'}
+        onBack={onBack}
+      />
+      <ScrollingNoticeBanner />
 
       {/* Main Content */}
       <ScrollView

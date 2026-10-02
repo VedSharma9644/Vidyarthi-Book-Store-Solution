@@ -109,6 +109,7 @@ export const cartStyles = {
   },
   cartItemDetails: {
     flex: 1,
+    minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -137,6 +138,9 @@ export const cartStyles = {
     color: colors.textPrimary,
     margin: 0,
     lineHeight: '1.4',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    whiteSpace: 'normal',
   },
   cartItemPriceInfo: {
     display: 'flex',

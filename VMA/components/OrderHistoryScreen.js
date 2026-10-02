@@ -14,6 +14,7 @@ import { styles, colors } from '../css/styles';
 import BottomNavigation from './BottomNavigation';
 import ApiService from '../services/apiService';
 import ProductTitle from './ProductTitle';
+import ScreenHeader from './ScreenHeader';
 
 const OrderHistoryScreen = ({ onTabPress, onBack, onGoToOrderDetails }) => {
   const [orders, setOrders] = useState([]);
@@ -170,16 +171,7 @@ const OrderHistoryScreen = ({ onTabPress, onBack, onGoToOrderDetails }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.orderHistoryHeader}>
-        <View style={styles.orderHistoryHeaderContent}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.orderHistoryHeaderTitle}>Order History</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-      </View>
+      <ScreenHeader title="Order History" onBack={onBack} backLabel="‹" />
 
       {/* Main Content */}
       <ScrollView 

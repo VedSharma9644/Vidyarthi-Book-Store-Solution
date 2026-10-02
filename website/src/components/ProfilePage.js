@@ -5,12 +5,14 @@ import { borderRadius } from '../css/theme';
 import { useAuth } from '../contexts/AuthContext';
 import ApiService from '../services/apiService';
 import LoadingScreen from './common/LoadingScreen';
+import { usePageTitle } from '../contexts/PageTitleContext';
 
 const defaultProfileImage = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBpjxEfE7ea34iS2cRGSWsmeaKsAFJRhbMGl69cHfVqKLFhPihowan-DypyvXbvvn0088j2FSLVvnYQccFUXJ73y1eNXuGDz7KAWV5_t5tguQ_78LpNELkmN9zjgxGwv15mYEGnQ2BLbuOaM5v3bB4ZqMjmnvbwFuvNwUatcbej9LbHH92_fwVOMKk2vqSYRmMUXx-d7urQeB4sjVbew1-CARvegFPvB4-ifYUqGvVa0YgVIlUqEF2rkCV3WZX3WmnVstFVlPqbGTI';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  usePageTitle('Profile');
   const [profileImage, setProfileImage] = useState(defaultProfileImage);
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('');
